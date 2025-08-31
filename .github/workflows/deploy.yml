@@ -13,6 +13,10 @@ env:
   AWS_REGION: us-east-1
   CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   deploy-pr:
     if: github.event_name == 'pull_request'
@@ -33,7 +37,7 @@ jobs:
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v3
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-cdk-role
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy Preview Stack
@@ -76,6 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
+      AWS_REGION: us-east-1
 
     steps:
       - uses: actions/checkout@v4
