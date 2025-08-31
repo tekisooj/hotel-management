@@ -1,5 +1,7 @@
+import json
 from uuid import UUID, uuid4
 
+import boto3
 from fastapi import HTTPException
 from services.user_service.app.schemas import UserCreate, UserResponse, UserUpdate
 from sqlalchemy import create_engine
@@ -8,16 +10,41 @@ from models import Base, User
 
 class UserDBClient:
     def __init__(
-            self, db_url: str | None
+            self,  user_database_secret_name: str | None, region: str
     ) -> None:
 
-        if not db_url:
-            raise ValueError("Database url must be provided or set in environment variables.")
+        if not user_database_secret_name:
+            raise ValueError("Secret name must be provided or set in environment variables.")
         
-        self.db_url = db_url
+        self.db_url = self.build_db_url_from_secret(user_database_secret_name, region)
+        
+        if not self.db_url:
+            raise ValueError("Unable to get db url.")
+
+        
         self.engine = create_engine(self.db_url)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
-        Base.metadata.create_all(bind=self.engine)
+        Base.metadata.create_all(bind=self.engine, echo=True)
+
+    def get_secret_by_name(self, secret_name: str, region_name: str = "us-east-1") -> dict:
+        client = boto3.client("secretsmanager", region_name=region_name)
+        
+        try:
+            response = client.get_secret_value(SecretId=secret_name)
+            secret_string = response["SecretString"]
+            return json.loads(secret_string)
+        except client.exceptions.ResourceNotFoundException:
+            raise Exception(f"Secret {secret_name} not found.")
+        except client.exceptions.ClientError as e:
+            raise Exception(f"Error retrieving secret: {str(e)}")
+
+    def build_db_url_from_secret(self, secret_name: str, region: str) -> str:
+        secret = self.get_secret_by_name(secret_name, region)
+
+        return (
+            f"postgresql+psycopg2://{secret['username']}:{secret['password']}"
+            f"@{secret['host']}:{secret['port']}/{secret['dbname']}"
+        )
 
     def get_session(self) -> Session:
         return self.SessionLocal()
