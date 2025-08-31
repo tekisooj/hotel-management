@@ -46,7 +46,15 @@ jobs:
 
       - name: Deploy Preview Stack
         run: |
-          cdk deploy $(echo "${{ matrix.service }}" | sed 's/_/-/g' | awk '{print toupper(substr($0,1,1)) substr($0,2)}')Stack-pr-${{ env.PR_NUMBER }} \
+          to_pascal_case() {
+            echo "$1" | sed -r 's/(^|_)([a-z])/\U\2/g'
+          }
+
+          SERVICE_NAME="user_service"
+          STACK_NAME="$(to_pascal_case "$SERVICE_NAME")Stack-pr-${PR_NUMBER}"
+
+          echo "Deploying stack: $STACK_NAME"
+          cdk deploy "$STACK_NAME" | sed 's/_/-/g' | awk '{print toupper(substr($0,1,1)) substr($0,2)}')Stack-pr-${{ env.PR_NUMBER }} \
             --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
             --context env=pr \
             --context pr_number=${{ env.PR_NUMBER }} \
@@ -78,7 +86,15 @@ jobs:
 
       - name: Deploy Production Stack
         run: |
-          cdk deploy $(echo "${{ matrix.service }}" | sed 's/_/-/g' | awk '{print toupper(substr($0,1,1)) substr($0,2)}')Stack-prod \
+          to_pascal_case() {
+            echo "$1" | sed -r 's/(^|_)([a-z])/\U\2/g'
+          }
+
+          SERVICE_NAME="user_service"
+          STACK_NAME="$(to_pascal_case "$SERVICE_NAME")Stack-pr-${PR_NUMBER}"
+
+          echo "Deploying stack: $STACK_NAME"
+          cdk deploy "$STACK_NAME" | sed 's/_/-/g' | awk '{print toupper(substr($0,1,1)) substr($0,2)}')Stack-prod \
             --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
             --context env=prod \
             --require-approval never
