@@ -1,0 +1,93 @@
+name: Deploy CDK
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches:
+      - main
+  pull_request_target:
+    types: [closed]
+
+env:
+  AWS_REGION: us-east-1
+  CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+
+jobs:
+  deploy-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: npm install -g aws-cdk
+      - run: pip install -r cdk/requirements.txt
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-cdk-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Preview Stack
+        run: |
+          cdk deploy UserServiceStack-pr-${{ env.PR_NUMBER }} \
+            --app "python3 cdk/app.py" \
+            --context env=pr \
+            --context pr_number=${{ env.PR_NUMBER }} \
+            --require-approval never
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: npm install -g aws-cdk
+      - run: pip install -r cdk/requirements.txt
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-cdk-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Production Stack
+        run: |
+          cdk deploy UserServiceStack-prod \
+            --app "python3 cdk/app.py" \
+            --context env=prod \
+            --require-approval never
+
+  destroy-pr:
+    if: github.event.pull_request.merged == false && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install -g aws-cdk
+      - run: pip install -r cdk/requirements.txt
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-cdk-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Destroy PR Preview Stack
+        run: |
+          cdk destroy UserServiceStack-pr-${{ env.PR_NUMBER }} --force

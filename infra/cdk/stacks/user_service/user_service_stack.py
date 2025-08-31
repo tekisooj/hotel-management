@@ -9,12 +9,12 @@ from aws_cdk.aws_secretsmanager import Secret
 from constructs import Construct
 
 class UserServiceStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, env_name: str, **kwargs):
+    def __init__(self, scope: Construct, construct_id: str, env_name: str, pr_number: str | None = None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
         self.env_name = env_name
 
         lambda_role = Role(
-            self, "UserServiceLambdaRole",
+            self, f"UserServiceLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
             assumed_by=ServicePrincipal("lambda.amazonaws.com"), # type: ignore
             managed_policies=[
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
@@ -23,10 +23,10 @@ class UserServiceStack(Stack):
             ]
         )
 
-        secret_name = f"user_database_{self.env_name}"
+        secret_name = f"user_database_{self.env_name if self.env_name == 'prod' else 'int'}"
 
         db_secret = Secret.from_secret_name_v2(
-            self, "UserServiceDBSecret",
+            self, f"UserServiceDBSecret-{env_name}{f'-{pr_number}' if pr_number else ''}",
             secret_name=secret_name
         )
 
@@ -41,10 +41,10 @@ class UserServiceStack(Stack):
 
 
         lambda_function = Function(
-            self, "UserServiceFunction",
+            self, f"UserServiceFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
             runtime=Runtime.PYTHON_3_11,
             handler="main.handler",
-            code=Code.from_asset("../services/user_service/app"),
+            code=Code.from_asset("../../services/user_service/app"),
             role=lambda_role, # type: ignore
             timeout=Duration.seconds(30),
             memory_size=512,
@@ -57,7 +57,7 @@ class UserServiceStack(Stack):
         )
 
         LambdaRestApi(
-            self, "UserServiceApi",
+            self, f"UserServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
             handler=lambda_function, # type: ignore
             proxy=True,
             rest_api_name="user-service-api",
