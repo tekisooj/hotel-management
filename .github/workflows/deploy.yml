@@ -51,7 +51,7 @@ jobs:
           STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
           
           echo "Deploying stack: $STACK_NAME"
-          cdk deploy "$STACK_NAME" | sed 's/_/-/g' | awk '{print toupper(substr($0,1,1)) substr($0,2)}')Stack-pr-${{ env.PR_NUMBER }} \
+          cdk deploy "$STACK_NAME" \
             --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
             --context env=pr \
             --context pr_number=${{ env.PR_NUMBER }} \
@@ -85,10 +85,10 @@ jobs:
         run: |
           SERVICE_NAME=${{matrix.service}}
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' '{ for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); OFS=""; print }')
-          STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
+          STACK_NAME="${PASCAL_CASE_NAME}Stack-prod"
           
           echo "Deploying stack: $STACK_NAME"
-          cdk deploy "$STACK_NAME" | sed 's/_/-/g' | awk '{print toupper(substr($0,1,1)) substr($0,2)}')Stack-prod \
+          cdk deploy "$STACK_NAME" \
             --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
             --context env=prod \
             --require-approval never
