@@ -13,7 +13,6 @@ class UserServiceStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
         self.env_name = env_name
 
-        # IAM Role for Lambda
         lambda_role = Role(
             self, "UserServiceLambdaRole",
             assumed_by=ServicePrincipal("lambda.amazonaws.com"), # type: ignore
@@ -24,23 +23,23 @@ class UserServiceStack(Stack):
             ]
         )
 
-        # Reference RDS DB Secret
+        secret_name = f"user_database_{self.env_name}"
+
         db_secret = Secret.from_secret_name_v2(
             self, "UserServiceDBSecret",
-            secret_name="user-service-db"
+            secret_name=secret_name
         )
 
         if self.env_name == "prod":
             user_pool_id = "us-east-1_Wtvh2rdSQ"
             audience = "7226gqpnghn0q22ec2ill399lv"
-            jwks_url = f"https://cognito-idp.us-east-1.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
         else:
             user_pool_id = "us-east-1_DDS5D565p"
             audience = "la13fgbn7avmni0f84pu5lk79"
-            jwks_url = f"https://cognito-idp.us-east-1.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
+
+        jwks_url = f"https://cognito-idp.us-east-1.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
 
 
-        # Lambda Function
         lambda_function = Function(
             self, "UserServiceFunction",
             runtime=Runtime.PYTHON_3_11,
@@ -50,15 +49,13 @@ class UserServiceStack(Stack):
             timeout=Duration.seconds(30),
             memory_size=512,
             environment={
-                "DB_SECRET_ARN": db_secret.secret_arn,
-                "COGNITO_REGION": "us-east-1",
-                "USER_POOL_ID": user_pool_id,
+                "USER_SERVICE_ENV": self.env_name,
+                "USER_DATABASE_SECRET_NAME": secret_name,
                 "AUDIENCE": audience,
                 "JWKS_URL": jwks_url
             }
         )
 
-        # API Gateway
         LambdaRestApi(
             self, "UserServiceApi",
             handler=lambda_function, # type: ignore
