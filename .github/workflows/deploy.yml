@@ -31,7 +31,7 @@ jobs:
       - run: pip install -r infra/requirements.txt
 
       - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v3
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-cdk-role
           aws-region: ${{ env.AWS_REGION }}
