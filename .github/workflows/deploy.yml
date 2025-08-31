@@ -46,7 +46,7 @@ jobs:
 
       - name: Deploy Preview Stack
         run: |
-          SERVICE_NAME={{matrix.service}}
+          SERVICE_NAME=${{matrix.service}}
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' '{ for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); OFS=""; print }')
           STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
           
@@ -83,7 +83,7 @@ jobs:
 
       - name: Deploy Production Stack
         run: |
-          SERVICE_NAME={{matrix.service}}
+          SERVICE_NAME=${{matrix.service}}
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' '{ for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); OFS=""; print }')
           STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
           
