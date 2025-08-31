@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+*.env
+*.egg
+*.egg-info/
+dist/
+build/
+pip-wheel-metadata/
+
+# Pydantic cache
+*.mypy_cache/
+.dmypy.json
+.pyre/
+
+# FastAPI / Uvicorn logs
+*.log
+
+# Lambda zip artifacts
+*.zip
+
+# AWS CDK
+cdk.out/
+cdk.context.json
+
+# VSCode & IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node.js (CDK & Lambda bundling)
+node_modules/
+package-lock.json
+npm-debug.log
+yarn-error.log
+
+# Test/coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# GitHub Actions artifacts
+.github/workflows/*.bak
+.github/workflows/*.log
+
+# Terraform/other infra tools (if used)
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# Secrets (don't commit!)
+.env
+.env.*
+*.pem
+*.key
+*.crt
+secrets.json
+aws-credentials.json
+
+# Docker (if you later add it)
+*.dockerfile
+Dockerfile*
+docker-compose.yml
+docker-compose.*.yml
