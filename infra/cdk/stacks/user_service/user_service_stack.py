@@ -44,7 +44,7 @@ class UserServiceStack(Stack):
             self, f"UserServiceFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
             runtime=Runtime.PYTHON_3_11,
             handler="main.handler",
-            code=Code.from_asset("../../services/user_service/app"),
+            code=Code.from_asset("services/user_service/app"),
             role=lambda_role, # type: ignore
             timeout=Duration.seconds(30),
             memory_size=512,
