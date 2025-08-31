@@ -21,6 +21,9 @@ jobs:
   deploy-pr:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [user_service]
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
 
@@ -32,18 +35,18 @@ jobs:
         with:
           python-version: "3.11"
       - run: npm install -g aws-cdk
-      - run: pip install -r infra/requirements.txt
+      - run: pip install -r services/${{ matrix.service }}/requirements.txt
 
       - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy Preview Stack
         run: |
-          cdk deploy UserServiceStack-pr-${{ env.PR_NUMBER }} \
-            --app "python3 cdk/app.py" \
+          cdk deploy $(echo "${{ matrix.service }}" | sed 's/_/-/g' | awk '{print toupper(substr($0,1,1)) substr($0,2)}')Stack-pr-${{ env.PR_NUMBER }} \
+            --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
             --context env=pr \
             --context pr_number=${{ env.PR_NUMBER }} \
             --require-approval never
@@ -51,6 +54,9 @@ jobs:
   deploy-prod:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [user_service]
 
     steps:
       - uses: actions/checkout@v4
@@ -60,39 +66,41 @@ jobs:
         with:
           python-version: "3.11"
       - run: npm install -g aws-cdk
-      - run: pip install -r cdk/requirements.txt
+      - run: pip install -r services/${{ matrix.service }}/requirements.txt
 
       - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-cdk-role
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy Production Stack
         run: |
-          cdk deploy UserServiceStack-prod \
-            --app "python3 cdk/app.py" \
+          cdk deploy $(echo "${{ matrix.service }}" | sed 's/_/-/g' | awk '{print toupper(substr($0,1,1)) substr($0,2)}')Stack-prod \
+            --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
             --context env=prod \
             --require-approval never
 
   destroy-pr:
     if: github.event.pull_request.merged == false && github.event.action == 'closed'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [user_service]
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
-      AWS_REGION: us-east-1
 
     steps:
       - uses: actions/checkout@v4
       - run: npm install -g aws-cdk
-      - run: pip install -r cdk/requirements.txt
+      - run: pip install -r services/${{ matrix.service }}/requirements.txt
 
       - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-cdk-role
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Destroy PR Preview Stack
         run: |
-          cdk destroy UserServiceStack-pr-${{ env.PR_NUMBER }} --force
+          cdk destroy $(echo "${{ matrix.service }}" | sed 's/_/-/g' | awk '{print toupper(substr($0,1,1)) substr($0,2)}')Stack-pr-${{ env.PR_NUMBER }} --force
