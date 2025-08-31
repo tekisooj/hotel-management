@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: npm install -g aws-cdk
-      - run: pip install -r ../infra/requirements.txt
+      - run: pip install -r infra/requirements.txt
 
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v2
