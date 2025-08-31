@@ -93,6 +93,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm install -g aws-cdk
+      - run: pip install -r infra/requirements.txt
       - run: pip install -r services/${{ matrix.service }}/requirements.txt
 
       - name: Configure AWS
