@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [user_service]
+        service: [user_service, property_service]
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
 
@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [user_service]
+        service: [user_service, property_service]
 
     steps:
       - uses: actions/checkout@v4
@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [user_service]
+        service: [user_service, property_service]
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
 
