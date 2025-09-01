@@ -44,14 +44,14 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy Preview Stack
+      - name: Deploy PR Stack
         run: |
           SERVICE_NAME=${{matrix.service}}
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
           STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
-          
+
           echo "Deploying stack: $STACK_NAME"
-          cdk deploy "$STACK_NAME" \
+          PYTHONPATH=infra cdk deploy "$STACK_NAME" \
             --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
             --context env=pr \
             --context pr_number=${{ env.PR_NUMBER }} \
@@ -85,12 +85,13 @@ jobs:
         run: |
           SERVICE_NAME=${{matrix.service}}
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
-          STACK_NAME="${PASCAL_CASE_NAME}Stack-prod"
-          
+          STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
+
           echo "Deploying stack: $STACK_NAME"
-          cdk deploy "$STACK_NAME" \
+          PYTHONPATH=infra cdk deploy "$STACK_NAME" \
             --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
-            --context env=prod \
+            --context env=pr \
+            --context pr_number=${{ env.PR_NUMBER }} \
             --require-approval never
 
   destroy-pr:
