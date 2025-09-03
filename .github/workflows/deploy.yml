@@ -2,10 +2,12 @@ name: Deploy CDK
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize]
   push:
     branches:
       - main
+  pull_request_target:
+    types: [closed]
 
 env:
   AWS_REGION: us-east-1
@@ -16,30 +18,28 @@ permissions:
   contents: read
 
 jobs:
-  detect-changed-services:
+  detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-      pr_number: ${{ github.event.pull_request.number }}
+      changed_services: ${{ steps.set.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get changed services
-        id: set-matrix
+      - id: set
         run: |
-          CHANGED=$(git diff --name-only origin/main...HEAD | grep '^services/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
-          echo "Detected changed services: $CHANGED"
-          echo "matrix=$CHANGED" >> $GITHUB_OUTPUT
+          changed=$(git diff --name-only origin/main...HEAD | grep -Eo 'services/[^/]+|infra/cdk/stacks/[^/]+' | cut -d '/' -f2 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "changed=$changed" >> $GITHUB_OUTPUT
 
   deploy-pr:
-    needs: detect-changed-services
-    if: github.event_name == 'pull_request' && needs.detect-changed-services.outputs.matrix != '[]'
+    needs: detect-changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: ${{ fromJson(needs.detect-changed-services.outputs.matrix) }}
+        service: ${{ fromJson(needs.detect-changes.outputs.changed_services) }}
     env:
-      PR_NUMBER: ${{ needs.detect-changed-services.outputs.pr_number }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -49,9 +49,9 @@ jobs:
           python-version: "3.11"
       - run: npm install -g aws-cdk
       - run: pip install -r infra/requirements.txt
-      - run: pip install -r services/${{ matrix.service }}/requirements.txt
+      - run: pip install -r services/${{ matrix.service }}/requirements.txt || true
 
-      - name: Configure AWS credentials
+      - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
@@ -65,18 +65,19 @@ jobs:
 
           echo "Deploying stack: $STACK_NAME"
           cdk deploy "$STACK_NAME" \
-            --app "python3 infra/cdk/stacks/$SERVICE_NAME/app.py" \
+            --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
             --context env=pr \
-            --context pr_number=${PR_NUMBER} \
+            --context pr_number=${{ env.PR_NUMBER }} \
             --require-approval never
 
   deploy-prod:
-    needs: detect-changed-services
-    if: github.ref == 'refs/heads/main' && needs.detect-changed-services.outputs.matrix != '[]'
+    needs: detect-changes
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: ${{ fromJson(needs.detect-changed-services.outputs.matrix) }}
+        service: ${{ fromJson(needs.detect-changes.outputs.changed_services) }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -86,9 +87,9 @@ jobs:
           python-version: "3.11"
       - run: npm install -g aws-cdk
       - run: pip install -r infra/requirements.txt
-      - run: pip install -r services/${{ matrix.service }}/requirements.txt
+      - run: pip install -r services/${{ matrix.service }}/requirements.txt || true
 
-      - name: Configure AWS credentials
+      - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
@@ -100,38 +101,37 @@ jobs:
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
           STACK_NAME="${PASCAL_CASE_NAME}Stack-prod"
 
-          echo "Deploying production stack: $STACK_NAME"
+          echo "Deploying stack: $STACK_NAME"
           cdk deploy "$STACK_NAME" \
-            --app "python3 infra/cdk/stacks/$SERVICE_NAME/app.py" \
+            --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
             --context env=prod \
             --require-approval never
 
   destroy-pr:
-    needs: detect-changed-services
-    if: github.event.pull_request.merged == false && github.event.action == 'closed' && needs.detect-changed-services.outputs.matrix != '[]'
+    needs: detect-changes
+    if: github.event.pull_request.merged == false && github.event.action == 'closed'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: ${{ fromJson(needs.detect-changed-services.outputs.matrix) }}
+        service: ${{ fromJson(needs.detect-changes.outputs.changed_services) }}
     env:
-      PR_NUMBER: ${{ needs.detect-changed-services.outputs.pr_number }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+
     steps:
       - uses: actions/checkout@v4
       - run: npm install -g aws-cdk
       - run: pip install -r infra/requirements.txt
-      - run: pip install -r services/${{ matrix.service }}/requirements.txt
+      - run: pip install -r services/${{ matrix.service }}/requirements.txt || true
 
-      - name: Configure AWS credentials
+      - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Destroy PR Stack
+      - name: Destroy PR Preview Stack
         run: |
-          SERVICE_NAME=${{ matrix.service }}
-          PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
+          PASCAL_CASE_NAME=$(echo "${{ matrix.service }}" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
           STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
-
           echo "Destroying stack: $STACK_NAME"
           cdk destroy "$STACK_NAME" --force
