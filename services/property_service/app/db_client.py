@@ -3,10 +3,10 @@ from uuid import UUID, uuid4
 
 import boto3
 from fastapi import HTTPException
-from services.user_service.app.schemas import UserCreate, UserResponse, UserUpdate
+from services.property_service.app.schemas import Property, Room, Amenity
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from models import Base, User
+from models import Base, PropertyDB, RoomDB, AmenityDB
 
 class HotelManagementDBClient:
     def __init__(
@@ -49,60 +49,26 @@ class HotelManagementDBClient:
     def get_session(self) -> Session:
         return self.SessionLocal()
     
-    def create_user(self, user: UserCreate) -> UUID:
+    def add_property(self, property: Property) -> UUID:
         session = self.get_session()
 
         try:
-            user_obj = User(
-                name=user.name,
-                last_name=user.last_name,
-                email=user.email,
-                user_type=user.user_type
+            property_obj = PropertyDB(
+                user_uuid=property.user_uuid,
+                name=property.name,
+                description = property.description,
+                country = property.country,
+                state=property.state,
+                city=property.city,
+                county=property.county,
+                address=property.address,
+                latitude=property.latitude,
+                longitude=property.longitude                
             )
-            session.add(user_obj)
+            session.add(property_obj)
             session.commit()
-            session.refresh(user_obj)
-            
-            return UserResponse.model_validate(user_obj).uuid
-        finally: 
+            session.refresh(property_obj)
+
+            return Property.model_validate(property_obj).uuid
+        finally:
             session.close()
-    
-    def get_user(self, user_uuid: UUID) -> UserResponse | None:
-        session = self.get_session()
-        try:
-            user = session.query(User).filter(User.uuid == user_uuid).first()
-            if not user:
-                return None
-            return UserResponse.model_validate(user)
-        finally:        
-            session.close()
-
-
-    def delete_user(self, user_uuid: UUID) -> None:
-        session = self.get_session()
-        user = session.query(User).filter(User.uuid == user_uuid).first()
-        if not user:
-            session.close()
-            raise HTTPException(status_code=404, detail="User not found")
-        session.delete(user)
-        session.commit()
-        session.close()
-        return
-    
-    def update_user(self, user_uuid: UUID, update_data: UserUpdate) -> UserResponse | None:
-        session = self.get_session()
-        user = session.query(User).filter(User.uuid == user_uuid).first()
-
-        if not user:
-            session.close()
-            return None
-        
-        update_fields = update_data.model_dump(exclude_none=True)
-        for field, value in update_fields.items():
-            setattr(user, field, value)
-
-        session.commit()
-        session.refresh(user)
-        session.close()
-
-        return UserResponse.model_validate(user)

@@ -8,13 +8,13 @@ from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from aws_cdk.aws_secretsmanager import Secret
 from constructs import Construct
 
-class UserServiceStack(Stack):
+class PropertyServiceStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, env_name: str, pr_number: str | None = None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
         self.env_name = env_name
 
         lambda_role = Role(
-            self, f"UserServiceLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            self, f"PropertyServiceLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
             assumed_by=ServicePrincipal("lambda.amazonaws.com"), # type: ignore
             managed_policies=[
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
@@ -23,39 +23,23 @@ class UserServiceStack(Stack):
             ]
         )
 
-        secret_name = f"user_database_{self.env_name if self.env_name == 'prod' else 'int'}"
-
-        db_secret = Secret.from_secret_name_v2(
-            self, f"UserServiceDBSecret-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            secret_name=secret_name
-        )
-
-        if self.env_name == "prod":
-            user_pool_id = "us-east-1_Wtvh2rdSQ"
-            audience = "7226gqpnghn0q22ec2ill399lv"
-        else:
-            user_pool_id = "us-east-1_DDS5D565p"
-            audience = "la13fgbn7avmni0f84pu5lk79"
-
-        jwks_url = f"https://cognito-idp.us-east-1.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
-
+        secret_name = f"hotel-management-database-{self.env_name if self.env_name == 'prod' else 'int'}"
 
         lambda_function = Function(
-            self, f"UserServiceFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            self, f"PropertyServiceFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
             runtime=Runtime.PYTHON_3_11,
             handler="main.handler",
-            code=Code.from_asset("services/user_service/app"),
+            code=Code.from_asset("services/property_service/app"),
             role=lambda_role, # type: ignore
             timeout=Duration.seconds(30),
             memory_size=512,
             environment={
-                "USER_SERVICE_ENV": self.env_name,
-                "USER_DATABASE_SECRET_NAME": secret_name,
-                "AUDIENCE": audience,
-                "JWKS_URL": jwks_url
+                "PROPERTY_SERVICE_ENV": self.env_name,
+                "HOTEL_MANAGEMENT_DATABASE_SECRET_NAME": secret_name,
             }
         )
 
+        
         LambdaRestApi(
             self, f"UserServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
             handler=lambda_function, # type: ignore
