@@ -21,28 +21,32 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      changed: ${{ steps.set-changed.outputs.changed }}
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin main
 
       - name: Detect changed services
-        id: set-changed
+        id: set-matrix
         run: |
-          git fetch origin main
-          changed=$(git diff --name-only origin/main...HEAD | grep -Eo 'services/[^/]+|infra/cdk/stacks/[^/]+' | cut -d '/' -f2 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "Changed services: $changed"
-          echo "changed=$changed" >> $GITHUB_OUTPUT
+          changed=$(git diff --name-only origin/main...HEAD | \
+            grep -Eo 'services/[^/]+|infra/cdk/stacks/[^/]+' | \
+            cut -d '/' -f2 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Detected changes: $changed"
+          echo "matrix={\"include\": $(echo "$changed" | jq '[.[] | {service: .}]')}" >> $GITHUB_OUTPUT
 
-  deploy:
+  deploy-pr:
+    if: github.event_name == 'pull_request'
     needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.changed != '[]' }}
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        service: ${{ fromJson(needs.detect-changes.outputs.changed) }}
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     env:
-      PR_NUMBER: ${{ github.event.pull_request.number || '' }}
-      IS_PR: ${{ github.event_name == 'pull_request' }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@v4
 
@@ -51,18 +55,10 @@ jobs:
         with:
           python-version: "3.11"
       - run: npm install -g aws-cdk
-
-      - name: Install Infra CDK requirements
-        run: |
-          if [ -f infra/cdk/requirements.txt ]; then
-            pip install -r infra/cdk/requirements.txt
-          fi
-
-      - name: Install Service requirements
-        run: |
-          REQ="services/${{ matrix.service }}/requirements.txt"
-          if [ -f "$REQ" ]; then
-            pip install -r "$REQ"
+      - run: pip install -r infra/requirements.txt
+      - run: |
+          if [ -f "services/${{ matrix.service }}/requirements.txt" ]; then
+            pip install -r services/${{ matrix.service }}/requirements.txt
           fi
 
       - name: Configure AWS
@@ -71,42 +67,73 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy Stack
+      - name: Deploy Preview Stack
         run: |
-          SERVICE=${{ matrix.service }}
-          PASCAL_CASE=$(echo "$SERVICE" | awk -F'_' 'BEGIN{OFS=""} {for (i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print}')
-          STACK_NAME="${PASCAL_CASE}Stack-${{ env.IS_PR == 'true' && format('pr-{0}', env.PR_NUMBER) || 'prod' }}"
-
-          echo "Deploying $STACK_NAME..."
+          PASCAL_CASE_NAME=$(echo "${{ matrix.service }}" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
+          STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
+          echo "Deploying stack: $STACK_NAME"
           cdk deploy "$STACK_NAME" \
-            --app "python3 infra/cdk/stacks/${SERVICE}/app.py" \
-            --context env=${{ env.IS_PR == 'true' && 'pr' || 'prod' }} \
-            ${{ env.IS_PR == 'true' && format('--context pr_number={0}', env.PR_NUMBER) || '' }} \
+            --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
+            --context env=pr \
+            --context pr_number=${PR_NUMBER} \
+            --require-approval never
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/main'
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: npm install -g aws-cdk
+      - run: pip install -r infra/requirements.txt
+      - run: |
+          if [ -f "services/${{ matrix.service }}/requirements.txt" ]; then
+            pip install -r services/${{ matrix.service }}/requirements.txt
+          fi
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Production Stack
+        run: |
+          PASCAL_CASE_NAME=$(echo "${{ matrix.service }}" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
+          STACK_NAME="${PASCAL_CASE_NAME}Stack-prod"
+          echo "Deploying stack: $STACK_NAME"
+          cdk deploy "$STACK_NAME" \
+            --app "python3 infra/cdk/stacks/${{ matrix.service }}/app.py" \
+            --context env=prod \
             --require-approval never
 
   destroy-pr:
     if: github.event.pull_request.merged == false && github.event.action == 'closed'
+    needs: detect-changes
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        service: [user_service, property_service]
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
       - run: npm install -g aws-cdk
-
-      - name: Install Infra CDK requirements
-        run: |
-          if [ -f infra/cdk/requirements.txt ]; then
-            pip install -r infra/cdk/requirements.txt
-          fi
-
-      - name: Install Service requirements
-        run: |
-          REQ="services/${{ matrix.service }}/requirements.txt"
-          if [ -f "$REQ" ]; then
-            pip install -r "$REQ"
+      - run: pip install -r infra/requirements.txt
+      - run: |
+          if [ -f "services/${{ matrix.service }}/requirements.txt" ]; then
+            pip install -r services/${{ matrix.service }}/requirements.txt
           fi
 
       - name: Configure AWS
@@ -115,11 +142,9 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Destroy PR Stack
+      - name: Destroy PR Preview Stack
         run: |
-          SERVICE=${{ matrix.service }}
-          PASCAL_CASE=$(echo "$SERVICE" | awk -F'_' 'BEGIN{OFS=""} {for (i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print}')
-          STACK_NAME="${PASCAL_CASE}Stack-pr-${PR_NUMBER}"
-
-          echo "Destroying $STACK_NAME..."
+          PASCAL_CASE_NAME=$(echo "${{ matrix.service }}" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
+          STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
+          echo "Destroying stack: $STACK_NAME"
           cdk destroy "$STACK_NAME" --force
