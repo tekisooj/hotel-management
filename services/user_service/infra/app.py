@@ -1,6 +1,6 @@
 import os
 import aws_cdk as cdk
-from infra.cdk.stacks.user_service.api_stack import UserServiceStack
+from services.user_service.infra.api_stack import UserServiceStack
 
 app = cdk.App()
 

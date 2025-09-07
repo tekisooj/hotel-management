@@ -1,6 +1,6 @@
 import os
 import aws_cdk as cdk
-from infra.cdk.stacks.property_service.api_stack import PropertyServiceStack
+from services.property_service.infra.api_stack import PropertyServiceStack
 
 app = cdk.App()
 

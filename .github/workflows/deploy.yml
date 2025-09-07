@@ -21,33 +21,27 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      changed: ${{ steps.set.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Fetch base branch
-        run: git fetch origin main
-
       - name: Detect changed services
-        id: set-matrix
+        id: set
         run: |
-          changed=$(git diff --name-only origin/main...HEAD | \
-            grep -Eo 'services/[^/]+|infra/cdk/stacks/[^/]+' | \
-            cut -d '/' -f2 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
-
-          echo "Detected changes: $changed"
-          
-          matrix_json=$(echo "$changed" | jq -c '[.[] | {service: .}]')
-          echo "matrix={\"include\":$matrix_json}" >> $GITHUB_OUTPUT
+          git fetch origin main
+          changed=$(git diff --name-only origin/main...HEAD | grep -Eo '^services/[^/]+' | cut -d '/' -f2 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Changed services: $changed"
+          echo "changed=$changed" >> $GITHUB_OUTPUT
 
   deploy-pr:
     if: github.event_name == 'pull_request'
     needs: detect-changes
     runs-on: ubuntu-latest
     strategy:
-      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.changed) }}
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
 
@@ -58,11 +52,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: npm install -g aws-cdk
-      - run: pip install -r infra/requirements.txt
-      - run: pip install -r services/${{ matrix.service }}/requirements.txt
 
-      - name: Configure AWS
+      - run: npm install -g aws-cdk
+
+      - name: Install requirements
+        run: |
+          pip install -r services/${{ matrix.service }}/infra/requirements.txt
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
@@ -76,7 +73,7 @@ jobs:
 
           echo "Deploying stack: $STACK_NAME"
           cdk deploy "$STACK_NAME" \
-            --app "python3 infra/cdk/stacks/${SERVICE_NAME}/app.py" \
+            --app "python3 services/${SERVICE_NAME}/infra/cdk/stacks/${SERVICE_NAME}/app.py" \
             --context env=pr \
             --context pr_number=${PR_NUMBER} \
             --require-approval never
@@ -86,7 +83,8 @@ jobs:
     needs: detect-changes
     runs-on: ubuntu-latest
     strategy:
-      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.changed) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -95,11 +93,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: npm install -g aws-cdk
-      - run: pip install -r infra/requirements.txt
-      - run: pip install -r services/${{ matrix.service }}/requirements.txt
 
-      - name: Configure AWS
+      - run: npm install -g aws-cdk
+
+      - name: Install requirements
+        run: |
+          pip install -r services/${{ matrix.service }}/infra/requirements.txt
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
@@ -113,7 +114,7 @@ jobs:
 
           echo "Deploying stack: $STACK_NAME"
           cdk deploy "$STACK_NAME" \
-            --app "python3 infra/cdk/stacks/${SERVICE_NAME}/app.py" \
+            --app "python3 services/${SERVICE_NAME}/infra/cdk/stacks/${SERVICE_NAME}/app.py" \
             --context env=prod \
             --require-approval never
 
@@ -122,17 +123,21 @@ jobs:
     needs: detect-changes
     runs-on: ubuntu-latest
     strategy:
-      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.changed) }}
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
 
     steps:
       - uses: actions/checkout@v4
-      - run: npm install -g aws-cdk
-      - run: pip install -r infra/requirements.txt
-      - run: pip install -r services/${{ matrix.service }}/requirements.txt
 
-      - name: Configure AWS
+      - run: npm install -g aws-cdk
+
+      - name: Install requirements
+        run: |
+          pip install -r services/${{ matrix.service }}/infra/requirements.txt
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
