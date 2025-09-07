@@ -73,7 +73,7 @@ jobs:
 
           echo "Deploying stack: $STACK_NAME"
           cdk deploy "$STACK_NAME" \
-            --app "python3 services/${SERVICE_NAME}/infra/app.py" \
+            --app "python3 services.${SERVICE_NAME}.infra.app.py" \
             --context env=pr \
             --context pr_number=${PR_NUMBER} \
             --require-approval never
@@ -114,7 +114,7 @@ jobs:
 
           echo "Deploying stack: $STACK_NAME"
           cdk deploy "$STACK_NAME" \
-            --app "python3 services/${SERVICE_NAME}/infra/app.py" \
+            --app "python3 services.${SERVICE_NAME}.infra.app.py" \
             --context env=prod \
             --require-approval never
 
