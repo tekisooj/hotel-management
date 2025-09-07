@@ -1,3 +1,4 @@
+from uuid import uuid4
 from sqlalchemy import Column, String, UUID
 from sqlalchemy.ext.declarative import declarative_base
 from enum import Enum
@@ -12,7 +13,7 @@ class UserType(str, Enum):
 class User(Base):
     __tablename__ = "users"
     
-    uuid = Column(UUID(as_uuid=True), primary_key=True, index=True)
+    uuid = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid4)
     name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)

@@ -25,7 +25,7 @@ router.add_api_route(
 router.add_api_route(
     path="/user",
     methods=["POST"],
-    response_model=UserResponse,
+    response_model=UUID,
     endpoint=register_user,
     description="Add a new user"
 )
