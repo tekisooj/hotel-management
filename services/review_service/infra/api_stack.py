@@ -62,9 +62,9 @@ class ReviewServiceStack(Stack):
         self.review_table.grant_read_write_data(self.lambda_function)
 
         
-        LambdaRestApi(
+        self.gatewat = LambdaRestApi(
             self, f"ReviewServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            handler=lambda_function, # type: ignore
+            handler=self.lambda_function, # type: ignore
             proxy=True,
             rest_api_name="review-service-api",
             description="API Gateway exposing review service Lambda"
