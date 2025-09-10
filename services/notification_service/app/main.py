@@ -1,15 +1,12 @@
 import logging
-import os
-from fastapi import FastAPI
-from app.routes import router
-from services.notification_service.app.config import AppMetadata, AppConfiguration
-from mangum import Mangum
+from services.notification_service.app.config import AppConfiguration
+
+from services.notification_service.app.ses_client import NotificationClient
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 def handler(event, context) -> None:
-    app_metadata = AppMetadata()
     app_config = AppConfiguration()
     notification_client = NotificationClient(app_config.sender_email, app_config.region)
 
@@ -17,7 +14,7 @@ def handler(event, context) -> None:
     detail = event.get("detail", {})
 
     if detail_type == "booking.confirmed":
-        quest_email = detail.get("guest_email")
+        guest_email = detail.get("guest_email")
         property_name = detail.get("property_name")
         check_in = detail.get("check_in")
 

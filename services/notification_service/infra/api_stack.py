@@ -4,7 +4,10 @@ from aws_cdk import (
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
 from aws_cdk.aws_apigateway import LambdaRestApi
-from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
+from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy, PolicyStatement
+from aws_cdk.aws_events import Rule, EventPattern
+from aws_cdk.aws_events_targets import LambdaFunction
+
 from constructs import Construct
 
 
@@ -36,7 +39,7 @@ class NotificationServiceStack(Stack):
                 detail_type=["booking.confirmed"]
             ))
         
-        self.booking_rule.add_target(LambdaFunction(self.notification_lambda))
+        self.booking_rule.add_target(LambdaFunction(self.lambda_function)) # type: ignore
 
         self.review_rule = Rule(self, "ReviewCreatedEventRule",
             event_pattern=EventPattern(
@@ -44,5 +47,5 @@ class NotificationServiceStack(Stack):
                 detail_type=["review.created"]
             ))
 
-        self.review_rule.add_target(LambdaFunction(self.notification_lambda))
+        self.review_rule.add_target(LambdaFunction(self.lambda_function)) # type: ignore
         
