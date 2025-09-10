@@ -50,7 +50,7 @@ class ReviewServiceStack(Stack):
             runtime=Runtime.PYTHON_3_11,
             handler="main.handler",
             code=Code.from_asset("services/review_service/app"),
-            role=lambda_role, # type: ignore
+            role=self.lambda_role, # type: ignore
             timeout=Duration.seconds(30),
             memory_size=512,
             environment={
