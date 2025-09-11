@@ -1,0 +1,88 @@
+name: Deploy CDK (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        options: [int, prod]
+        default: int
+        required: true
+      services:
+        description: "Comma-separated services to deploy (leave empty for all)"
+        type: string
+        required: false
+
+env:
+  AWS_REGION: us-east-1
+  CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.compute.outputs.services }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: compute
+        name: Compute service list
+        shell: bash
+        run: |
+          INPUT_SERVICES="${{ github.event.inputs.services }}"
+          if [ -n "${INPUT_SERVICES}" ]; then
+            # Normalize comma/space separated to JSON array
+            echo "Using selected services: ${INPUT_SERVICES}"
+            # remove spaces, split by comma, to JSON
+            SERVICES_JSON=$(echo "${INPUT_SERVICES}" | tr -d ' ' | tr ',' '\n' | jq -R -s -c 'split("\n") | map(select(length>0))')
+          else
+            echo "No services provided. Deploying all services/ folders."
+            SERVICES_JSON=$(ls services | jq -R -s -c 'split("\n") | map(select(length>0))')
+          fi
+          echo "services=${SERVICES_JSON}" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.prepare.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: npm install -g aws-cdk
+
+      - name: Install requirements
+        run: |
+          pip install -r services/${{ matrix.service }}/infra/requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Stack (manual)
+        env:
+          TARGET_ENV: ${{ github.event.inputs.environment }}
+        run: |
+          SERVICE_NAME=${{ matrix.service }}
+          PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
+          STACK_NAME="${PASCAL_CASE_NAME}Stack-${TARGET_ENV}"
+
+          echo "Deploying stack: $STACK_NAME"
+          cdk deploy "$STACK_NAME" \
+            --app "python3 services/${SERVICE_NAME}/infra/app.py" \
+            --context env=${TARGET_ENV} \
+            --require-approval never
+
