@@ -78,6 +78,46 @@ jobs:
             --context pr_number=${PR_NUMBER} \
             --require-approval never
 
+  deploy-int:
+      if: github.ref == 'refs/heads/main'
+      needs: detect-changes
+      runs-on: ubuntu-latest
+      strategy:
+        matrix:
+          service: ${{ fromJson(needs.detect-changes.outputs.changed) }}
+
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Setup Python and CDK
+          uses: actions/setup-python@v5
+          with:
+            python-version: "3.11"
+
+        - run: npm install -g aws-cdk
+
+        - name: Install requirements
+          run: |
+            pip install -r services/${{ matrix.service }}/infra/requirements.txt
+
+        - name: Configure AWS credentials
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+            aws-region: ${{ env.AWS_REGION }}
+
+        - name: Deploy Int Stack
+          run: |
+            SERVICE_NAME=${{ matrix.service }}
+            PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
+            STACK_NAME="${PASCAL_CASE_NAME}Stack-int"
+
+            echo "Deploying stack: $STACK_NAME"
+            cdk deploy "$STACK_NAME" \
+              --app "python3 services/${SERVICE_NAME}/infra/app.py" \
+              --context env=int \
+              --require-approval never
+
   deploy-prod:
     if: github.ref == 'refs/heads/main'
     needs: detect-changes
