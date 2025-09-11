@@ -5,7 +5,7 @@ from aws_cdk import (
 from aws_cdk.aws_lambda import Function, Runtime, Code
 from aws_cdk.aws_apigateway import LambdaRestApi
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
-from aws_cdk.aws_secretsmanager import Secret
+from aws_cdk.aws_dynamodb import Attribute, AttributeType, BillingMode, Table, TableEncryption
 from constructs import Construct
 
 class PropertyServiceStack(Stack):
@@ -18,12 +18,38 @@ class PropertyServiceStack(Stack):
             assumed_by=ServicePrincipal("lambda.amazonaws.com"), # type: ignore
             managed_policies=[
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
-                ManagedPolicy.from_aws_managed_policy_name("AmazonRDSDataFullAccess"),
-                ManagedPolicy.from_aws_managed_policy_name("SecretsManagerReadWrite")
             ]
         )
+        
+        property_table = Table(
+            self,
+            "property_table",
+            table_name=f"property_table_{env_name}{f'-{pr_number}' if pr_number else ''}",
+            partition_key=Attribute(name="uuid", type=AttributeType.STRING),
+            encryption=TableEncryption.AWS_MANAGED,
+            billing_mode=BillingMode.PAY_PER_REQUEST,
+        )
+        
+        property_table.add_global_secondary_index(
+            index_name="user_index",
+            partition_key=Attribute(name="user_uuid", type=AttributeType.STRING),
+            sort_key=Attribute(name="created_at", type=AttributeType.STRING),
+        )
 
-        secret_name = f"hotel-management-database-{self.env_name if self.env_name == 'prod' else 'int'}"
+        room_table = Table(
+            self,
+            "room_table",
+            table_name=f"room_table_{env_name}{f'-{pr_number}' if pr_number else ''}",
+            partition_key=Attribute(name="property_uuid", type=AttributeType.STRING),
+            sort_key=Attribute(name="uuid", type=AttributeType.STRING),
+            encryption=TableEncryption.AWS_MANAGED,
+            billing_mode=BillingMode.PAY_PER_REQUEST,
+        )
+
+        room_table.add_global_secondary_index(
+            index_name="room_uuid_index",
+            partition_key=Attribute(name="uuid", type=AttributeType.STRING),
+        )
 
         lambda_function = Function(
             self, f"PropertyServiceFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
@@ -35,9 +61,13 @@ class PropertyServiceStack(Stack):
             memory_size=512,
             environment={
                 "PROPERTY_SERVICE_ENV": self.env_name,
-                "HOTEL_MANAGEMENT_DATABASE_SECRET_NAME": secret_name,
+                "PROPERTY_TABLE_NAME": property_table.table_name,
+                "ROOM_TABLE_NAME": room_table.table_name
             }
         )
+
+        property_table.grant_read_write_data(lambda_function)
+        room_table.grant_read_write_data(lambda_function)
 
         
         LambdaRestApi(
