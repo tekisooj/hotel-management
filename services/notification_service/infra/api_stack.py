@@ -46,7 +46,7 @@ class NotificationServiceStack(Stack):
                 detail_type=["BookingConfirmed"]
             ))
         
-        self.booking_rule.add_target(LambdaFunction(self.lambda_function, retry_attempt=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
+        self.booking_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
 
         self.review_rule = Rule(self, "ReviewCreatedEventRule",
             event_pattern=EventPattern(
@@ -54,5 +54,5 @@ class NotificationServiceStack(Stack):
                 detail_type=["ReviewCreated"]
             ))
 
-        self.review_rule.add_target(LambdaFunction(self.lambda_function, retry_attempt=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
+        self.review_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
         
