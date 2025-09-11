@@ -30,6 +30,7 @@ jobs:
       - name: Detect changed services
         id: set
         shell: bash
+        shell: bash
         run: |
           git fetch origin main --depth=1 || true
           EVENT_NAME="${{ github.event_name }}"
@@ -44,7 +45,6 @@ jobs:
             echo "Diff range (PR): origin/main...HEAD"
             changed=$(git diff --name-only origin/main...HEAD | grep -Eo '^services/[^/]+' | cut -d '/' -f2 | sort -u)
           elif [ "$EVENT_NAME" = "pull_request_target" ]; then
-            # After merge event; conservatively deploy all services if diff is ambiguous
             if [ "${{ github.event.action }}" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ] && [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
               echo "PR merged into main; deploying all services"
               changed=$(ls services | tr '\n' '\n')
@@ -104,6 +104,9 @@ jobs:
             --require-approval never
 
   deploy-int:
+      if: |
+        github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+        (github.event_name == 'pull_request_target' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')
       if: |
         github.event_name == 'push' && github.ref == 'refs/heads/main' ||
         (github.event_name == 'pull_request_target' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')
