@@ -149,11 +149,13 @@ jobs:
     if: |
       github.event_name == 'push' && github.ref == 'refs/heads/main' ||
       (github.event_name == 'pull_request_target' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')
-    needs: detect-changes
+    needs: [detect-changes, deploy-int]
     runs-on: ubuntu-latest
     strategy:
       matrix:
         service: ${{ fromJson(needs.detect-changes.outputs.changed) }}
+    # Require int to succeed before running prod
+    if: needs.deploy-int.result == 'success'
 
     steps:
       - uses: actions/checkout@v4
