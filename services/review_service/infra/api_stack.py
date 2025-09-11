@@ -25,7 +25,7 @@ class ReviewServiceStack(Stack):
 
         self.review_table = Table(
             self,
-            "review_table",
+            f"review_table_{env_name}{f'-{pr_number}' if pr_number else ''}",
             table_name=f"{self.env_name}_review_table",
             partition_key=Attribute(name="uuid", type=AttributeType.STRING),
             encryption=TableEncryption.AWS_MANAGED,

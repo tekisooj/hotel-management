@@ -23,7 +23,7 @@ class PropertyServiceStack(Stack):
         
         property_table = Table(
             self,
-            "property_table",
+            "property_table_{env_name}{f'-{pr_number}' if pr_number else ''}",
             table_name=f"{self.env_name}_property_table",
             partition_key=Attribute(name="uuid", type=AttributeType.STRING),
             encryption=TableEncryption.AWS_MANAGED,
@@ -38,7 +38,7 @@ class PropertyServiceStack(Stack):
 
         room_table = Table(
             self,
-            "room_table",
+            "room_table_{env_name}{f'-{pr_number}' if pr_number else ''}",
             table_name=f"{self.env_name}_room_table",
             partition_key=Attribute(name="property_uuid", type=AttributeType.STRING),
             sort_key=Attribute(name="uuid", type=AttributeType.STRING),
