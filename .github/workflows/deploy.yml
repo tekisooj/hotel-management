@@ -29,11 +29,36 @@ jobs:
 
       - name: Detect changed services
         id: set
+        shell: bash
         run: |
-          git fetch origin main
-          changed=$(git diff --name-only origin/main...HEAD | grep -Eo '^services/[^/]+' | cut -d '/' -f2 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "Changed services: $changed"
-          echo "changed=$changed" >> $GITHUB_OUTPUT
+          git fetch origin main --depth=1 || true
+          EVENT_NAME="${{ github.event_name }}"
+          echo "Event: $EVENT_NAME"
+          changed=""
+          if [ "$EVENT_NAME" = "push" ]; then
+            BEFORE="${{ github.event.before }}"
+            AFTER="${{ github.sha }}"
+            echo "Diff range (push): $BEFORE..$AFTER"
+            changed=$(git diff --name-only "$BEFORE" "$AFTER" | grep -Eo '^services/[^/]+' | cut -d '/' -f2 | sort -u)
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "Diff range (PR): origin/main...HEAD"
+            changed=$(git diff --name-only origin/main...HEAD | grep -Eo '^services/[^/]+' | cut -d '/' -f2 | sort -u)
+          elif [ "$EVENT_NAME" = "pull_request_target" ]; then
+            # After merge event; conservatively deploy all services if diff is ambiguous
+            if [ "${{ github.event.action }}" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ] && [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
+              echo "PR merged into main; deploying all services"
+              changed=$(ls services | tr '\n' '\n')
+            fi
+          fi
+
+          if [ -z "$changed" ]; then
+            echo "No changed services computed; defaulting to all services"
+            changed=$(ls services | tr '\n' '\n')
+          fi
+
+          changed_json=$(echo "$changed" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Changed services: $changed_json"
+          echo "changed=$changed_json" >> $GITHUB_OUTPUT
 
   deploy-pr:
     if: github.event_name == 'pull_request'
@@ -79,7 +104,9 @@ jobs:
             --require-approval never
 
   deploy-int:
-      if: github.ref == 'refs/heads/main'
+      if: |
+        github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+        (github.event_name == 'pull_request_target' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')
       needs: detect-changes
       runs-on: ubuntu-latest
       strategy:
@@ -119,7 +146,9 @@ jobs:
               --require-approval never
 
   deploy-prod:
-    if: github.ref == 'refs/heads/main'
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      (github.event_name == 'pull_request_target' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')
     needs: detect-changes
     runs-on: ubuntu-latest
     strategy:
