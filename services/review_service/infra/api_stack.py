@@ -63,7 +63,7 @@ class ReviewServiceStack(Stack):
 
         self.api = RestApi(
             self, f"ReviewServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            rest_api_name="review-service-api",
+            rest_api_name=f"review-service-api-{env_name}{f'-{pr_number}' if pr_number else ''}",
             description="API Gateway exposing review service Lambda",
             endpoint_types=[EndpointType.REGIONAL],
         )

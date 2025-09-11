@@ -53,7 +53,7 @@ class UserServiceStack(Stack):
 
         api = RestApi(
             self, f"UserServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            rest_api_name="user-service-api",
+            rest_api_name=f"user-service-api-{env_name}{f'-{pr_number}' if pr_number else ''}",
             description="API Gateway exposing user service Lambda",
             endpoint_types=[EndpointType.REGIONAL],
         )
