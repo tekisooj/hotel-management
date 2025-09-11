@@ -1,7 +1,6 @@
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request, Response
 from services.property_service.app.schemas import Property
-from services.property_service.app.db_client import HotelManagementDBClient
 from services.review_service.app.db_client import ReviewDBClient
 from services.review_service.app.schemas import Review
 

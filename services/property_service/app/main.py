@@ -2,7 +2,7 @@ import logging
 import os
 from fastapi import FastAPI
 from app.routes import router
-from db_client import HotelManagementDBClient
+from services.property_service.app.db_clients import PropertyTableClient, RoomTableClient
 from services.property_service.app.config import AppMetadata, property_service_int_configuration, property_service_prod_configuration
 from mangum import Mangum
 
@@ -17,7 +17,12 @@ def create_app() -> FastAPI:
         description=app_metadata.app_description
     )
     app.state.app_metadata = app_metadata
-    app.state.user_table_client = HotelManagementDBClient(app_config.hotel_management_database_secret_name, app_config.region)
+    app.state.property_table_client = PropertyTableClient(
+        app_config.property_table_name,
+    )
+    app.state.room_table_client = RoomTableClient(
+        app_config.room_table_name,
+    )
 
     app.include_router(router)
 
