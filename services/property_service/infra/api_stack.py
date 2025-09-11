@@ -3,7 +3,7 @@ from aws_cdk import (
     Duration,
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
-from aws_cdk.aws_apigateway import LambdaRestApi
+from aws_cdk.aws_apigateway import RestApi, LambdaIntegration, EndpointType
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from aws_cdk.aws_dynamodb import Attribute, AttributeType, BillingMode, Table, TableEncryption
 from constructs import Construct
@@ -69,11 +69,28 @@ class PropertyServiceStack(Stack):
         property_table.grant_read_write_data(lambda_function)
         room_table.grant_read_write_data(lambda_function)
 
-        
-        LambdaRestApi(
+        api = RestApi(
             self, f"PropertyServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            handler=lambda_function, # type: ignore
-            proxy=True,
             rest_api_name="property-service-api",
-            description="API Gateway exposing property service Lambda"
+            description="API Gateway exposing property service Lambda",
+            endpoint_types=[EndpointType.REGIONAL],
         )
+        integration = LambdaIntegration(lambda_function, proxy=True) #typing: ignore
+
+        resource_property = api.root.add_resource("property")
+        resource_property.add_method("POST", integration)
+
+        resource_property_id = resource_property.add_resource("{property_uuid}")
+        resource_property_id.add_method("GET", integration)
+
+        resource_room = api.root.add_resource("room")
+        resource_room.add_method("POST", integration)
+
+        resource_room_id = resource_room.add_resource("{room_uuid}")
+        resource_room_id.add_method("GET", integration)
+
+        resource_rooms = api.root.add_resource("rooms")
+        resource_rooms.add_method("GET", integration)
+
+        resource_rooms_property = resource_rooms.add_resource("{property_uuid}")
+        resource_rooms_property.add_method("GET", integration)
