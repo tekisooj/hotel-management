@@ -3,7 +3,7 @@ from aws_cdk import (
     Duration,
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
-from aws_cdk.aws_apigateway import LambdaRestApi
+from aws_cdk.aws_apigateway import RestApi, LambdaIntegration, EndpointType
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from aws_cdk.aws_secretsmanager import Secret
 from constructs import Construct
@@ -51,10 +51,21 @@ class UserServiceStack(Stack):
             }
         )
 
-        LambdaRestApi(
+        api = RestApi(
             self, f"UserServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            handler=lambda_function, # type: ignore
-            proxy=True,
             rest_api_name="user-service-api",
-            description="API Gateway exposing user service Lambda"
+            description="API Gateway exposing user service Lambda",
+            endpoint_types=[EndpointType.REGIONAL],
         )
+        integration = LambdaIntegration(lambda_function, proxy=True) #typing: ignore
+
+        resource_me = api.root.add_resource("me")
+        resource_me.add_method("GET", integration)
+
+        resource_user = api.root.add_resource("user")
+        resource_user.add_method("POST", integration)
+
+        resource_user_id = resource_user.add_resource("{user_uuid}")
+        resource_user_id.add_method("GET", integration)
+        resource_user_id.add_method("DELETE", integration)
+        resource_user_id.add_method("PATCH", integration)

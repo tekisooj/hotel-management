@@ -3,7 +3,7 @@ from aws_cdk import (
     Duration,
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
-from aws_cdk.aws_apigateway import LambdaRestApi
+from aws_cdk.aws_apigateway import RestApi, LambdaIntegration, EndpointType
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from aws_cdk.aws_secretsmanager import Secret
 from constructs import Construct
@@ -39,11 +39,26 @@ class BookingServiceStack(Stack):
             }
         )
 
-        
-        LambdaRestApi(
+        api = RestApi(
             self, f"BookingServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            handler=lambda_function, # type: ignore
-            proxy=True,
             rest_api_name="booking-service-api",
-            description="API Gateway exposing booking service Lambda"
+            description="API Gateway exposing booking service Lambda",
+            endpoint_types=[EndpointType.REGIONAL],
         )
+        integration = LambdaIntegration(lambda_function, proxy=True) # typing: ignore
+
+        resource_booking = api.root.add_resource("booking")
+        resource_booking.add_method("POST", integration)
+        resource_booking.add_method("PATCH", integration)
+
+        resource_booking_id = resource_booking.add_resource("{booking_uuid}")
+        resource_booking_id.add_method("GET", integration)
+
+        resource_booking_cancel = resource_booking_id.add_resource("cancel")
+        resource_booking_cancel.add_method("PATCH", integration)
+
+        resource_bookings = api.root.add_resource("bookings")
+        resource_bookings.add_method("GET", integration)
+
+        resource_availability = api.root.add_resource("availability")
+        resource_availability.add_method("GET", integration)

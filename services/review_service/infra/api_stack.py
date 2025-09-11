@@ -4,7 +4,7 @@ from aws_cdk import (
     RemovalPolicy
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
-from aws_cdk.aws_apigateway import LambdaRestApi
+from aws_cdk.aws_apigateway import RestApi, LambdaIntegration, EndpointType
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from aws_cdk.aws_dynamodb import Attribute, AttributeType, BillingMode, Table, TableEncryption
 from constructs import Construct
@@ -61,11 +61,19 @@ class ReviewServiceStack(Stack):
 
         self.review_table.grant_read_write_data(self.lambda_function)
 
-        
-        self.gatewat = LambdaRestApi(
+        self.api = RestApi(
             self, f"ReviewServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            handler=self.lambda_function, # type: ignore
-            proxy=True,
             rest_api_name="review-service-api",
-            description="API Gateway exposing review service Lambda"
+            description="API Gateway exposing review service Lambda",
+            endpoint_types=[EndpointType.REGIONAL],
         )
+        self.integration = LambdaIntegration(self.lambda_function, proxy=True) #typing: ignore
+
+
+        self.resource_review = self.api.root.add_resource("review")
+        self.resource_review_id = self.resource_review.add_resource("{property_uuid}")
+        self.resource_review_id.add_method("POST", self.integration)
+
+        self.resource_reviews = self.api.root.add_resource("reviews")
+        self.resource_reviews_id = self.resource_reviews.add_resource("{id}")
+        self.resource_reviews_id.add_method("GET", self.integration)
