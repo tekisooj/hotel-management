@@ -41,7 +41,7 @@ class BookingServiceStack(Stack):
 
         api = RestApi(
             self, f"BookingServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            rest_api_name="booking-service-api",
+            rest_api_name=f"booking-service-api-{env_name}{f'-{pr_number}' if pr_number else ''}",
             description="API Gateway exposing booking service Lambda",
             endpoint_types=[EndpointType.REGIONAL],
         )

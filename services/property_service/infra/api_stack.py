@@ -71,7 +71,7 @@ class PropertyServiceStack(Stack):
 
         api = RestApi(
             self, f"PropertyServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            rest_api_name="property-service-api",
+            rest_api_name=f"property-service-api-{env_name}{f'-{pr_number}' if pr_number else ''}",
             description="API Gateway exposing property service Lambda",
             endpoint_types=[EndpointType.REGIONAL],
         )
