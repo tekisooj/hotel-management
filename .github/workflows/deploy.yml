@@ -119,8 +119,10 @@ jobs:
               --require-approval never
 
   deploy-prod:
-    if: github.ref == 'refs/heads/main'
-    needs: detect-changes
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      (github.event_name == 'pull_request_target' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')
+    needs: [detect-changes, deploy-int]
     runs-on: ubuntu-latest
     strategy:
       matrix:
