@@ -38,7 +38,6 @@ def from_dynamodb_item(item: dict[str, dict[str, Any]]) -> dict[str, Any]:
             python_dict[key] = value["S"]
         elif "N" in value:
             number = value["N"]
-            # Preserve numeric precision using Decimal
             python_dict[key] = Decimal(number)
         elif "BOOL" in value:
             python_dict[key] = value["BOOL"]
