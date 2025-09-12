@@ -3,6 +3,8 @@ from fastapi import APIRouter
 
 from services.property_service.app.handlers import (
     add_property,
+    delete_property,
+    delete_room,
     get_filtered_rooms,
     get_property,
     get_properties_by_city,
@@ -10,6 +12,7 @@ from services.property_service.app.handlers import (
     get_property_rooms,
     get_room,
     add_room,
+    get_user_properties,
 )
 from services.property_service.app.schemas import Property, Room
 
@@ -18,10 +21,18 @@ router = APIRouter()
 
 router.add_api_route(
     path="/property",
-    methods=["POST"],
+    methods=["POST", "PUT"],
     response_model=UUID,
     endpoint=add_property,
     description="Add a new property"
+)
+
+router.add_api_route(
+    path="/property/{property_uuid}",
+    methods=["DELETE"],
+    response_model=UUID,
+    endpoint=delete_property,
+    description="Delete property"
 )
 
 router.add_api_route(
@@ -30,6 +41,14 @@ router.add_api_route(
     response_model=Property,
     endpoint=get_property,
     description="Get property"
+)
+
+router.add_api_route(
+    path="/property/{user_uuid}",
+    methods=["GET"],
+    response_model=list[Property],
+    endpoint=get_user_properties,
+    description="Get user properties"
 )
 
 router.add_api_route(
@@ -50,7 +69,7 @@ router.add_api_route(
 
 router.add_api_route(
     path="/room",
-    methods=["POST"],
+    methods=["POST", "PUT"],
     response_model=UUID,
     endpoint=add_room,
     description="Add room"
@@ -62,6 +81,14 @@ router.add_api_route(
     response_model=Room,
     endpoint=get_room,
     description="Get room"
+)
+
+router.add_api_route(
+    path="/room/{room_uuid}",
+    methods=["DELETE"],
+    response_model=UUID,
+    endpoint=delete_room,
+    description="Delete room"
 )
 
 router.add_api_route(

@@ -11,7 +11,6 @@ def get_property_table_client(request: Request) -> PropertyTableClient:
 def get_room_table_client(request: Request) -> RoomTableClient:
     return request.app.state.room_table_client
 
-
 def build_city_key(country: str, state: str | None, city: str) -> str:
     parts = [country.strip().upper()]
     parts.append(state.strip().upper() if state else "")
@@ -47,6 +46,13 @@ async def get_property(property_uuid: UUID, property_table_client: PropertyTable
 
     return property_table_client.get_property(property_uuid)
 
+async def get_user_properties(user_uuid: UUID, property_table_client: PropertyTableClient = Depends(get_property_table_client)) -> list[Property]
+
+    return property_table_client.get_user_properties(user_uuid)
+
+async def delete_property(property_uuid: UUID, property_table_client: PropertyTableClient = Depends(get_property_table_client)) -> UUID:
+
+    return property_table_client.delete_property(property_uuid)
 
 async def get_properties_by_city(
     country: str,
@@ -84,6 +90,9 @@ async def add_room(room: Room, room_table_client: RoomTableClient = Depends(get_
 async def get_room(room_uuid: UUID, room_table_client: RoomTableClient = Depends(get_room_table_client)) -> Room:
     
     return room_table_client.get_room(room_uuid)
+
+async def delete_room(room_uuid: UUID, room_table_client: RoomTableClient = Depends(get_room_table_client)) -> UUID:
+    return room_table_client.delete_rooom(room_uuid)
 
 async def get_property_rooms(property_uuid: UUID, room_table_client: RoomTableClient = Depends(get_room_table_client)) -> list[Room]:
 
