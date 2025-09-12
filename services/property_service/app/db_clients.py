@@ -23,8 +23,7 @@ class PropertyTableClient:
             data["uuid"] = uuid4()
         if not data.get("created_at"):
             data["created_at"] = datetime.now()
-        if not data.get("updated_at"):
-            data["updated_at"] = datetime.now()
+        data["updated_at"] = datetime.now()
 
         self.property_db_client.put_item(
             TableName=self.property_table_name,
@@ -43,6 +42,26 @@ class PropertyTableClient:
         data = from_dynamodb_item(item)
         return Property(**{k: v for k, v in data.items() if k in Property.model_fields})
 
+
+    def delete_property(self, property_uuid: UUID) -> UUID:
+        _ = self.property_db_client.delete_item(
+            TableName=self.property_table_name,
+            Key={"uuid": {"S": str(property_uuid)}}
+        )
+        return property_uuid
+
+    def get_user_properties(self, user_uuid: UUID) -> list[Property]:
+        response = self.property_db_client.query(
+            TableName=self.property_table_name,
+            IndexName="user_uuid_index",
+            KeyConditionExpression="user_uuid = :user_uuid",
+            ExpressionAttributeValues={":user_uuid": {"S": user_uuid}},
+        )
+
+        items = response.get("Items", [])
+        return [Property(**from_dynamodb_item(item)) for item in items]
+
+
     def get_properties_by_city_key(self, city_key: str) -> list[Property]:
         response = self.property_db_client.query(
             TableName=self.property_table_name,
@@ -51,11 +70,8 @@ class PropertyTableClient:
             ExpressionAttributeValues={":ck": {"S": city_key}},
         )
         items = response.get("Items", [])
-        out: list[Property] = []
-        for it in items:
-            data = from_dynamodb_item(it)
-            out.append(Property(**{k: v for k, v in data.items() if k in Property.model_fields}))
-        return out
+        return [Property(**from_dynamodb_item(item)) for item in items]
+
 
     def get_properties_in_bbox(
         self,
@@ -128,8 +144,8 @@ class RoomTableClient:
             data["uuid"] = uuid4()
         if not data.get("created_at"):
             data["created_at"] = datetime.now()
-        if not data.get("updated_at"):
-            data["updated_at"] = datetime.now()
+        
+        data["updated_at"] = datetime.now()
 
         self.room_db_client.put_item(
             TableName=self.room_table_name,
@@ -138,23 +154,29 @@ class RoomTableClient:
         return UUID(str(data["uuid"]))
     
     def get_room(self, room_uuid: UUID) -> Room:
-        response = self.room_db_client.query(
+        response = self.room_db_client.get_item(
             TableName=self.room_table_name,
-            IndexName="room_uuid_index",
-            KeyConditionExpression="uuid = :u",
-            ExpressionAttributeValues={":u": {"S": str(room_uuid)}},
+            Key={"uuid": {"S": str(room_uuid)}},
         )
-        items = response.get("Items", [])
-        if not items:
+        item = response.get("Item")
+        if not item:
             raise ValueError("Room not found")
-        return Room(**from_dynamodb_item(items[0]))
+        return Room(**from_dynamodb_item(item))
     
+    def delete_rooom(self, room_uuid: UUID) -> UUID:
+        _ = self.room_db_client.delete_item(
+            TableName=self.room_table_name,
+            Key={"uuid": {"S": str(room_uuid)}}
+        )
+        return room_uuid
+
     def get_property_rooms(self, property_uuid: UUID) -> list[Room]:
 
         response = self.room_db_client.query(
             TableName=self.room_table_name,
-            KeyConditionExpression="property_uuid=:property_uuid",
-            ExpressionAttributeValues={":property_uuid": {"S": str(property_uuid)}}
+            IndexName="property_uuid_index",
+            KeyConditionExpression="property_uuid = :p",
+            ExpressionAttributeValues={":p": {"S": str(property_uuid)}},
         )
         
         items = response.get("Items", [])
@@ -221,6 +243,7 @@ class RoomTableClient:
 
         params: dict[str, Any] = {
             "TableName": self.room_table_name,
+            "IndexName": "property_uuid_index",
             "KeyConditionExpression": "property_uuid = :p",
             "ExpressionAttributeValues": eav,
         }

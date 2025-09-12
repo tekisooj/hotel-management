@@ -46,15 +46,14 @@ class PropertyServiceStack(Stack):
             self,
             "room_table",
             table_name=f"room_table_{env_name}{f'-{pr_number}' if pr_number else ''}",
-            partition_key=Attribute(name="property_uuid", type=AttributeType.STRING),
-            sort_key=Attribute(name="uuid", type=AttributeType.STRING),
+            partition_key=Attribute(name="uuid", type=AttributeType.STRING),
             encryption=TableEncryption.AWS_MANAGED,
             billing_mode=BillingMode.PAY_PER_REQUEST,
         )
 
         room_table.add_global_secondary_index(
-            index_name="room_uuid_index",
-            partition_key=Attribute(name="uuid", type=AttributeType.STRING),
+            index_name="property_uuid_index",
+            partition_key=Attribute(name="property_uuid", type=AttributeType.STRING),
         )
 
         lambda_function = Function(
