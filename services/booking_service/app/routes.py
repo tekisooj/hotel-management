@@ -48,7 +48,7 @@ router.add_api_route(
 )
 
 router.add_api_route(
-    path="/availability",
+    path="/availability/{room_uuid}",
     methods=["GET"],
     response_model=bool,
     endpoint=check_availability,

@@ -1,5 +1,4 @@
 from datetime import datetime
-from decimal import Decimal
 from enum import Enum
 from pydantic import BaseModel, Field
 from uuid import UUID
@@ -45,8 +44,12 @@ class Property(BaseModel):
     county: str | None = Field(description="County or municipality the property is in", default=None)
     address: str = Field(description="Address of the property - street name and number")
     full_address: str | None = Field(description="Full address of the property", default=None)
-    latitude: Decimal | None = Field(description="Latitude of the property", default=None)
-    longitude: Decimal | None = Field(description="Longitude of the property", default=None)
-    city_key: str | None = Field(description="Computed city key COUNTRY#STATE#CITY", default=None)
+    latitude: float | None = Field(description="Latitude of the property", default=None)
+    longitude: float | None = Field(description="Longitude of the property", default=None)
     created_at: datetime | None = Field(description="Property created at", default=None)
     updated_at: datetime | None = Field(description="Property updated at", default=None)
+
+
+class PropertyDetail(Property):
+    rooms: list[Room] | None = Field(description="Property rooms", default=[])
+    average_rating: float | None = Field(description="Property average rating", default=None)

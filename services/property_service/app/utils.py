@@ -1,6 +1,7 @@
 from typing import Any
 from uuid import UUID
 from datetime import datetime
+from decimal import Decimal
 
 
 def to_dynamodb_item(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -13,7 +14,7 @@ def to_dynamodb_item(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
             dynamodb_item[key] = {"S": value}
         elif isinstance(value, bool):
             dynamodb_item[key] = {"BOOL": value}
-        elif isinstance(value, int) or isinstance(value, float):
+        elif isinstance(value, int) or isinstance(value, float) or isinstance(value, Decimal):
             dynamodb_item[key] = {"N": str(value)}
         elif isinstance(value, UUID):
             dynamodb_item[key] = {"S": str(value)}
@@ -37,7 +38,7 @@ def from_dynamodb_item(item: dict[str, dict[str, Any]]) -> dict[str, Any]:
             python_dict[key] = value["S"]
         elif "N" in value:
             number = value["N"]
-            python_dict[key] = float(number) if '.' in number else int(number)
+            python_dict[key] = Decimal(number)
         elif "BOOL" in value:
             python_dict[key] = value["BOOL"]
         elif "L" in value:
