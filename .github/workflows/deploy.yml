@@ -55,19 +55,19 @@ jobs:
             echo "No specific paths detected; defaulting to all services and bffs"
             if [ -d services ]; then
               for n in $(ls services); do
-                TARGETS_JSON=$(echo "$TARGETS_JSON" | jq --arg p "services/$n" '. + [$p]')
+                TARGETS_JSON=$(echo "$TARGETS_JSON" | jq -c --arg p "services/$n" '. + [$p]')
               done
             fi
             if [ -d bffs ]; then
               for n in $(ls bffs); do
-                TARGETS_JSON=$(echo "$TARGETS_JSON" | jq --arg p "bffs/$n" '. + [$p]')
+                TARGETS_JSON=$(echo "$TARGETS_JSON" | jq -c --arg p "bffs/$n" '. + [$p]')
               done
             fi
           else
             SRV=$(echo "$CHANGED_PATHS" | grep -Eo '^services/[^/]+' | sort -u)
             BFF=$(echo "$CHANGED_PATHS" | grep -Eo '^bffs/[^/]+' | sort -u)
-            for p in $SRV; do TARGETS_JSON=$(echo "$TARGETS_JSON" | jq --arg p "$p" '. + [$p]'); done
-            for p in $BFF; do TARGETS_JSON=$(echo "$TARGETS_JSON" | jq --arg p "$p" '. + [$p]'); done
+            for p in $SRV; do TARGETS_JSON=$(echo "$TARGETS_JSON" | jq -c --arg p "$p" '. + [$p]'); done
+            for p in $BFF; do TARGETS_JSON=$(echo "$TARGETS_JSON" | jq -c --arg p "$p" '. + [$p]'); done
           fi
 
           echo "Changed components: $TARGETS_JSON"

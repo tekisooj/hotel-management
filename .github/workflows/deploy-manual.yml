@@ -42,10 +42,10 @@ jobs:
             echo "No components provided. Deploying all services and bffs."
             COMPONENTS_JSON='[]'
             if [ -d services ]; then
-              for n in $(ls services); do COMPONENTS_JSON=$(echo "$COMPONENTS_JSON" | jq --arg p "services/$n" '. + [$p]'); done
+              for n in $(ls services); do COMPONENTS_JSON=$(echo "$COMPONENTS_JSON" | jq -c --arg p "services/$n" '. + [$p]'); done
             fi
             if [ -d bffs ]; then
-              for n in $(ls bffs); do COMPONENTS_JSON=$(echo "$COMPONENTS_JSON" | jq --arg p "bffs/$n" '. + [$p]'); done
+              for n in $(ls bffs); do COMPONENTS_JSON=$(echo "$COMPONENTS_JSON" | jq -c --arg p "bffs/$n" '. + [$p]'); done
             fi
           fi
           echo "components=${COMPONENTS_JSON}" >> $GITHUB_OUTPUT
