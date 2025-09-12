@@ -180,7 +180,7 @@ async def put_room(
     room_uuid = response.json()
     return room_uuid
 
-async def delete_user_room(
+async def delete_room(
     room_uuid: UUID,
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
@@ -190,7 +190,7 @@ async def delete_user_room(
     return room_uuid
 
 
-async def delete_user_property(
+async def delete_property(
     property_uuid: UUID,
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
@@ -251,22 +251,6 @@ async def get_bookings(
     return availabilities
 
 
-async def cancel_user_booking(
-    booking_uuid: UUID,
-    current_user_uuid: UUID = Depends(get_current_user_uuid),
-    booking_service_client: AsyncClient = Depends(get_booking_service_client),
-) -> UUID:
-    resp = await booking_service_client.patch(
-        f"/booking/{str(booking_uuid)}/cancel",
-        json={"user_uuid": str(current_user_uuid)},
-        timeout=15.0,
-    )
-    if resp.status_code != 200:
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    body = resp.json()
-    return UUID(body if isinstance(body, str) else body.get("uuid"))
-
-
 async def get_current_user(
     request: Request,
     user_service_client: AsyncClient = Depends(get_user_service_client),
@@ -307,107 +291,3 @@ async def get_property_reviews(
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     reviews_response = resp.json() or []
     return [Review(**review) for review in reviews_response]
-
-
-async def get_user_reviews(
-    user_uuid: UUID,
-    review_service_client: AsyncClient = Depends(get_review_service_client),
-) -> list[Review]:
-    resp = await review_service_client.get(f"/reviews/{str(user_uuid)}", timeout=10.0)
-    if resp.status_code != 200:
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    reviews_response = resp.json() or []
-    return [Review(**review) for review in reviews_response]
-
-
-async def get_filtered_rooms(
-    check_in_date: datetime | None = None,
-    check_out_date: datetime | None = None,
-    amenities: list[Amenity] | None = None,
-    capacity: int | None = None,
-    max_price: float | None = None,
-    country: str | None = None,
-    state: str | None = None,
-    city: str | None = None,
-    rating_above: float | None = None,
-    review_service_client: AsyncClient = Depends(get_review_service_client),
-    booking_service_client: AsyncClient = Depends(get_booking_service_client),
-    property_service_client: AsyncClient = Depends(get_property_service_client),
-):
-    properties = []
-    if country and city:
-        params = {"country": country, "city": city}
-        if state:
-            params["state"] = state
-        property_response = await property_service_client.get("/properties/city", params=params, timeout=10.0)
-        if property_response.status_code != 200:
-            raise HTTPException(status_code=property_response.status_code, detail=property_response.text)
-        property_response = property_response.json()
-        properties = [Property(**property) for property in property_response]
-
-    room_results: list[PropertyDetail]= []
-    room_filter_params = {}
-    if capacity is not None:
-        room_filter_params["capacity"] = capacity
-    if max_price is not None:
-        room_filter_params["max_price_per_night"] = max_price
-    if amenities:
-        room_filter_params["amenities"] = [a.name for a in amenities]
-
-    if not properties:
-        raise ValueError("Location must be provided.")
-
-    for property in properties:
-        params = {"property_uuid": str(property.uuid)}
-        params.update(room_filter_params)
-        rooms_result = await property_service_client.get("/rooms", params=params, timeout=10.0)
-        if rooms_result.status_code != 200:
-            raise HTTPException(status_code=rooms_result.status_code, detail=rooms_result.text)
-        rooms_result = rooms_result.json()
-        prop_detail = PropertyDetail(**property.model_dump())
-        prop_detail.rooms = [Room(**room) for room in rooms_result]
-        room_results.append(prop_detail)
-
-
-    available_room_entries: list[PropertyDetail] = []
-    for prop in room_results:
-        property_detail = PropertyDetail(**prop.model_dump())
-        if not prop.rooms:
-            continue
-        for room in prop.rooms:
-            if check_in_date and check_out_date:
-                avail_response = await booking_service_client.get(
-                    "/availability",
-                    params={
-                        "room_uuid": str(room.uuid),
-                        "check_in": check_in_date.isoformat(),
-                        "check_out": check_out_date.isoformat(),
-                    },
-                    timeout=10.0,
-                )
-                if avail_response.status_code != 200:
-                    raise HTTPException(status_code=avail_response.status_code, detail=avail_response.text)
-                if bool(avail_response.json()):
-                    property_detail.rooms.append(room) # type: ignore
-        if property_detail.rooms:
-            available_room_entries.append(property_detail)
-                
-
-    
-    for prop_detail in available_room_entries:
-        rev = await review_service_client.get(f"/reviews/{str(prop_detail.uuid)}", timeout=10.0)
-        if rev.status_code != 200:
-            raise HTTPException(status_code=rev.status_code, detail=rev.text)
-        rev = rev.json()
-        reviews = [Review(**review) for review in rev]
-        if reviews:
-            avg = sum(r.rating for r in reviews) / len(reviews)
-        else:
-            avg = None
-        
-        prop_detail.average_rating = avg
-
-    if rating_above:
-        available_room_entries = list(filter(lambda x: x.average_rating and x.average_rating>=rating_above, available_room_entries))
-
-    return available_room_entries

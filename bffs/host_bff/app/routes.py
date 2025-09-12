@@ -3,8 +3,8 @@ from fastapi import APIRouter
 
 from bffs.host_bff.app.handlers import (
     change_booking_status,
-    delete_user_property,
-    delete_user_room,
+    delete_property,
+    delete_room,
     get_bookings,
     get_property_reviews,
     get_user_properties,
@@ -51,7 +51,7 @@ router.add_api_route(
     path="/room/{room_uuid}",
     methods=["DELETE"],
     response_model=UUID,
-    endpoint=delete_user_room,
+    endpoint=delete_room,
     description="Delete user room"
 )
 
@@ -59,7 +59,7 @@ router.add_api_route(
     path="/property/{property_uuid}",
     methods=["DELETE"],
     response_model=UUID,
-    endpoint=delete_user_property,
+    endpoint=delete_property,
     description="Delete user property"
 )
 
