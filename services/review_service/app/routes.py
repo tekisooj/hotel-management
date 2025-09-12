@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 router.add_api_route(
-    path="/review/{property_uuid}",
+    path="/review",
     methods=["POST"],
     response_model=UUID,
     endpoint=add_review,

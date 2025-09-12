@@ -48,3 +48,8 @@ class Property(BaseModel):
     longitude: float | None = Field(description="Longitude of the property", default=None)
     created_at: datetime | None = Field(description="Property created at", default=None)
     updated_at: datetime | None = Field(description="Property updated at", default=None)
+
+
+class PropertyDetail(Property):
+    rooms: list[Room] | None = Field(description="Property rooms", default=[])
+    average_rating: float | None = Field(description="Property average rating", default=None)

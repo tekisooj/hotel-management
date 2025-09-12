@@ -3,6 +3,9 @@ from fastapi import FastAPI
 from mangum import Mangum
 from app.routes import router
 from app.config import AppMetadata, guest_bff_prod_configuration, guest_bff_int_configuration
+from app.handlers import JWTVerifier
+from httpx import AsyncClient
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -18,7 +21,11 @@ def create_app() -> FastAPI:
     app.state.property_service_url = app_config.property_service_url
     app.state.booking_service_url = app_config.booking_service_url
     app.state.review_service_url = app_config.review_service_url
-    app.state.notification_service_url = app_config.notification_service_url
+    app.state.user_service_client = AsyncClient(base_url=app_config.user_service_url)
+    app.state.property_service_client = AsyncClient(base_url=app_config.property_service_url)
+    app.state.booking_service_client = AsyncClient(base_url=app_config.booking_service_url)
+    app.state.review_service_client = AsyncClient(base_url=app_config.review_service_url)
+    app.state.jwt_verifier = JWTVerifier(jwks_url=app_config.jwks_url, audience=app_config.audience, env=app_metadata.guest_bff_env)
 
     app.include_router(router)
 

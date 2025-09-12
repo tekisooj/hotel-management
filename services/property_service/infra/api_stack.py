@@ -35,6 +35,12 @@ class PropertyServiceStack(Stack):
             partition_key=Attribute(name="user_uuid", type=AttributeType.STRING),
             sort_key=Attribute(name="created_at", type=AttributeType.STRING),
         )
+        # Index for city-based lookups
+        property_table.add_global_secondary_index(
+            index_name="city_index",
+            partition_key=Attribute(name="city_key", type=AttributeType.STRING),
+            sort_key=Attribute(name="created_at", type=AttributeType.STRING),
+        )
 
         room_table = Table(
             self,
@@ -62,7 +68,7 @@ class PropertyServiceStack(Stack):
             environment={
                 "PROPERTY_SERVICE_ENV": self.env_name,
                 "PROPERTY_TABLE_NAME": property_table.table_name,
-                "ROOM_TABLE_NAME": room_table.table_name
+                "ROOM_TABLE_NAME": room_table.table_name,
             }
         )
 
@@ -94,3 +100,11 @@ class PropertyServiceStack(Stack):
 
         resource_rooms_property = resource_rooms.add_resource("{property_uuid}")
         resource_rooms_property.add_method("GET", integration)
+
+        # /properties/city and /properties/near
+        resource_properties = api.root.add_resource("properties")
+        resource_properties_city = resource_properties.add_resource("city")
+        resource_properties_city.add_method("GET", integration)
+
+        resource_properties_near = resource_properties.add_resource("near")
+        resource_properties_near.add_method("GET", integration)

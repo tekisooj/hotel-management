@@ -5,6 +5,8 @@ from services.property_service.app.handlers import (
     add_property,
     get_filtered_rooms,
     get_property,
+    get_properties_by_city,
+    get_properties_near,
     get_property_rooms,
     get_room,
     add_room,
@@ -28,6 +30,22 @@ router.add_api_route(
     response_model=Property,
     endpoint=get_property,
     description="Get property"
+)
+
+router.add_api_route(
+    path="/properties/city",
+    methods=["GET"],
+    response_model=list[Property],
+    endpoint=get_properties_by_city,
+    description="List properties by city/country/state"
+)
+
+router.add_api_route(
+    path="/properties/near",
+    methods=["GET"],
+    response_model=list[Property],
+    endpoint=get_properties_near,
+    description="List properties within approx bbox delta of given lat/lon, optionally filtered by country/state/city"
 )
 
 router.add_api_route(
