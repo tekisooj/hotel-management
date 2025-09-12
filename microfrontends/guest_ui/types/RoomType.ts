@@ -1,0 +1,1 @@
+export type RoomType = 'single' | 'double' | 'suite' | 'family' | 'deluxe' | 'studio';

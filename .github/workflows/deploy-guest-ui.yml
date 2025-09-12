@@ -1,0 +1,68 @@
+name: Deploy Guest UI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [opened, synchronize]
+
+env:
+  AWS_REGION: us-east-1
+  CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install deps and generate static site
+        working-directory: microfrontends/guest_ui
+        run: |
+          npm ci
+          npm run generate
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: npm install -g aws-cdk
+
+      - name: Install infra requirements
+        working-directory: microfrontends/guest_ui/infra
+        run: |
+          pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Guest UI
+        run: |
+          STACK_NAME="GuestUiStack-${{ github.event_name == 'pull_request' && 'pr-' || '' }}${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'int' }}"
+          # For push to main, use int env; for PR, use pr env
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            cdk deploy "GuestUiStack-pr-${{ github.event.pull_request.number }}" \
+              --app "python3 microfrontends/guest_ui/infra/app.py" \
+              --context env=pr \
+              --context pr_number=${{ github.event.pull_request.number }} \
+              --require-approval never
+          else
+            cdk deploy "GuestUiStack-int" \
+              --app "python3 microfrontends/guest_ui/infra/app.py" \
+              --context env=int \
+              --require-approval never
+          fi
+

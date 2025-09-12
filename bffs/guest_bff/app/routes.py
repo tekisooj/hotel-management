@@ -13,7 +13,7 @@ from bffs.guest_bff.app.handlers import (
     update_current_user,
 )
 from bffs.guest_bff.app.models.booking import Booking
-from bffs.guest_bff.app.models.property import Property, PropertyDetail
+from bffs.guest_bff.app.models.property import PropertyDetail
 from bffs.guest_bff.app.models.user import UserResponse
 from bffs.guest_bff.app.models.review import Review
 
@@ -72,6 +72,7 @@ router.add_api_route(
 router.add_api_route(
     path="/rooms",
     methods=["GET"],
+    response_model=PropertyDetail,
     endpoint=get_filtered_rooms,
     description="Get filtered rooms"
 )
