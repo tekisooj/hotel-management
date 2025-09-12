@@ -1,8 +1,10 @@
 import logging
+import os
 from fastapi import FastAPI
 from mangum import Mangum
 from app.routes import router
 from app.config import AppMetadata, guest_bff_prod_configuration, guest_bff_int_configuration
+from app.event_bus import EventBusClient
 from app.handlers import JWTVerifier
 from httpx import AsyncClient
 
@@ -26,6 +28,7 @@ def create_app() -> FastAPI:
     app.state.booking_service_client = AsyncClient(base_url=app_config.booking_service_url)
     app.state.review_service_client = AsyncClient(base_url=app_config.review_service_url)
     app.state.jwt_verifier = JWTVerifier(jwks_url=app_config.jwks_url, audience=app_config.audience, env=app_metadata.guest_bff_env)
+    app.state.event_bus = EventBusClient(bus_name=os.getenv("EVENT_BUS_NAME"))
 
     app.include_router(router)
 

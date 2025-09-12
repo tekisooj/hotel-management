@@ -19,6 +19,7 @@ def handler(event, context) -> None:
         guest_email = detail.get("guest_email")
         property_name = detail.get("property_name")
         check_in = detail.get("check_in")
+        host_email = detail.get("host_email")
 
         if guest_email and property_name and check_in:
             subject = "Your booking is confirmed!"
@@ -30,6 +31,16 @@ def handler(event, context) -> None:
                 logger.error(f"Failed to send booking email to {guest_email}: {e}")
         else:
             logger.warning(f"Missing booking fields in event: {detail}")
+
+        # Optionally notify the host as well
+        if host_email and property_name and check_in:
+            subject_host = "New booking received"
+            message_host = f"You have a new booking for {property_name} with check-in on {check_in}."
+            try:
+                notification_client.send_email(host_email, subject_host, message_host)
+                logger.info(f"Booking notification email sent to host {host_email}")
+            except Exception as e:
+                logger.error(f"Failed to send host booking email to {host_email}: {e}")
 
     elif detail_type == "ReviewCreated":
         host_email = detail.get("host_email")

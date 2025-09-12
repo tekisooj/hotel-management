@@ -5,6 +5,7 @@ from aws_cdk import (
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
 from aws_cdk.aws_apigateway import LambdaRestApi, EndpointType, Cors
+from aws_cdk.aws_events import EventBus
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from constructs import Construct
 
@@ -31,6 +32,7 @@ class GuestBffStack(Stack):
             memory_size=512,
             environment={
                 "GUEST_BFF_ENV": self.env_name,
+                "EVENT_BUS_NAME": "hotel-event-bus",
             }
         )
 
@@ -47,3 +49,6 @@ class GuestBffStack(Stack):
                 "allow_headers": Cors.DEFAULT_HEADERS,
             },
         )
+
+        event_bus = EventBus.from_event_bus_name(self, "SharedEventBus", "hotel-event-bus")
+        event_bus.grant_put_events_to(self.lambda_function)  # type: ignore
