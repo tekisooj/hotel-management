@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import jwtDecode from 'jwt-decode'
+import { jwtDecode } from 'jwt-decode'
 import { UserState } from 'types/UserState'
 import { User } from 'types/User'
 

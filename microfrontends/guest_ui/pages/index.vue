@@ -31,7 +31,7 @@
           <input v-model="maxPrice" type="number" class="form-control"/>
         </div>
         <div class="col-12 mt-2">
-          <button class="btn btn-primary" @click="submit" :disabled="!canSearch">Search</button>
+          <button class="btn btn-primary" :disabled="!canSearch">Search</button>
         </div>
       </form>
     </div>
@@ -46,15 +46,11 @@
 </template>
 
 <script setup lang="ts">
-import { useGuestBff } from 'api/guestBff'
-import axios from 'axios'
-import HotelList from 'components/HotelList.vue'
-import { useRuntimeConfig } from 'nuxt/app'
-import { onMounted, ref, watch } from 'vue'
+import { useGuestBff } from '@/api/guestBff'
+import HotelList from '@/components/HotelList.vue'
+import { ref, computed } from 'vue'
 
-const {searchRooms, addReview, addBooking, getPropertyReviews} = useGuestBff()
-const config = useRuntimeConfig()
-const message = ref('')
+const { searchRooms } = useGuestBff()
 const country = ref('')
 const city = ref('')
 const state = ref('')
@@ -63,15 +59,28 @@ const checkOut = ref('')
 const capacity = ref(0)
 const maxPrice = ref(undefined)
 
-const propertyDetails = ref([])
+const propertyDetails = ref<any[]>([])
 
 
 const canSearch = computed(() => !!country.value && !!city.value && !!checkIn.value && !!checkOut.value)
 
-function submit() {
+async function submit() {
   if (!canSearch.value) return
-
-  propertyDetails = searchRooms(country, city, state, checkIn, checkOut, capacity, maxPrice)
+  try {
+    const res = await searchRooms({
+      country: country.value,
+      city: city.value,
+      state: state.value || undefined,
+      check_in_date: checkIn.value,
+      check_out_date: checkOut.value,
+      capacity: capacity.value || undefined,
+      max_price: maxPrice.value || undefined,
+    })
+    propertyDetails.value = Array.isArray(res) ? res : []
+  } catch (e) {
+    // optional: surface error
+    propertyDetails.value = []
+  }
 }
 
 

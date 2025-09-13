@@ -8,7 +8,15 @@
     "baseUrl": ".",
     "types": [
       "@types/node"
-    ]
+    ],
+    "paths": {
+      "@/*": ["./*"],
+      "~/*": ["./*"],
+      "api/*": ["./api/*"],
+      "components/*": ["./components/*"],
+      "stores/*": ["./stores/*"],
+      "types/*": ["./types/*"]
+    }
   }
 }
 
