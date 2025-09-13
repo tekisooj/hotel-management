@@ -24,8 +24,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: microfrontends/guest_ui/package-lock.json
 
       - name: Install deps and generate static site
         working-directory: microfrontends/guest_ui
@@ -55,18 +53,17 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy Guest UI
+        working-directory: microfrontends/guest_ui/infra
         run: |
-          STACK_NAME="GuestUiStack-${{ github.event_name == 'pull_request' && 'pr-' || '' }}${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'int' }}"
-          # For push to main, use int env; for PR, use pr env
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             cdk deploy "GuestUiStack-pr-${{ github.event.pull_request.number }}" \
-              --app "python3 microfrontends/guest_ui/infra/app.py" \
+              --app "python3 app.py" \
               --context env=pr \
               --context pr_number=${{ github.event.pull_request.number }} \
               --require-approval never
           else
             cdk deploy "GuestUiStack-int" \
-              --app "python3 microfrontends/guest_ui/infra/app.py" \
+              --app "python3 app.py" \
               --context env=int \
               --require-approval never
           fi
