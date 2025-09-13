@@ -2,6 +2,8 @@ from datetime import datetime
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request
 from httpx import AsyncClient, HTTPError
+import os
+import boto3
 from jose import jwt
 import httpx
 
@@ -89,6 +91,35 @@ def get_user_service_client(request: Request) -> AsyncClient:
 def get_event_bus(request: Request):
     return request.app.state.event_bus
 
+def get_place_index(request: Request):
+    return request.app.state.place_index
+
+
+async def search_places(text: str,  index_name: str = Depends(get_place_index)) -> list[dict]:
+
+    if not index_name:
+        raise HTTPException(status_code=500, detail="PLACE_INDEX_NAME not configured")
+    client = boto3.client("location")
+    try:
+        resp = client.search_place_index_for_text(IndexName=index_name, Text=text, MaxResults=5)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Places lookup failed: {e}")
+    results: list[dict] = []
+    for r in resp.get("Results", []):
+        place = r.get("Place", {})
+        point = place.get("Geometry", {}).get("Point", [])
+        results.append({
+            "place_id": place.get("Id") or place.get("Label"),
+            "label": place.get("Label"),
+            "country": place.get("CountryCode") or place.get("Country"),
+            "city": place.get("Municipality"),
+            "state": place.get("Region"),
+            "address": (f"{place.get('AddressNumber')} {place.get('Street')}"
+                        if place.get('AddressNumber') and place.get('Street') else place.get("Street")),
+            "longitude": point[0] if len(point) == 2 else None,
+            "latitude": point[1] if len(point) == 2 else None,
+        })
+    return results
 
 async def add_review(
     review: Review,
@@ -309,13 +340,32 @@ async def get_filtered_rooms(
     country: str | None = None,
     state: str | None = None,
     city: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    radius_km: float | None = None,
     rating_above: float | None = None,
     review_service_client: AsyncClient = Depends(get_review_service_client),
     booking_service_client: AsyncClient = Depends(get_booking_service_client),
     property_service_client: AsyncClient = Depends(get_property_service_client),
 ):
     properties = []
-    if country and city:
+    if latitude is not None and longitude is not None and (radius_km is not None):
+        prop_resp = await property_service_client.get(
+            "/properties/near",
+            params={
+                "latitude": latitude,
+                "longitude": longitude,
+                "radius_km": radius_km,
+                **({"country": country} if country else {}),
+                **({"state": state} if state else {}),
+                **({"city": city} if city else {}),
+            },
+            timeout=10.0,
+        )
+        if prop_resp.status_code != 200:
+            raise HTTPException(status_code=prop_resp.status_code, detail=prop_resp.text)
+        properties = [Property(**p) for p in (prop_resp.json() or [])]
+    elif country and city:
         params = {"country": country, "city": city}
         if state:
             params["state"] = state

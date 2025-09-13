@@ -67,16 +67,16 @@ async def get_properties_by_city(
 async def get_properties_near(
     latitude: float,
     longitude: float,
-    delta: float,
+    radius_km: float,
     country: str | None = None,
     state: str | None = None,
     city: str | None = None,
     property_table_client: PropertyTableClient = Depends(get_property_table_client),
 ) -> list[Property]:
-    return property_table_client.get_properties_in_bbox(
+    return property_table_client.get_properties_within_radius(
         Decimal(str(latitude)),
         Decimal(str(longitude)),
-        delta,
+        radius_km,
         country=country,
         state=state,
         city=city,

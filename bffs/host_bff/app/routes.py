@@ -12,6 +12,7 @@ from bffs.host_bff.app.handlers import (
     put_property,
     put_room,
     update_current_user,
+    search_places,
 )
 from bffs.host_bff.app.models.booking import Booking
 from bffs.host_bff.app.models.property import Property, PropertyDetail
@@ -33,7 +34,7 @@ router.add_api_route(
 
 router.add_api_route(
     path="/property",
-    methods=["PUT"],
+    methods=["POST", "PUT"],
     response_model=UUID,
     endpoint=put_property,
     description="Add a new property"
@@ -41,7 +42,7 @@ router.add_api_route(
 
 router.add_api_route(
     path="/room",
-    methods=["PUT"],
+    methods=["POST","PUT"],
     response_model=UUID,
     endpoint=put_room,
     description="Add a new room"
@@ -85,6 +86,13 @@ router.add_api_route(
     response_model=list[Review],
     endpoint=get_property_reviews,
     description="Get property reviews"
+)
+
+router.add_api_route(
+    path="/places/search-text",
+    methods=["GET"],
+    endpoint=search_places,
+    description="Search places by free text via Amazon Location"
 )
 
 router.add_api_route(

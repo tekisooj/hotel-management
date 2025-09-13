@@ -6,7 +6,7 @@ from aws_cdk import (
 from aws_cdk.aws_lambda import Function, Runtime, Code
 from aws_cdk.aws_apigateway import LambdaRestApi, EndpointType, Cors
 from aws_cdk.aws_events import EventBus
-from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
+from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy, PolicyStatement
 from constructs import Construct
 
 class GuestBffStack(Stack):
@@ -46,7 +46,8 @@ class GuestBffStack(Stack):
                 "GUEST_BFF_ENV": self.env_name,
                 "EVENT_BUS_NAME": "hotel-event-bus",
                 "AUDIENCE": self.audience,
-                "JWKS_URL": self.jwks_url
+                "JWKS_URL": self.jwks_url,
+                "PLACE_INDEX_NAME": "HotelManagementPlaceIndex",
             }
         )
 
@@ -66,3 +67,8 @@ class GuestBffStack(Stack):
 
         event_bus = EventBus.from_event_bus_name(self, "SharedEventBus", "hotel-event-bus")
         event_bus.grant_put_events_to(self.lambda_function)  # type: ignore
+
+        self.lambda_function.add_to_role_policy(PolicyStatement(
+            actions=["geo:SearchPlaceIndexForText"],
+            resources=["*"]
+        ))

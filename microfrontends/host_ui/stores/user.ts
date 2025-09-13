@@ -1,7 +1,5 @@
-import { defineStore } from 'pinia'
+import { defineStore, storeToRefs } from 'pinia'
 import { jwtDecode } from 'jwt-decode'
-import { UserState } from 'types/UserState'
-import { User } from 'types/User'
 
 export function getUserUuidFromToken(token: string): string | null {
   try {
@@ -13,6 +11,18 @@ export function getUserUuidFromToken(token: string): string | null {
   }
 }
 
+interface UserProfile {
+  uuid?: string
+  name?: string
+  last_name?: string
+  email?: string
+}
+
+interface UserState {
+  token: string | null
+  uuid: string | null
+  profile: UserProfile | null
+}
 
 export const useUserStore = defineStore('user', {
   state: (): UserState => ({
@@ -36,16 +46,11 @@ export const useUserStore = defineStore('user', {
     async fetchProfile() {
       const config = useRuntimeConfig()
       if (!this.token) return
-      try {
-        const me = await $fetch<User>(`${config.public.apiBase}/me`, {
-          headers: { Authorization: `Bearer ${this.token}` },
-        })
-        this.profile = me
-        if (me?.uuid) this.uuid = me.uuid
-      } catch (e) {
-        this.clear()
-        throw e
-      }
+      const me = await $fetch<UserProfile>(`${config.public.apiBase}/me`, {
+        headers: { Authorization: `Bearer ${this.token}` },
+      })
+      this.profile = me
+      if (me?.uuid) this.uuid = me.uuid
     },
   },
 })

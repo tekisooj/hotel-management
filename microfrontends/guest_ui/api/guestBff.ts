@@ -118,5 +118,11 @@ export function useGuestBff() {
     cancelMyBooking,
     getMe,
     updateMe,
+    async searchPlaces(text: string) {
+      return await $fetch<any>(`${baseURL}/places/search-text`, {
+        params: { text},
+        headers: authHeaders(),
+      })
+    },
   }
 }
