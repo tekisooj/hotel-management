@@ -27,37 +27,51 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect changed services
+      - name: Detect changed components (services + bffs)
         id: set
         shell: bash
         run: |
           git fetch origin main --depth=1 || true
           EVENT_NAME="${{ github.event_name }}"
           echo "Event: $EVENT_NAME"
-          changed=""
+          CHANGED_PATHS=""
           if [ "$EVENT_NAME" = "push" ]; then
-            BEFORE="${{ github.event.before }}"
-            AFTER="${{ github.sha }}"
+            BEFORE="${{ github.event.before }}"; AFTER="${{ github.sha }}"
             echo "Diff range (push): $BEFORE..$AFTER"
-            changed=$(git diff --name-only "$BEFORE" "$AFTER" | grep -Eo '^services/[^/]+' | cut -d '/' -f2 | sort -u)
+            CHANGED_PATHS=$(git diff --name-only "$BEFORE" "$AFTER")
           elif [ "$EVENT_NAME" = "pull_request" ]; then
             echo "Diff range (PR): origin/main...HEAD"
-            changed=$(git diff --name-only origin/main...HEAD | grep -Eo '^services/[^/]+' | cut -d '/' -f2 | sort -u)
-          elif [ "$EVENT_NAME" = "pull_request_target" ]; then
-            if [ "${{ github.event.action }}" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ] && [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
-              echo "PR merged into main; deploying all services"
-              changed=$(ls services | tr '\n' '\n')
+            CHANGED_PATHS=$(git diff --name-only origin/main...HEAD)
+          elif [ "$EVENT_NAME" = "pull_request_target" ] && \
+               [ "${{ github.event.action }}" = "closed" ] && \
+               [ "${{ github.event.pull_request.merged }}" = "true" ] && \
+               [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
+            echo "PR merged into main; deploying all components"
+            CHANGED_PATHS="__ALL__"
+          fi
+
+          TARGETS_JSON='[]'
+          if [ "$CHANGED_PATHS" = "__ALL__" ] || [ -z "$CHANGED_PATHS" ]; then
+            echo "No specific paths detected; defaulting to all services and bffs"
+            if [ -d services ]; then
+              for n in $(ls services); do
+                TARGETS_JSON=$(echo "$TARGETS_JSON" | jq -c --arg p "services/$n" '. + [$p]')
+              done
             fi
+            if [ -d bffs ]; then
+              for n in $(ls bffs); do
+                TARGETS_JSON=$(echo "$TARGETS_JSON" | jq -c --arg p "bffs/$n" '. + [$p]')
+              done
+            fi
+          else
+            SRV=$(echo "$CHANGED_PATHS" | grep -Eo '^services/[^/]+' | sort -u)
+            BFF=$(echo "$CHANGED_PATHS" | grep -Eo '^bffs/[^/]+' | sort -u)
+            for p in $SRV; do TARGETS_JSON=$(echo "$TARGETS_JSON" | jq -c --arg p "$p" '. + [$p]'); done
+            for p in $BFF; do TARGETS_JSON=$(echo "$TARGETS_JSON" | jq -c --arg p "$p" '. + [$p]'); done
           fi
 
-          if [ -z "$changed" ]; then
-            echo "No changed services computed; defaulting to all services"
-            changed=$(ls services | tr '\n' '\n')
-          fi
-
-          changed_json=$(echo "$changed" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "Changed services: $changed_json"
-          echo "changed=$changed_json" >> $GITHUB_OUTPUT
+          echo "Changed components: $TARGETS_JSON"
+          echo "changed=$TARGETS_JSON" >> $GITHUB_OUTPUT
 
   deploy-pr:
     if: github.event_name == 'pull_request'
@@ -65,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: ${{ fromJson(needs.detect-changes.outputs.changed) }}
+        component: ${{ fromJson(needs.detect-changes.outputs.changed) }}
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
 
@@ -81,7 +95,7 @@ jobs:
 
       - name: Install requirements
         run: |
-          pip install -r services/${{ matrix.service }}/infra/requirements.txt
+          pip install -r ${{ matrix.component }}/infra/requirements.txt
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -91,13 +105,14 @@ jobs:
 
       - name: Deploy Preview Stack
         run: |
-          SERVICE_NAME=${{ matrix.service }}
+          SERVICE_PATH=${{ matrix.component }}
+          SERVICE_NAME=$(basename "$SERVICE_PATH")
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
           STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
 
           echo "Deploying stack: $STACK_NAME"
           cdk deploy "$STACK_NAME" \
-            --app "python3 services/${SERVICE_NAME}/infra/app.py" \
+            --app "python3 ${SERVICE_PATH}/infra/app.py" \
             --context env=pr \
             --context pr_number=${PR_NUMBER} \
             --require-approval never
@@ -110,7 +125,7 @@ jobs:
       runs-on: ubuntu-latest
       strategy:
         matrix:
-          service: ${{ fromJson(needs.detect-changes.outputs.changed) }}
+          component: ${{ fromJson(needs.detect-changes.outputs.changed) }}
 
       steps:
         - uses: actions/checkout@v4
@@ -124,7 +139,7 @@ jobs:
 
         - name: Install requirements
           run: |
-            pip install -r services/${{ matrix.service }}/infra/requirements.txt
+            pip install -r ${{ matrix.component }}/infra/requirements.txt
 
         - name: Configure AWS credentials
           uses: aws-actions/configure-aws-credentials@v4
@@ -134,13 +149,14 @@ jobs:
 
         - name: Deploy Int Stack
           run: |
-            SERVICE_NAME=${{ matrix.service }}
+            SERVICE_PATH=${{ matrix.component }}
+            SERVICE_NAME=$(basename "$SERVICE_PATH")
             PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
             STACK_NAME="${PASCAL_CASE_NAME}Stack-int"
 
             echo "Deploying stack: $STACK_NAME"
             cdk deploy "$STACK_NAME" \
-              --app "python3 services/${SERVICE_NAME}/infra/app.py" \
+              --app "python3 ${SERVICE_PATH}/infra/app.py" \
               --context env=int \
               --require-approval never
 
@@ -152,7 +168,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: ${{ fromJson(needs.detect-changes.outputs.changed) }}
+        component: ${{ fromJson(needs.detect-changes.outputs.changed) }}
     
 
     steps:
@@ -167,7 +183,7 @@ jobs:
 
       - name: Install requirements
         run: |
-          pip install -r services/${{ matrix.service }}/infra/requirements.txt
+          pip install -r ${{ matrix.component }}/infra/requirements.txt
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -177,13 +193,14 @@ jobs:
 
       - name: Deploy Production Stack
         run: |
-          SERVICE_NAME=${{ matrix.service }}
+          SERVICE_PATH=${{ matrix.component }}
+          SERVICE_NAME=$(basename "$SERVICE_PATH")
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
           STACK_NAME="${PASCAL_CASE_NAME}Stack-prod"
 
           echo "Deploying stack: $STACK_NAME"
           cdk deploy "$STACK_NAME" \
-            --app "python3 services/${SERVICE_NAME}/infra/app.py" \
+            --app "python3 ${SERVICE_PATH}/infra/app.py" \
             --context env=prod \
             --require-approval never
 
@@ -191,9 +208,9 @@ jobs:
     if: github.event.pull_request.merged == false && github.event.action == 'closed'
     needs: detect-changes
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: ${{ fromJson(needs.detect-changes.outputs.changed) }}
+      strategy:
+        matrix:
+          component: ${{ fromJson(needs.detect-changes.outputs.changed) }}
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
 
@@ -204,7 +221,7 @@ jobs:
 
       - name: Install requirements
         run: |
-          pip install -r services/${{ matrix.service }}/infra/requirements.txt
+          pip install -r ${{ matrix.component }}/infra/requirements.txt
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -214,7 +231,8 @@ jobs:
 
       - name: Destroy PR Preview Stack
         run: |
-          SERVICE_NAME=${{ matrix.service }}
+          SERVICE_PATH=${{ matrix.component }}
+          SERVICE_NAME=$(basename "$SERVICE_PATH")
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
           STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
 
