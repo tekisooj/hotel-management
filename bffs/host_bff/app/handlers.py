@@ -11,6 +11,8 @@ from app.models.user import UserResponse, UserUpdate
 from bffs.host_bff.app.models.property import Amenity, Property, PropertyDetail, Room
 from bffs.host_bff.app.models.property import Availability
 from services.user_service.app.models import User
+import os
+import boto3
 
 
 class JWTVerifier:
@@ -94,6 +96,33 @@ def get_user_service_client(request: Request) -> AsyncClient:
 
 def get_event_bus(request: Request):
     return request.app.state.event_bus
+
+
+async def search_places(text: str, index: str | None = None) -> list[dict]:
+
+    index_name = index or os.environ.get("PLACE_INDEX_NAME")
+    if not index_name:
+        raise HTTPException(status_code=500, detail="PLACE_INDEX_NAME not configured")
+    client = boto3.client("location")
+    try:
+        resp = client.search_place_index_for_text(IndexName=index_name, Text=text, MaxResults=5)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Places lookup failed: {e}")
+    results: list[dict] = []
+    for r in resp.get("Results", []):
+        place = r.get("Place", {})
+        point = place.get("Geometry", {}).get("Point", [])
+        results.append({
+            "place_id": place.get("Id") or place.get("Label"),
+            "label": place.get("Label"),
+            "country": place.get("CountryCode") or place.get("Country"),
+            "city": place.get("Municipality"),
+            "state": place.get("Region"),
+            "address": place.get("AddressNumber") and place.get("Street") and f"{place.get('AddressNumber')} {place.get('Street')}" or place.get("Street"),
+            "longitude": point[0] if len(point) == 2 else None,
+            "latitude": point[1] if len(point) == 2 else None,
+        })
+    return results
 
 
 async def get_user_properties(

@@ -48,6 +48,8 @@ class Property(BaseModel):
     longitude: float | None = Field(description="Longitude of the property", default=None)
     created_at: datetime | None = Field(description="Property created at", default=None)
     updated_at: datetime | None = Field(description="Property updated at", default=None)
+    stars: int | None = Field(description="Number of stard", default=1)
+    place_id: str | None = Field(description="AWS location place id", default=None)
 
 
 class PropertyDetail(Property):

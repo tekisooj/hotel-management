@@ -6,7 +6,7 @@ from aws_cdk import (
 from aws_cdk.aws_lambda import Function, Runtime, Code
 from aws_cdk.aws_apigateway import LambdaRestApi, EndpointType, Cors
 from aws_cdk.aws_events import EventBus
-from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
+from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy, PolicyStatement
 from constructs import Construct
 
 class HostBffStack(Stack):
@@ -44,7 +44,8 @@ class HostBffStack(Stack):
                 "HOST_BFF_ENV": self.env_name,
                 "EVENT_BUS_NAME": "hotel-event-bus",
                 "AUDIENCE": self.audience,
-                "JWKS_URL": self.jwks_url
+                "JWKS_URL": self.jwks_url,
+                "PLACE_INDEX_NAME": f"hotel-place-index-{env_name}{f'-{pr_number}' if pr_number else ''}",
             }
         )
 
@@ -61,3 +62,9 @@ class HostBffStack(Stack):
                 "allow_headers": Cors.DEFAULT_HEADERS,
             },
         )
+
+        # Allow BFF to query Amazon Location Places
+        self.lambda_function.add_to_role_policy(PolicyStatement(
+            actions=["geo:SearchPlaceIndexForText"],
+            resources=["*"]
+        ))

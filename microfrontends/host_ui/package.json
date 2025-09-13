@@ -14,8 +14,10 @@
     "@aws-sdk/credential-provider-node": "^3.x.x",
     "@aws-sdk/credential-providers": "^3.888.0",
     "@pinia/nuxt": "^0.5.1",
+    "amazon-location-helpers": "^1.1.1",
     "axios": "^1.7.2",
     "jwt-decode": "^4.0.0",
+    "maplibre-gl": "^5.7.1",
     "nuxt": "^3.12.0",
     "pinia": "^2.1.7"
   },

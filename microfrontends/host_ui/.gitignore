@@ -1,0 +1,26 @@
+.nuxt
+.output
+node_modules
+dist
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors/OS
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+
+# Tooling caches
+.cache/
+.parcel-cache/
+.turbo/

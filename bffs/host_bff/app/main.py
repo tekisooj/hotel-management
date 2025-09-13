@@ -1,10 +1,10 @@
 import logging
 import os
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 from app.routes import router
-from app.config import AppMetadata, guest_bff_prod_configuration, guest_bff_int_configuration
-from app.event_bus import EventBusClient
+from app.config import AppMetadata, host_bff_prod_configuration, host_bff_int_configuration
 from app.handlers import JWTVerifier
 from httpx import AsyncClient
 
@@ -13,7 +13,7 @@ logger.setLevel(logging.INFO)
 
 def create_app() -> FastAPI:
     app_metadata = AppMetadata()
-    app_config = guest_bff_prod_configuration if app_metadata.guest_bff_env == "prod" else guest_bff_int_configuration
+    app_config = host_bff_prod_configuration if app_metadata.host_bff_env == "prod" else host_bff_int_configuration
     app = FastAPI(
         title=app_metadata.app_title,
         description=app_metadata.app_description
@@ -27,8 +27,16 @@ def create_app() -> FastAPI:
     app.state.property_service_client = AsyncClient(base_url=app_config.property_service_url)
     app.state.booking_service_client = AsyncClient(base_url=app_config.booking_service_url)
     app.state.review_service_client = AsyncClient(base_url=app_config.review_service_url)
-    app.state.jwt_verifier = JWTVerifier(jwks_url=app_config.jwks_url, audience=app_config.audience, env=app_metadata.guest_bff_env)
-    app.state.event_bus = EventBusClient(bus_name=os.getenv("EVENT_BUS_NAME"))
+    app.state.jwt_verifier = JWTVerifier(jwks_url=app_config.jwks_url, audience=app_config.audience, env=app_metadata.host_bff_env)
+    app.state.event_bus = None
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"]
+    )
 
     app.include_router(router)
 

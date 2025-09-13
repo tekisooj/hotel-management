@@ -309,13 +309,32 @@ async def get_filtered_rooms(
     country: str | None = None,
     state: str | None = None,
     city: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    radius_km: float | None = None,
     rating_above: float | None = None,
     review_service_client: AsyncClient = Depends(get_review_service_client),
     booking_service_client: AsyncClient = Depends(get_booking_service_client),
     property_service_client: AsyncClient = Depends(get_property_service_client),
 ):
     properties = []
-    if country and city:
+    if latitude is not None and longitude is not None and (radius_km is not None):
+        prop_resp = await property_service_client.get(
+            "/properties/near",
+            params={
+                "latitude": latitude,
+                "longitude": longitude,
+                "radius_km": radius_km,
+                **({"country": country} if country else {}),
+                **({"state": state} if state else {}),
+                **({"city": city} if city else {}),
+            },
+            timeout=10.0,
+        )
+        if prop_resp.status_code != 200:
+            raise HTTPException(status_code=prop_resp.status_code, detail=prop_resp.text)
+        properties = [Property(**p) for p in (prop_resp.json() or [])]
+    elif country and city:
         params = {"country": country, "city": city}
         if state:
             params["state"] = state

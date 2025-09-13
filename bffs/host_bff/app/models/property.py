@@ -38,6 +38,7 @@ class Property(BaseModel):
 
     uuid: UUID | None = Field(description="UUID of a property", default=None)
     user_uuid: UUID = Field(description="UUID of a property owner")
+    place_id: str | None = Field(description="External place provider id", default=None)
     name: str = Field(description="Property name")
     description: str | None = Field(description="Property description", default=None)
     country: str = Field(description="Country the property is in")
@@ -50,6 +51,8 @@ class Property(BaseModel):
     longitude: float | None = Field(description="Longitude of the property", default=None)
     created_at: datetime | None = Field(description="Property created at", default=None)
     updated_at: datetime | None = Field(description="Property updated at", default=None)
+    stars: int | None = Field(description="Number of stard", default=1)
+    place_id: str | None = Field(description="AWS location place id", default=None)
 
 
 class Availability(Room):

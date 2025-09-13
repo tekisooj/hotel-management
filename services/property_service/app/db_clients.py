@@ -127,6 +127,54 @@ class PropertyTableClient:
 
         return results
 
+    def get_properties_within_radius(
+        self,
+        latitude: Decimal,
+        longitude: Decimal,
+        radius_km: float,
+        country: str | None = None,
+        state: str | None = None,
+        city: str | None = None,
+    ) -> list[Property]:
+        import math
+        lat_f = float(latitude)
+        lon_f = float(longitude)
+        delta_lat = radius_km / 111.0
+        delta_lon = radius_km / (111.0 * max(math.cos(math.radians(lat_f)), 1e-6))
+
+        candidates = self.get_properties_in_bbox(
+            latitude=latitude,
+            longitude=longitude,
+            delta=max(delta_lat, delta_lon),
+            country=country,
+            state=state,
+            city=city,
+        )
+
+        def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+            R = 6371.0
+            phi1 = math.radians(lat1)
+            phi2 = math.radians(lat2)
+            dphi = math.radians(lat2 - lat1)
+            dlambda = math.radians(lon2 - lon1)
+            a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+            return R * c
+
+        results: list[Property] = []
+        for p in candidates:
+            plat = getattr(p, 'latitude', None)
+            plon = getattr(p, 'longitude', None)
+            if plat is None or plon is None:
+                continue
+            try:
+                d = haversine(lat_f, lon_f, float(plat), float(plon))
+            except Exception:
+                continue
+            if d <= radius_km:
+                results.append(p)
+        return results
+
 
 
 class RoomTableClient:

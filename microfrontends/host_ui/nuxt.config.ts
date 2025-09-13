@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   ],
   app: {
     head: {
-      title: 'Guest UI',
+      title: 'Host UI',
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       ],
@@ -32,7 +32,10 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBase: process.env.GUEST_API_BASE || '',
+      apiBase: process.env.HOST_API_BASE || process.env.HOST_API_DOMAIN || '',
+      awsRegion: process.env.VITE_AWS_REGION || '',
+      awsPlaceIndex: process.env.VITE_AWS_PLACE_INDEX || '',
+      awsLocationApiKey: process.env.VITE_AWS_LOCATION_API_KEY || '',
     },
   },
 })
