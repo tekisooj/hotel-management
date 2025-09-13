@@ -28,7 +28,7 @@ jobs:
       - name: Install deps and generate static site
         working-directory: microfrontends/guest_ui
         run: |
-          npm ci
+          npm install --no-fund --no-audit
           npm run generate
 
       - name: Setup Python and CDK
