@@ -94,13 +94,12 @@ def get_property_service_client(request: Request) -> AsyncClient:
 def get_user_service_client(request: Request) -> AsyncClient:
     return request.app.state.user_service_client
 
-def get_event_bus(request: Request):
-    return request.app.state.event_bus
+def get_place_index(request: Request):
+    return request.app.state.place_index
 
 
-async def search_places(text: str, index: str | None = None) -> list[dict]:
+async def search_places(text: str, index_name: str = Depends(get_place_index)) -> list[dict]:
 
-    index_name = index or os.environ.get("PLACE_INDEX_NAME")
     if not index_name:
         raise HTTPException(status_code=500, detail="PLACE_INDEX_NAME not configured")
     client = boto3.client("location")

@@ -36,16 +36,15 @@ const emit = defineEmits<{
   (e: 'search', payload: { country: string; city: string; state?: string; check_in_date: string; check_out_date: string }): void
 }>()
 
-const handleLocation = (location) =>
-{
-  name.value = location.value;
-  country.value = location.value;
-  state.value = location.value;
-  city.value = location.value;
-  county.value = location.value;
-  address.value = location.value;
-  latitude.value = location.value;
-  longitude.value = location.value;
+const handleLocation = (location: any) => {
+  name.value = location.name
+  country.value = location.country
+  state.value = location.state
+  city.value = location.city
+  county.value = location.county
+  address.value = location.address
+  latitude.value = location.latitude
+  longitude.value = location.longitude
 }
 
 const canSearch = computed(() => !!country.value && !!city.value && !!checkIn.value && !!checkOut.value)

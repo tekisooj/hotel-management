@@ -32,7 +32,11 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBase: process.env.GUEST_API_BASE || '',
+      // Use explicit base if provided; else derive from domain with '/prod'
+      apiBase: process.env.GUEST_API_BASE || (
+        process.env.GUEST_API_DOMAIN ? `${(process.env.GUEST_API_DOMAIN as string).replace(/\/$/, '')}/prod` : ''
+      ),
+      awsPlaceIndex: process.env.VITE_AWS_PLACE_INDEX || '',
     },
   },
 })

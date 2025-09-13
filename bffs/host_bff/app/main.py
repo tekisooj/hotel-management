@@ -8,6 +8,7 @@ from app.config import AppMetadata, host_bff_prod_configuration, host_bff_int_co
 from app.handlers import JWTVerifier
 from httpx import AsyncClient
 
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -28,7 +29,8 @@ def create_app() -> FastAPI:
     app.state.booking_service_client = AsyncClient(base_url=app_config.booking_service_url)
     app.state.review_service_client = AsyncClient(base_url=app_config.review_service_url)
     app.state.jwt_verifier = JWTVerifier(jwks_url=app_config.jwks_url, audience=app_config.audience, env=app_metadata.host_bff_env)
-    app.state.event_bus = None
+    app.state.place_index = app_config.place_index
+
 
     app.add_middleware(
         CORSMiddleware,

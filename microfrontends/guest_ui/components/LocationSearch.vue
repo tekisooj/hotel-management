@@ -15,7 +15,7 @@
         @click="selectPlace(result)"
         class="px-4 py-2 cursor-pointer hover:bg-gray-100"
       >
-        {{ result.Place.Label }}
+        {{ result.label || result.Place?.Label }}
       </li>
     </ul>
   </div>
@@ -23,33 +23,14 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import {
-  LocationClient,
-  SearchPlaceIndexForTextCommand,
-  SearchPlaceIndexForTextCommandOutput,
-  Place,
-} from '@aws-sdk/client-location'
-import { fromCognitoIdentityPool } from '@aws-sdk/credential-providers'
-
-
+import { useGuestBff } from '@/api/guestBff'
 const emit = defineEmits<{
   (e: 'selected', value): void
 }>()
 
-const region = 'us-east-1'
-const placeIndexName = 'MyPlaceIndex'
-const identityPoolId = 'us-east-1:xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-
-const locationClient = new LocationClient({
-  region,
-  credentials: fromCognitoIdentityPool({
-    clientConfig: { region },
-    identityPoolId,
-  }),
-})
-
 const query = ref('')
-const results = ref<SearchPlaceIndexForTextCommandOutput['Results']>([])
+const results = ref<any[]>([])
+const { searchPlaces: searchPlacesApi } = useGuestBff()
 
 const searchPlaces = async () => {
   if (query.value.trim().length < 3) {
@@ -58,38 +39,29 @@ const searchPlaces = async () => {
   }
 
   try {
-    const command = new SearchPlaceIndexForTextCommand({
-      IndexName: placeIndexName,
-      Text: query.value,
-      MaxResults: 5,
-    })
-
-    const response = await locationClient.send(command)
-    results.value = response.Results || []
+    const data = await searchPlacesApi(query.value)
+    results.value = Array.isArray(data) ? data : []
   } catch (error) {
     console.error('Search failed:', error)
   }
 }
 
-const selectPlace = (result: { Place: Place }) => {
-  const place = result.Place
-
+const selectPlace = (place: any) => {
+  // place already simplified by BFF
   const detail = {
-    name: place.Label || '',
-    country: place.Country || '',
-    state: place.Region || '',
-    city: place.Municipality || '',
-    county: place.SubRegion || '',
-    address: place.AddressNumber && place.Street
-      ? `${place.AddressNumber} ${place.Street}`
-      : place.Street || place.Label || '',
-    latitude: place.Geometry?.Point?.[1],
-    longitude: place.Geometry?.Point?.[0],
+    name: place.label || '',
+    country: place.country || '',
+    state: place.state || '',
+    city: place.city || '',
+    county: place.county || '',
+    address: place.address || place.label || '',
+    latitude: place.latitude,
+    longitude: place.longitude,
   }
 
   emit('selected', detail)
 
-  query.value = place.Label || ''
+  query.value = detail.name
   results.value = []
 }
 </script>

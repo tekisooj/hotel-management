@@ -11,6 +11,7 @@ from bffs.guest_bff.app.handlers import (
     get_user_reviews,
     get_current_user,
     update_current_user,
+    search_places,
 )
 from bffs.guest_bff.app.models.booking import Booking
 from bffs.guest_bff.app.models.property import PropertyDetail
@@ -75,6 +76,13 @@ router.add_api_route(
     response_model=PropertyDetail,
     endpoint=get_filtered_rooms,
     description="Get filtered rooms"
+)
+
+router.add_api_route(
+    path="/places/search-text",
+    methods=["GET"],
+    endpoint=search_places,
+    description="Search places by free text via Amazon Location"
 )
 
 router.add_api_route(

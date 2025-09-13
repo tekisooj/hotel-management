@@ -42,10 +42,9 @@ class HostBffStack(Stack):
             memory_size=512,
             environment={
                 "HOST_BFF_ENV": self.env_name,
-                "EVENT_BUS_NAME": "hotel-event-bus",
                 "AUDIENCE": self.audience,
                 "JWKS_URL": self.jwks_url,
-                "PLACE_INDEX_NAME": f"hotel-place-index-{env_name}{f'-{pr_number}' if pr_number else ''}",
+                "PLACE_INDEX_NAME": "HotelManagementPlaceIndex",
             }
         )
 
@@ -62,8 +61,7 @@ class HostBffStack(Stack):
                 "allow_headers": Cors.DEFAULT_HEADERS,
             },
         )
-
-        # Allow BFF to query Amazon Location Places
+        
         self.lambda_function.add_to_role_policy(PolicyStatement(
             actions=["geo:SearchPlaceIndexForText"],
             resources=["*"]

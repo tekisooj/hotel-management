@@ -14,6 +14,7 @@ class AppConfiguration(BaseSettings):
     review_service_url: str
     audience: str | None = None
     jwks_url: str | None = None
+    place_index: str | None = None
 
 host_bff_prod_configuration = AppConfiguration(
     user_service_url="https://9by6xj4b6h.execute-api.us-east-1.amazonaws.com",
@@ -21,7 +22,8 @@ host_bff_prod_configuration = AppConfiguration(
     property_service_url="https://ztcr86tzq7.execute-api.us-east-1.amazonaws.com",
     review_service_url="https://p6fhqo8np0.execute-api.us-east-1.amazonaws.com",
     audience=os.environ.get("AUDIENCE", None),
-    jwks_url=os.environ.get("JWKS_URL", None)
+    jwks_url=os.environ.get("JWKS_URL", None),
+    place_index=os.environ.get("PLACE_INDEX_NAME", None)
 )
 
 host_bff_int_configuration = AppConfiguration(
@@ -30,5 +32,6 @@ host_bff_int_configuration = AppConfiguration(
     property_service_url="https://kuquysqcnb.execute-api.us-east-1.amazonaws.com",
     review_service_url="https://vdt7h3agnj.execute-api.us-east-1.amazonaws.com",
     audience=os.environ.get("AUDIENCE", None),
-    jwks_url=os.environ.get("JWKS_URL", None)
+    jwks_url=os.environ.get("JWKS_URL", None),
+    place_index=os.environ.get("PLACE_INDEX_NAME", None)
 )
