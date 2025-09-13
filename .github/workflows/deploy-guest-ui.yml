@@ -23,12 +23,17 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: microfrontends/guest_ui/package-lock.json
 
       - name: Install deps and generate static site
         working-directory: microfrontends/guest_ui
+        env:
+          # Set API base for generated SPA; adjust to your int/prod URLs as needed
+          GUEST_API_BASE: ${{ github.event_name == 'pull_request' && 'https://example-pr-guest-bff' || 'https://example-int-guest-bff' }}
         run: |
-          npm install --no-fund --no-audit
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
 
       - name: Setup Python and CDK

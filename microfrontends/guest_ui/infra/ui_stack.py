@@ -4,6 +4,7 @@ from aws_cdk import aws_s3 as s3
 from aws_cdk.aws_cloudfront import CfnOriginAccessControl, Distribution, BehaviorOptions, ViewerProtocolPolicy, ErrorResponse
 from aws_cdk.aws_cloudfront_origins import S3Origin
 from aws_cdk.aws_s3_deployment import BucketDeployment, Source
+from pathlib import Path
 
 
 class GuestUiStack(Stack):
@@ -54,10 +55,11 @@ class GuestUiStack(Stack):
         )
 
         # Deploy local built assets (Nuxt generate) to S3 and invalidate CF
+        build_dir = (Path(__file__).resolve().parents[1] / ".output" / "public").as_posix()
         BucketDeployment(
             self,
             f"guest-ui-deploy-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            sources=[Source.asset("../.output/public")],
+            sources=[Source.asset(build_dir)],
             destination_bucket=bucket,
             distribution=dist,
             distribution_paths=["/*"],
