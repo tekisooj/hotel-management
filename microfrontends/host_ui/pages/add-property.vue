@@ -73,6 +73,8 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
+import { useRuntimeConfig } from 'nuxt/app'
+import { useUserStore } from '@/stores/user'
 import { RoomType } from '@/types/RoomType';
 import { Room } from '@/types/Room';
 import { Amenity } from '@/types/Amenity';
@@ -80,6 +82,8 @@ import { PropertyDetail } from '@/types/PropertyDetail';
 import { useHostBff } from '@/api/hostBff';
 
 const { addProperty } = useHostBff();
+const config = useRuntimeConfig()
+const user = useUserStore()
 
 // Room types for select
 const roomTypes: RoomType[] = ['single', 'double', 'suite', 'family', 'deluxe', 'studio'];
@@ -137,7 +141,7 @@ const handleLocation = (location: any) => {
   property.placeId = location.placeId;
 };
 
-function add() {
+async function add() {
   const convertedRooms: Room[] = rooms.map((room) => ({
     uuid: '',
     propertyUuid: '',
@@ -154,6 +158,7 @@ function add() {
   }));
 
   const propDetail: PropertyDetail = {
+    userUuid: user.uuid || (config.public as any).devUserId,
     name: property.hotelName,
     country: property.country,
     state: property.state,
