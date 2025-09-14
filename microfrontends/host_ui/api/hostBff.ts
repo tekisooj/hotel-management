@@ -43,7 +43,12 @@ export function useHostBff() {
   const user = useUserStore()
 
   function authHeaders() {
-    return user.token ? { Authorization: `Bearer ${user.token}` } : {}
+    if (user.token) {
+      return { Authorization: `Bearer ${user.token}` }
+    }
+    // Dev-only convenience: include X-User-Id when no token and a devUserId is configured
+    const devUserId = (config.public as any).devUserId as string | undefined
+    return devUserId ? { 'X-User-Id': devUserId } : {}
   }
 
   async function getProperties(): Promise<PropertyDetail[]> {

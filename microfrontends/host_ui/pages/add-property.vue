@@ -65,8 +65,9 @@
       </div>
     </div>
 
-    <button class="btn btn-primary mb-4" @click="addRoom">+ Add Room</button>
-    <button class="btn btn-success" @click="add">Add Property</button>
+    <button class="btn btn-primary col-md-3 mb-4" @click="addRoom">+ Add Room</button>
+    <hr></hr>
+    <button class="btn btn-success col-md-3 mb-4" @click="add">Add Property</button>
   </div>
 </template>
 

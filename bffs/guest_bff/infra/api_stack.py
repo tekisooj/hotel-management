@@ -61,7 +61,11 @@ class GuestBffStack(Stack):
             default_cors_preflight_options={
                 "allow_origins": Cors.ALL_ORIGINS,
                 "allow_methods": Cors.ALL_METHODS,
-                "allow_headers": Cors.DEFAULT_HEADERS,
+                "allow_headers": [
+                    *Cors.DEFAULT_HEADERS,
+                    "X-User-Id",
+                    "x-user-id",
+                ],
             },
         )
 

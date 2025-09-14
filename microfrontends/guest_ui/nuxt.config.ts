@@ -37,6 +37,8 @@ export default defineNuxtConfig({
         process.env.GUEST_API_DOMAIN ? `${(process.env.GUEST_API_DOMAIN as string).replace(/\/$/, '')}/prod` : ''
       ),
       awsPlaceIndex: process.env.VITE_AWS_PLACE_INDEX || '',
+      // Optional dev convenience header for BFF when no JWT
+      devUserId: process.env.DEV_USER_ID || '',
     },
   },
 })
