@@ -1,8 +1,8 @@
 from datetime import date
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request, Response
-from services.property_service.app.schemas import Amenity, Property, Room
-from services.property_service.app.db_clients import PropertyTableClient, RoomTableClient
+from schemas import Amenity, Property, Room
+from db_clients import PropertyTableClient, RoomTableClient
 from decimal import Decimal
 
 def get_property_table_client(request: Request) -> PropertyTableClient:

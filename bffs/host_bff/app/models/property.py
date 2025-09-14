@@ -3,7 +3,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from uuid import UUID
 
-from bffs.host_bff.app.models.booking import Booking
+from models.booking import Booking
 
 
 class Amenity(BaseModel):

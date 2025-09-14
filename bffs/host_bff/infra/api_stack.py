@@ -4,7 +4,7 @@ from aws_cdk import (
     RemovalPolicy
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
-from aws_cdk.aws_apigateway import LambdaRestApi, EndpointType, Cors
+from aws_cdk.aws_apigateway import LambdaRestApi, EndpointType, Cors, LambdaIntegration
 from aws_cdk.aws_events import EventBus
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy, PolicyStatement
 from constructs import Construct
@@ -61,6 +61,42 @@ class HostBffStack(Stack):
                 "allow_headers": Cors.DEFAULT_HEADERS,
             },
         )
+
+        integration = LambdaIntegration(self.lambda_function)
+
+        places = self.gateway.root.add_resource("places")
+        places_search = places.add_resource("search-text")
+        places_search.add_method("GET", integration)
+
+        properties = self.gateway.root.add_resource("properties")
+        properties.add_method("GET", integration)
+
+        property_res = self.gateway.root.add_resource("property")
+        property_res.add_method("POST", integration)
+        property_res.add_method("PUT", integration)
+        property_id = property_res.add_resource("{property_uuid}")
+        property_id.add_method("DELETE", integration)
+
+        room = self.gateway.root.add_resource("room")
+        room.add_method("POST", integration)
+        room.add_method("PUT", integration)
+        room_id = room.add_resource("{room_uuid}")
+        room_id.add_method("DELETE", integration)
+
+        bookings = self.gateway.root.add_resource("bookings")
+        bookings.add_method("GET", integration)
+
+        booking = self.gateway.root.add_resource("booking")
+        booking_id = booking.add_resource("{booking_uuid}")
+        booking_id.add_method("PATCH", integration)
+
+        reviews = self.gateway.root.add_resource("reviews")
+        reviews_property = reviews.add_resource("{property_uuid}")
+        reviews_property.add_method("GET", integration)
+
+        me = self.gateway.root.add_resource("me")
+        me.add_method("GET", integration)
+        me.add_method("PATCH", integration)
         
         self.lambda_function.add_to_role_policy(PolicyStatement(
             actions=["geo:SearchPlaceIndexForText"],

@@ -4,7 +4,7 @@ from aws_cdk import (
     RemovalPolicy
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
-from aws_cdk.aws_apigateway import LambdaRestApi, EndpointType, Cors
+from aws_cdk.aws_apigateway import LambdaRestApi, EndpointType, Cors, LambdaIntegration
 from aws_cdk.aws_events import EventBus
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy, PolicyStatement
 from constructs import Construct
@@ -72,3 +72,35 @@ class GuestBffStack(Stack):
             actions=["geo:SearchPlaceIndexForText"],
             resources=["*"]
         ))
+
+        integration = LambdaIntegration(self.lambda_function)
+
+        places = self.gateway.root.add_resource("places")
+        places_search = places.add_resource("search-text")
+        places_search.add_method("GET", integration)
+
+        review = self.gateway.root.add_resource("review")
+        review.add_method("POST", integration)
+
+        reviews = self.gateway.root.add_resource("reviews")
+        reviews_property = reviews.add_resource("{property_uuid}")
+        reviews_property.add_method("GET", integration)
+        # NOTE: API Gateway cannot have two sibling variable resources.
+        # The '/reviews/{user_uuid}' route will still work via 'proxy=True'.
+
+        booking = self.gateway.root.add_resource("booking")
+        booking.add_method("POST", integration)
+
+        my = self.gateway.root.add_resource("my")
+        my_bookings = my.add_resource("bookings")
+        my_bookings.add_method("GET", integration)
+        my_booking = my.add_resource("booking")
+        my_booking_id = my_booking.add_resource("{booking_uuid}")
+        my_booking_id.add_method("DELETE", integration)
+
+        rooms = self.gateway.root.add_resource("rooms")
+        rooms.add_method("GET", integration)
+
+        me = self.gateway.root.add_resource("me")
+        me.add_method("GET", integration)
+        me.add_method("PATCH", integration)

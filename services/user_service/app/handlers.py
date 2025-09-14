@@ -1,8 +1,8 @@
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request, Response
-from services.user_service.app.models import User
-from services.user_service.app.schemas import UserCreate, UserResponse, UserUpdate
-from services.user_service.app.db_client import HotelManagementDBClient
+from models import User
+from schemas import UserCreate, UserResponse, UserUpdate
+from db_client import HotelManagementDBClient
 
 def get_hotel_management_db_client(request: Request) -> HotelManagementDBClient:
     return request.app.state.hotel_management_db_client

@@ -1,9 +1,9 @@
 import logging
 import os
 from fastapi import FastAPI
-from app.routes import router
+from routes import router
 from db_client import HotelManagementDBClient
-from services.booking_service.app.config import AppMetadata, booking_service_int_configuration, booking_service_prod_configuration
+from config import AppMetadata, booking_service_int_configuration, booking_service_prod_configuration
 from mangum import Mangum
 
 logger = logging.getLogger()

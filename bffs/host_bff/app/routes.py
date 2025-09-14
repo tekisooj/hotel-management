@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import APIRouter
 
-from bffs.host_bff.app.handlers import (
+from handlers import (
     change_booking_status,
     delete_property,
     delete_room,
@@ -14,11 +14,11 @@ from bffs.host_bff.app.handlers import (
     update_current_user,
     search_places,
 )
-from bffs.host_bff.app.models.booking import Booking
-from bffs.host_bff.app.models.property import Property, PropertyDetail
-from bffs.host_bff.app.models.user import UserResponse
-from bffs.host_bff.app.models.review import Review
-from bffs.host_bff.app.models.property import Room
+from models.booking import Booking
+from models.property import Property, PropertyDetail
+from models.user import UserResponse
+from models.review import Review
+from models.property import Room
 
 
 router = APIRouter()

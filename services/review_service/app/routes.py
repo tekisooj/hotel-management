@@ -1,9 +1,9 @@
 from uuid import UUID
 from fastapi import APIRouter
 
-from services.property_service.app.handlers import add_property
-from services.review_service.app.handlers import add_review, get_property_reviews, get_user_reviews
-from services.review_service.app.schemas import Review
+from handlers import add_property
+from handlers import add_review, get_property_reviews, get_user_reviews
+from schemas import Review
 
 router = APIRouter()
 

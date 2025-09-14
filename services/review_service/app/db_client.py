@@ -6,7 +6,7 @@ import boto3
 from fastapi import HTTPException
 
 from schemas import Review
-from services.review_service.app.utils import from_dynamodb_item, to_dynamodb_item
+from utils import from_dynamodb_item, to_dynamodb_item
 
 
 class ReviewDBClient:

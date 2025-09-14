@@ -1,8 +1,8 @@
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request, Response
-from services.property_service.app.schemas import Property
-from services.review_service.app.db_client import ReviewDBClient
-from services.review_service.app.schemas import Review
+from schemas import Property
+from db_client import ReviewDBClient
+from schemas import Review
 
 def get_review_db_client(request: Request) -> ReviewDBClient:
     return request.app.state.review_db_client

@@ -1,9 +1,9 @@
 import logging
 import os
 from fastapi import FastAPI
-from app.routes import router
+from routes import router
 from db_client import ReviewDBClient
-from services.review_service.app.config import AppMetadata, review_service_int_configuration, review_service_prod_configuration
+from config import AppMetadata, review_service_int_configuration, review_service_prod_configuration
 from mangum import Mangum
 
 logger = logging.getLogger()

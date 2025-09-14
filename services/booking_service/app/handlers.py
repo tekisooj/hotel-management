@@ -1,9 +1,9 @@
 
 from datetime import datetime
 from uuid import UUID
-from fastapi import Depends, Request, Response
-from services.booking_service.app.db_client import HotelManagementDBClient
-from services.booking_service.app.schemas import Booking, BookingUpdateRequest
+from fastapi import Depends, Request
+from db_client import HotelManagementDBClient
+from schemas import Booking, BookingUpdateRequest
 
 def get_hotel_management_db_client(request: Request) -> HotelManagementDBClient:
     return request.app.state.hotel_management_db_client

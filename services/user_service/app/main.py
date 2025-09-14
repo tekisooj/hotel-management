@@ -1,10 +1,10 @@
 import logging
 import os
 from fastapi import FastAPI
-from app.routes import router
+from routes import router
 from db_client import HotelManagementDBClient
-from services.user_service.app.auth import CognitoAuthMiddleware
-from services.user_service.app.config import AppMetadata, user_service_int_configuration, user_service_prod_configuration
+from auth import CognitoAuthMiddleware
+from config import AppMetadata, user_service_int_configuration, user_service_prod_configuration
 from mangum import Mangum
 
 logger = logging.getLogger()

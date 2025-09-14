@@ -4,8 +4,8 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 import boto3
-from services.property_service.app.schemas import Amenity, Property, Room
-from services.property_service.app.utils import from_dynamodb_item, to_dynamodb_item
+from schemas import Amenity, Property, Room
+from utils import from_dynamodb_item, to_dynamodb_item
 
 
 class PropertyTableClient:

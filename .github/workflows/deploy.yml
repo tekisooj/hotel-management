@@ -97,6 +97,21 @@ jobs:
         run: |
           pip install -r ${{ matrix.component }}/infra/requirements.txt
 
+      - name: Vendor Python runtime dependencies
+        shell: bash
+        run: |
+          SERVICE_PATH=${{ matrix.component }}
+          APP_DIR="$SERVICE_PATH/app"
+          if [ -f "$APP_DIR/requirements.txt" ]; then
+            echo "Installing app requirements: $APP_DIR/requirements.txt -> $APP_DIR"
+            pip install -r "$APP_DIR/requirements.txt" -t "$APP_DIR"
+          elif [ -f "$SERVICE_PATH/requirements.txt" ]; then
+            echo "Installing service requirements: $SERVICE_PATH/requirements.txt -> $APP_DIR"
+            pip install -r "$SERVICE_PATH/requirements.txt" -t "$APP_DIR"
+          else
+            echo "No runtime requirements.txt found for $SERVICE_PATH; skipping vendoring"
+          fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -141,6 +156,21 @@ jobs:
           run: |
             pip install -r ${{ matrix.component }}/infra/requirements.txt
 
+        - name: Vendor Python runtime dependencies
+          shell: bash
+          run: |
+            SERVICE_PATH=${{ matrix.component }}
+            APP_DIR="$SERVICE_PATH/app"
+            if [ -f "$APP_DIR/requirements.txt" ]; then
+              echo "Installing app requirements: $APP_DIR/requirements.txt -> $APP_DIR"
+              pip install -r "$APP_DIR/requirements.txt" -t "$APP_DIR"
+            elif [ -f "$SERVICE_PATH/requirements.txt" ]; then
+              echo "Installing service requirements: $SERVICE_PATH/requirements.txt -> $APP_DIR"
+              pip install -r "$SERVICE_PATH/requirements.txt" -t "$APP_DIR"
+            else
+              echo "No runtime requirements.txt found for $SERVICE_PATH; skipping vendoring"
+            fi
+
         - name: Configure AWS credentials
           uses: aws-actions/configure-aws-credentials@v4
           with:
@@ -184,6 +214,21 @@ jobs:
       - name: Install requirements
         run: |
           pip install -r ${{ matrix.component }}/infra/requirements.txt
+
+      - name: Vendor Python runtime dependencies
+        shell: bash
+        run: |
+          SERVICE_PATH=${{ matrix.component }}
+          APP_DIR="$SERVICE_PATH/app"
+          if [ -f "$APP_DIR/requirements.txt" ]; then
+            echo "Installing app requirements: $APP_DIR/requirements.txt -> $APP_DIR"
+            pip install -r "$APP_DIR/requirements.txt" -t "$APP_DIR"
+          elif [ -f "$SERVICE_PATH/requirements.txt" ]; then
+            echo "Installing service requirements: $SERVICE_PATH/requirements.txt -> $APP_DIR"
+            pip install -r "$SERVICE_PATH/requirements.txt" -t "$APP_DIR"
+          else
+            echo "No runtime requirements.txt found for $SERVICE_PATH; skipping vendoring"
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
