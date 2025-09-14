@@ -85,8 +85,8 @@ class GuestBffStack(Stack):
         reviews = self.gateway.root.add_resource("reviews")
         reviews_property = reviews.add_resource("{property_uuid}")
         reviews_property.add_method("GET", integration)
-        reviews_user = reviews.add_resource("{user_uuid}")
-        reviews_user.add_method("GET", integration)
+        # NOTE: API Gateway cannot have two sibling variable resources.
+        # The '/reviews/{user_uuid}' route will still work via 'proxy=True'.
 
         booking = self.gateway.root.add_resource("booking")
         booking.add_method("POST", integration)
