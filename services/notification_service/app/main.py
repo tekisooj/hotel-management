@@ -1,7 +1,7 @@
 import logging
-from services.notification_service.app.config import AppConfiguration
+from config import AppConfiguration
 
-from services.notification_service.app.ses_client import NotificationClient
+from ses_client import NotificationClient
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

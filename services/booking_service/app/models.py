@@ -3,7 +3,7 @@ from sqlalchemy import Column, Numeric, UUID, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 from sqlalchemy import Enum as SqlEnum
-from services.booking_service.app.schemas import BookingStatus
+from schemas import BookingStatus
 
 Base = declarative_base()
 

@@ -3,7 +3,7 @@ import json
 from uuid import UUID
 
 import boto3
-from services.booking_service.app.schemas import Booking, BookingStatus, BookingUpdateRequest
+from schemas import Booking, BookingStatus, BookingUpdateRequest
 from sqlalchemy import and_, create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base, BookingDB

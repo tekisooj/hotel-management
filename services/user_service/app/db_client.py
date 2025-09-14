@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 import boto3
 from fastapi import HTTPException
-from services.user_service.app.schemas import UserCreate, UserResponse, UserUpdate
+from schemas import UserCreate, UserResponse, UserUpdate
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base, User

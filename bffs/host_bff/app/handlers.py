@@ -5,12 +5,11 @@ from httpx import AsyncClient, HTTPError
 from jose import jwt
 import httpx
 
-from app.models.review import Review
-from app.models.booking import Booking, BookingStatus
-from app.models.user import UserResponse, UserUpdate
-from bffs.host_bff.app.models.property import Amenity, Property, PropertyDetail, Room
-from bffs.host_bff.app.models.property import Availability
-from services.user_service.app.models import User
+from models.review import Review
+from models.booking import Booking, BookingStatus
+from models.user import UserResponse, UserUpdate
+from models.property import Property, PropertyDetail, Room
+from models.property import Availability
 import os
 import boto3
 

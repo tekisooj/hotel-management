@@ -3,9 +3,9 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
-from app.routes import router
-from app.config import AppMetadata, host_bff_prod_configuration, host_bff_int_configuration
-from app.handlers import JWTVerifier
+from routes import router
+from config import AppMetadata, host_bff_prod_configuration, host_bff_int_configuration
+from handlers import JWTVerifier
 from httpx import AsyncClient
 
 

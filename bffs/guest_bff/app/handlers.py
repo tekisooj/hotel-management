@@ -7,11 +7,10 @@ import boto3
 from jose import jwt
 import httpx
 
-from app.models.review import Review
-from app.models.booking import Booking
-from app.models.user import UserResponse, UserUpdate
-from bffs.guest_bff.app.models.property import Amenity, Property, PropertyDetail, Room
-from services.user_service.app.models import User
+from models.review import Review
+from models.booking import Booking
+from models.user import UserResponse, UserUpdate
+from models.property import Amenity, Property, PropertyDetail, Room
 
 
 class JWTVerifier:

@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import APIRouter
 
-from services.property_service.app.handlers import (
+from handlers import (
     add_property,
     delete_property,
     delete_room,
@@ -14,7 +14,7 @@ from services.property_service.app.handlers import (
     add_room,
     get_user_properties,
 )
-from services.property_service.app.schemas import Property, Room
+from schemas import Property, Room
 
 router = APIRouter()
 

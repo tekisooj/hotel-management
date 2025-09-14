@@ -1,8 +1,8 @@
 from uuid import UUID
 from fastapi import APIRouter
 
-from services.booking_service.app.handlers import add_booking, cancel_booking, check_availability, get_booking, get_filtered_bookings, update_booking
-from services.booking_service.app.schemas import Booking
+from handlers import add_booking, cancel_booking, check_availability, get_booking, get_filtered_bookings, update_booking
+from schemas import Booking
 
 router = APIRouter()
 

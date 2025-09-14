@@ -3,10 +3,10 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
-from app.routes import router
-from app.config import AppMetadata, guest_bff_prod_configuration, guest_bff_int_configuration
-from app.event_bus import EventBusClient
-from app.handlers import JWTVerifier
+from routes import router
+from config import AppMetadata, guest_bff_prod_configuration, guest_bff_int_configuration
+from event_bus import EventBusClient
+from handlers import JWTVerifier
 from httpx import AsyncClient
 
 logger = logging.getLogger()

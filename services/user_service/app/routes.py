@@ -1,8 +1,8 @@
 from uuid import UUID
 from fastapi import APIRouter
-from app.handlers import get_logged_in_user, get_user, delete_user, register_user, update_user
-from services.user_service.app.models import User
-from services.user_service.app.schemas import  UserCreate, UserResponse
+from handlers import get_logged_in_user, get_user, delete_user, register_user, update_user
+from models import User
+from schemas import  UserCreate, UserResponse
 
 router = APIRouter()
 

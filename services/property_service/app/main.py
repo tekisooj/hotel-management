@@ -1,9 +1,9 @@
 import logging
 import os
 from fastapi import FastAPI
-from app.routes import router
-from services.property_service.app.db_clients import PropertyTableClient, RoomTableClient
-from services.property_service.app.config import AppMetadata, property_service_int_configuration, property_service_prod_configuration
+from routes import router
+from db_clients import PropertyTableClient, RoomTableClient
+from config import AppMetadata, property_service_int_configuration, property_service_prod_configuration
 from mangum import Mangum
 
 logger = logging.getLogger()
