@@ -21,7 +21,7 @@ class RoomType(str, Enum):
 class Room(BaseModel):
 
     uuid: UUID | None = Field(description="UUID of a room", default=None)
-    property_uuid: UUID = Field(description="UUID of a property")
+    property_uuid: UUID | None = Field(description="UUID of a property", default = None)
     name: str = Field(description="Room name")
     description: str = Field(description="Room description", default=None)
     capacity: int = Field(description="Room capacity")

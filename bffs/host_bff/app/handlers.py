@@ -186,8 +186,9 @@ async def put_property(
         return prop_uuid
     
     for room in property.rooms:
-        
-        response = await property_service_client.post(f"/room", json = room.model_dump())
+        room_dict = room.model_dump()
+        room_dict["property_uuid"] = prop_uuid
+        response = await property_service_client.post(f"/room", json = room_dict)
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=response.text)
 

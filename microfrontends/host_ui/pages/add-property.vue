@@ -143,8 +143,6 @@ const handleLocation = (location: any) => {
 
 async function add() {
   const convertedRooms: Room[] = rooms.map((room) => ({
-    uuid: '',
-    propertyUuid: '',
     name: room.name!,
     description: room.description!,
     capacity: room.capacity!,
