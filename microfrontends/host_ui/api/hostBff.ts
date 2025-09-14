@@ -110,7 +110,7 @@ export function useHostBff() {
     getPropertyReviews,
     async searchPlaces(text: string) {
       return await $fetch<any>(`${baseURL}/places/search-text`, {
-        params: { text },
+        params: { text, index: (config.public as any).awsPlaceIndex },
         headers: authHeaders(),
       })
     },

@@ -94,17 +94,23 @@ def get_property_service_client(request: Request) -> AsyncClient:
 def get_user_service_client(request: Request) -> AsyncClient:
     return request.app.state.user_service_client
 
-def get_place_index(request: Request):
-    return request.app.state.place_index
+def get_place_index(request: Request) -> str | None:
+    # Prefer value set on app state; fall back to env var
+    place_index = getattr(request.app.state, "place_index", None)
+    return place_index or os.environ.get("PLACE_INDEX_NAME")
 
 
-async def search_places(text: str, index_name: str = Depends(get_place_index)) -> list[dict]:
-
-    if not index_name:
-        raise HTTPException(status_code=500, detail="PLACE_INDEX_NAME not configured")
+async def search_places(
+    text: str,
+    index: str | None = None,
+    index_name: str | None = Depends(get_place_index),
+) -> list[dict]:
+    use_index = (index or index_name or "").strip()
+    if not use_index:
+        raise HTTPException(status_code=500, detail="PLACE_INDEX_NAME not configured; pass ?index=... or set env")
     client = boto3.client("location")
     try:
-        resp = client.search_place_index_for_text(IndexName=index_name, Text=text, MaxResults=5)
+        resp = client.search_place_index_for_text(IndexName=use_index, Text=text, MaxResults=5)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Places lookup failed: {e}")
     results: list[dict] = []
