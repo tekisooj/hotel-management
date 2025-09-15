@@ -52,7 +52,9 @@ export function useHostBff() {
   }
 
   async function getProperties(): Promise<PropertyDetail[]> {
-    return await $fetch<PropertyDetail[]>(`${baseURL}/properties` as string)
+    return await $fetch<PropertyDetail[]>(`${baseURL}/properties` as string, {
+      headers: authHeaders(),
+    })
   }
 
   async function addProperty(body: PropertyDetail): Promise<string> {
