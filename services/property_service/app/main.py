@@ -8,11 +8,11 @@ from config import AppMetadata, property_service_int_configuration, property_ser
 from mangum import Mangum
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
 if not logger.hasHandlers():
-    handler = logging.StreamHandler(sys.stdout)
-    logger.addHandler(handler)
+    logger.addHandler(logging.StreamHandler())
+
+logger.setLevel(logging.INFO)
 
     
 

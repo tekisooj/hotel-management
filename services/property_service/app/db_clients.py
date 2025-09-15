@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 from typing import Any
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -7,6 +8,7 @@ import boto3
 from schemas import Amenity, Property, Room
 from utils import from_dynamodb_item, to_dynamodb_item
 
+logger = logging.getLogger()
 
 class PropertyTableClient:
     def __init__(self, property_table_name: str | None) -> None:
@@ -25,11 +27,13 @@ class PropertyTableClient:
             data["created_at"] = datetime.now()
         data["updated_at"] = datetime.now()
 
+        logger.info("DB CLIENT", self.property_table_name, self.property_db_client)
+
         self.property_db_client.put_item(
             TableName=self.property_table_name,
             Item=to_dynamodb_item(data),
         )
-        return UUID(str(data["uuid"]))
+        return data["uuid"]
     
     def get_property(self, property_uuid: UUID) -> Property:
         response = self.property_db_client.get_item(
@@ -194,12 +198,12 @@ class RoomTableClient:
             data["created_at"] = datetime.now()
         
         data["updated_at"] = datetime.now()
-
+    
         self.room_db_client.put_item(
             TableName=self.room_table_name,
             Item=to_dynamodb_item(data),
         )
-        return UUID(str(data["uuid"]))
+        return data["uuid"]
     
     def get_room(self, room_uuid: UUID) -> Room:
         response = self.room_db_client.get_item(

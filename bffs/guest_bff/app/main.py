@@ -11,11 +11,11 @@ from handlers import JWTVerifier
 from httpx import AsyncClient
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
 if not logger.hasHandlers():
-    handler = logging.StreamHandler(sys.stdout)
-    logger.addHandler(handler)
+    logger.addHandler(logging.StreamHandler())
+
+logger.setLevel(logging.INFO)
 
 def create_app() -> FastAPI:
     app_metadata = AppMetadata()
