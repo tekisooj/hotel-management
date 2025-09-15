@@ -1,10 +1,15 @@
 name: Deploy Host UI
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     types: [opened, synchronize]
+    paths:
+      - 'microfrontends/host_ui/**'
+
+  push:
+    branches: [ main ]
+    paths:
+      - 'microfrontends/host_ui/**'
 
 env:
   AWS_REGION: us-east-1
@@ -15,7 +20,8 @@ permissions:
   contents: read
 
 jobs:
-  build-and-deploy:
+  build-and-deploy-pr:
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,8 +34,7 @@ jobs:
       - name: Install deps and generate static site
         working-directory: microfrontends/host_ui
         env:
-          # Set API base for generated SPA; adjust to your int/prod URLs as needed
-          HOST_API_BASE: ${{ github.event_name == 'pull_request' && 'https://example-pr-host-bff' || 'https://example-int-host-bff' }}
+          HOST_API_BASE: ${{ secrets.HOST_API_BASE_INT }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -43,8 +48,7 @@ jobs:
 
       - name: Install infra requirements
         working-directory: microfrontends/host_ui/infra
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -52,19 +56,100 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy Host UI
+      - name: Deploy Host UI (PR)
         working-directory: microfrontends/host_ui/infra
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            cdk deploy "HostUiStack-pr-${{ github.event.pull_request.number }}" \
-              --app "python3 app.py" \
-              --context env=pr \
-              --context pr_number=${{ github.event.pull_request.number }} \
-              --require-approval never
-          else
-            cdk deploy "HostUiStack-int" \
-              --app "python3 app.py" \
-              --context env=int \
-              --require-approval never
-          fi
+          cdk deploy "HostUiStack-pr-${{ github.event.pull_request.number }}" \
+            --app "python3 app.py" \
+            --context env=pr \
+            --context pr_number=${{ github.event.pull_request.number }} \
+            --require-approval never
 
+  build-and-deploy-int:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps and generate static site
+        working-directory: microfrontends/host_ui
+        env:
+          HOST_API_BASE: ${{ secrets.HOST_API_BASE_INT }}
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
+          npm run generate
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: npm install -g aws-cdk
+
+      - name: Install infra requirements
+        working-directory: microfrontends/host_ui/infra
+        run: pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Host UI (INT)
+        working-directory: microfrontends/host_ui/infra
+        run: |
+          cdk deploy "HostUiStack-int" \
+            --app "python3 app.py" \
+            --context env=int \
+            --require-approval never
+
+  build-and-deploy-prod:
+    if: ${{ github.event_name == 'push' }}
+    needs: build-and-deploy-int
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps and generate static site
+        working-directory: microfrontends/host_ui
+        env:
+          HOST_API_BASE: ${{ secrets.HOST_API_BASE_PROD }}
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
+          npm run generate
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: npm install -g aws-cdk
+
+      - name: Install infra requirements
+        working-directory: microfrontends/host_ui/infra
+        run: pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Host UI (PROD)
+        working-directory: microfrontends/host_ui/infra
+        run: |
+          cdk deploy "HostUiStack-prod" \
+            --app "python3 app.py" \
+            --context env=prod \
+            --require-approval never
