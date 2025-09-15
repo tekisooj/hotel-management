@@ -146,10 +146,10 @@ async function add() {
     name: room.name!,
     description: room.description!,
     capacity: room.capacity!,
-    roomType: room.roomType!,
-    pricePerNight: room.pricePerNight!,
-    minPricePerNight: room.minPricePerNight!,
-    maxPricePerNight: room.maxPricePerNight!,
+    room_type: room.roomType!,
+    price_per_night: room.pricePerNight!,
+    min_price_per_night: room.minPricePerNight!,
+    max_price_per_night: room.maxPricePerNight!,
     amenities: room.amenitiesInput
       ? room.amenitiesInput.split(',').map((name) => ({ name: name.trim() }))
       : []
