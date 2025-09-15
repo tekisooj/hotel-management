@@ -1,4 +1,4 @@
-name: Deploy Guest UI
+name: Deploy Host UI
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
         working-directory: microfrontends/host_ui
         env:
           # Set API base for generated SPA; adjust to your int/prod URLs as needed
-          GUEST_API_BASE: ${{ github.event_name == 'pull_request' && 'https://example-pr-host-bff' || 'https://example-int-host-bff' }}
+          HOST_API_BASE: ${{ github.event_name == 'pull_request' && 'https://example-pr-host-bff' || 'https://example-int-host-bff' }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -52,17 +52,17 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy Guest UI
+      - name: Deploy Host UI
         working-directory: microfrontends/host_ui/infra
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            cdk deploy "GuestUiStack-pr-${{ github.event.pull_request.number }}" \
+            cdk deploy "HostUiStack-pr-${{ github.event.pull_request.number }}" \
               --app "python3 app.py" \
               --context env=pr \
               --context pr_number=${{ github.event.pull_request.number }} \
               --require-approval never
           else
-            cdk deploy "GuestUiStack-int" \
+            cdk deploy "HostUiStack-int" \
               --app "python3 app.py" \
               --context env=int \
               --require-approval never
