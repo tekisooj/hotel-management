@@ -9,8 +9,8 @@ from handlers import (
     get_property_reviews,
     get_user_properties,
     get_current_user,
-    put_property,
-    put_room,
+    add_property,
+    add_room,
     update_current_user,
     search_places,
 )
@@ -34,17 +34,17 @@ router.add_api_route(
 
 router.add_api_route(
     path="/property",
-    methods=["POST", "PUT"],
+    methods=["POST"],
     response_model=UUID,
-    endpoint=put_property,
+    endpoint=add_property,
     description="Add a new property"
 )
 
 router.add_api_route(
     path="/room",
-    methods=["POST","PUT"],
+    methods=["POST"],
     response_model=UUID,
-    endpoint=put_room,
+    endpoint=add_room,
     description="Add a new room"
 )
 

@@ -204,11 +204,11 @@ async def put_property(
 #     room_uuid = response.json()
 #     return room_uuid
 
-async def put_room(
+async def add_room(
     room: Room,
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
-    response = await property_service_client.put(f"/room", json = room.model_dump(mode="json"))
+    response = await property_service_client.post(f"/room", json = room.model_dump(mode="json"))
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     room_uuid = response.json()
