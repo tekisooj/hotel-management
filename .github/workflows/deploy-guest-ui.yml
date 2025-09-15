@@ -34,7 +34,7 @@ jobs:
       - name: Install deps and generate static site
         working-directory: microfrontends/guest_ui
         env:
-          GUEST_API_BASE: ${{ vars.GUEST_API_BASE_INT }}
+          GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_INT }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -79,7 +79,7 @@ jobs:
       - name: Install deps and generate static site
         working-directory: microfrontends/guest_ui
         env:
-          GUEST_API_BASE: ${{ vars.GUEST_API_BASE_INT }}
+          GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_INT }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -124,7 +124,7 @@ jobs:
       - name: Install deps and generate static site
         working-directory: microfrontends/guest_ui
         env:
-          GUEST_API_BASE: ${{ vars.GUEST_API_BASE_PROD }}
+          GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_PROD }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
