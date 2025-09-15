@@ -155,8 +155,8 @@ async def get_user_properties(
 #     property: PropertyDetail,
 #     property_service_client: AsyncClient = Depends(get_property_service_client)
 # ) -> UUID:
-#     prop = Property(**property.model_dump())
-#     response = await property_service_client.post(f"/property", json = prop.model_dump())
+#     prop = Property(**property.model_dump(mode="json"))
+#     response = await property_service_client.post(f"/property", json = prop.model_dump(mode="json"))
 #     if response.status_code != 200:
 #         raise HTTPException(status_code=response.status_code, detail=response.text)
 #     prop_uuid = response.json()
@@ -166,7 +166,7 @@ async def get_user_properties(
     
 #     for room in property.rooms:
         
-#         response = await property_service_client.post(f"/room", json = room.model_dump())
+#         response = await property_service_client.post(f"/room", json = room.model_dump(mode="json"))
 #         if response.status_code != 200:
 #             raise HTTPException(status_code=response.status_code, detail=response.text)
 
@@ -176,8 +176,8 @@ async def put_property(
     property: PropertyDetail,
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
-    prop = Property(**property.model_dump())
-    response = await property_service_client.post(f"/property", json = prop.model_dump())
+    prop = Property(**property.model_dump(mode="json"))
+    response = await property_service_client.post(f"/property", json = prop.model_dump(mode="json"))
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     prop_uuid = response.json()
@@ -186,7 +186,7 @@ async def put_property(
         return prop_uuid
     
     for room in property.rooms:
-        room_dict = room.model_dump()
+        room_dict = room.model_dump(mode="json")
         room_dict["property_uuid"] = prop_uuid
         response = await property_service_client.post(f"/room", json = room_dict)
         if response.status_code != 200:
@@ -198,7 +198,7 @@ async def put_property(
 #     room: Room,
 #     property_service_client: AsyncClient = Depends(get_property_service_client)
 # ) -> UUID:
-#     response = await property_service_client.post(f"/room", json = room.model_dump())
+#     response = await property_service_client.post(f"/room", json = room.model_dump(mode="json"))
 #     if response.status_code != 200:
 #         raise HTTPException(status_code=response.status_code, detail=response.text)
 #     room_uuid = response.json()
@@ -208,7 +208,7 @@ async def put_room(
     room: Room,
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
-    response = await property_service_client.put(f"/room", json = room.model_dump())
+    response = await property_service_client.put(f"/room", json = room.model_dump(mode="json"))
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     room_uuid = response.json()
@@ -277,7 +277,7 @@ async def get_bookings(
         if bookings_response.status_code != 200:
             raise HTTPException(status_code=bookings_response.status_code, detail=bookings_response.text)
         bookings_response=bookings_response.json()
-        availability = Availability(**room.model_dump())
+        availability = Availability(**room.model_dump(mode="json"))
         availability.property=property_obj
         availability.bookings = [Booking(**booking) for booking in bookings_response]
         availabilities.append(availability)
