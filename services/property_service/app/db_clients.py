@@ -26,13 +26,13 @@ class PropertyTableClient:
         if not data.get("created_at"):
             data["created_at"] = datetime.now()
         data["updated_at"] = datetime.now()
-
-        logger.info("DB CLIENT", self.property_table_name)
-
-        self.property_db_client.put_item(
-            TableName=self.property_table_name,
-            Item=to_dynamodb_item(data),
-        )
+        try:
+            self.property_db_client.put_item(
+                TableName=self.property_table_name,
+                Item=to_dynamodb_item(data),
+            )
+        except Exception as e:
+            raise e
         return data["uuid"]
     
     def get_property(self, property_uuid: UUID) -> Property:
