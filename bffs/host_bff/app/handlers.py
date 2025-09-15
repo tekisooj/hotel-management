@@ -172,7 +172,7 @@ async def get_user_properties(
 
 #     return prop_uuid
 
-async def put_property(
+async def add_property(
     property: PropertyDetail,
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
