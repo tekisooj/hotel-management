@@ -38,7 +38,11 @@ export function useGuestBff() {
   const user = useUserStore()
 
   function authHeaders() {
-    return user.token ? { Authorization: `Bearer ${user.token}` } : {}
+    if (user.token) {
+      return { Authorization: `Bearer ${user.token}` }
+    }
+    const devUserId = (config.public as any).devUserId as string | undefined
+    return devUserId ? { 'X-User-Id': devUserId } : {}
   }
 
   // Search rooms (returns PropertyDetail[] with rooms + average_rating)

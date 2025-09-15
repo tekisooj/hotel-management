@@ -1,15 +1,15 @@
-name: Deploy Guest UI
+name: Deploy Host UI
 
 on:
   pull_request:
     types: [opened, synchronize]
     paths:
-      - 'microfrontends/guest_ui/**'
+      - 'microfrontends/host_ui/**'
 
   push:
     branches: [ main ]
     paths:
-      - 'microfrontends/guest_ui/**'
+      - 'microfrontends/host_ui/**'
 
 env:
   AWS_REGION: us-east-1
@@ -32,9 +32,9 @@ jobs:
           node-version: '20'
 
       - name: Install deps and generate static site
-        working-directory: microfrontends/guest_ui
+        working-directory: microfrontends/host_ui
         env:
-          GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_INT }}
+          HOST_API_BASE: ${{ secrets.HOST_API_BASE_INT }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -47,7 +47,7 @@ jobs:
       - run: npm install -g aws-cdk
 
       - name: Install infra requirements
-        working-directory: microfrontends/guest_ui/infra
+        working-directory: microfrontends/host_ui/infra
         run: pip install -r requirements.txt
 
       - name: Configure AWS credentials
@@ -56,10 +56,10 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy Guest UI (PR)
-        working-directory: microfrontends/guest_ui/infra
+      - name: Deploy Host UI (PR)
+        working-directory: microfrontends/host_ui/infra
         run: |
-          cdk deploy "GuestUiStack-pr-${{ github.event.pull_request.number }}" \
+          cdk deploy "HostUiStack-pr-${{ github.event.pull_request.number }}" \
             --app "python3 app.py" \
             --context env=pr \
             --context pr_number=${{ github.event.pull_request.number }} \
@@ -77,9 +77,9 @@ jobs:
           node-version: '20'
 
       - name: Install deps and generate static site
-        working-directory: microfrontends/guest_ui
+        working-directory: microfrontends/host_ui
         env:
-          GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_INT }}
+          HOST_API_BASE: ${{ secrets.HOST_API_BASE_INT }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -92,7 +92,7 @@ jobs:
       - run: npm install -g aws-cdk
 
       - name: Install infra requirements
-        working-directory: microfrontends/guest_ui/infra
+        working-directory: microfrontends/host_ui/infra
         run: pip install -r requirements.txt
 
       - name: Configure AWS credentials
@@ -101,10 +101,10 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy Guest UI (INT)
-        working-directory: microfrontends/guest_ui/infra
+      - name: Deploy Host UI (INT)
+        working-directory: microfrontends/host_ui/infra
         run: |
-          cdk deploy "GuestUiStack-int" \
+          cdk deploy "HostUiStack-int" \
             --app "python3 app.py" \
             --context env=int \
             --require-approval never
@@ -122,9 +122,9 @@ jobs:
           node-version: '20'
 
       - name: Install deps and generate static site
-        working-directory: microfrontends/guest_ui
+        working-directory: microfrontends/host_ui
         env:
-          GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_PROD }}
+          HOST_API_BASE: ${{ secrets.HOST_API_BASE_PROD }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -137,7 +137,7 @@ jobs:
       - run: npm install -g aws-cdk
 
       - name: Install infra requirements
-        working-directory: microfrontends/guest_ui/infra
+        working-directory: microfrontends/host_ui/infra
         run: pip install -r requirements.txt
 
       - name: Configure AWS credentials
@@ -146,10 +146,10 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy Guest UI (PROD)
-        working-directory: microfrontends/guest_ui/infra
+      - name: Deploy Host UI (PROD)
+        working-directory: microfrontends/host_ui/infra
         run: |
-          cdk deploy "GuestUiStack-prod" \
+          cdk deploy "HostUiStack-prod" \
             --app "python3 app.py" \
             --context env=prod \
             --require-approval never

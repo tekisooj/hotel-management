@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
@@ -10,6 +11,10 @@ from handlers import JWTVerifier
 from httpx import AsyncClient
 
 logger = logging.getLogger()
+
+if not logger.hasHandlers():
+    logger.addHandler(logging.StreamHandler())
+
 logger.setLevel(logging.INFO)
 
 def create_app() -> FastAPI:

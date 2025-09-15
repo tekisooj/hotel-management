@@ -29,24 +29,19 @@ def set_property_full_address(property: Property)-> None:
     property.full_address=full_address
     property.city_key = build_city_key(property.country, property.state, property.city)
 
-def get_coordinates_of_a_property(property: Property) -> tuple[float, float]:
-    #TODO ADD THIS
-    return 0, 0
-
 async def add_property(
     property: Property,
     property_table_client: PropertyTableClient = Depends(get_property_table_client),
 ) -> UUID:
     
     set_property_full_address(property)
-    # Latitude/longitude are provided by frontend; do not override here
     return property_table_client.add_property(property)
 
 async def get_property(property_uuid: UUID, property_table_client: PropertyTableClient = Depends(get_property_table_client)) -> Property:
 
     return property_table_client.get_property(property_uuid)
 
-async def get_user_properties(user_uuid: UUID, property_table_client: PropertyTableClient = Depends(get_property_table_client)) -> list[Property]
+async def get_user_properties(user_uuid: UUID, property_table_client: PropertyTableClient = Depends(get_property_table_client)) -> list[Property]:
 
     return property_table_client.get_user_properties(user_uuid)
 

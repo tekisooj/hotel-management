@@ -65,13 +65,16 @@
       </div>
     </div>
 
-    <button class="btn btn-primary mb-4" @click="addRoom">+ Add Room</button>
-    <button class="btn btn-success" @click="add">Add Property</button>
+    <button class="btn btn-primary col-md-3 mb-4" @click="addRoom">+ Add Room</button>
+    <hr></hr>
+    <button class="btn btn-success col-md-3 mb-4" @click="add">Add Property</button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
+import { useRuntimeConfig } from 'nuxt/app'
+import { useUserStore } from '@/stores/user'
 import { RoomType } from '@/types/RoomType';
 import { Room } from '@/types/Room';
 import { Amenity } from '@/types/Amenity';
@@ -79,6 +82,8 @@ import { PropertyDetail } from '@/types/PropertyDetail';
 import { useHostBff } from '@/api/hostBff';
 
 const { addProperty } = useHostBff();
+const config = useRuntimeConfig()
+const user = useUserStore()
 
 // Room types for select
 const roomTypes: RoomType[] = ['single', 'double', 'suite', 'family', 'deluxe', 'studio'];
@@ -136,23 +141,22 @@ const handleLocation = (location: any) => {
   property.placeId = location.placeId;
 };
 
-function add() {
+async function add() {
   const convertedRooms: Room[] = rooms.map((room) => ({
-    uuid: '',
-    propertyUuid: '',
     name: room.name!,
     description: room.description!,
     capacity: room.capacity!,
-    roomType: room.roomType!,
-    pricePerNight: room.pricePerNight!,
-    minPricePerNight: room.minPricePerNight!,
-    maxPricePerNight: room.maxPricePerNight!,
+    room_type: room.roomType!,
+    price_per_night: room.pricePerNight!,
+    min_price_per_night: room.minPricePerNight!,
+    max_price_per_night: room.maxPricePerNight!,
     amenities: room.amenitiesInput
       ? room.amenitiesInput.split(',').map((name) => ({ name: name.trim() }))
       : []
   }));
 
   const propDetail: PropertyDetail = {
+    userUuid: user.uuid || (config.public as any).devUserId,
     name: property.hotelName,
     country: property.country,
     state: property.state,

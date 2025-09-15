@@ -21,7 +21,7 @@ router = APIRouter()
 
 router.add_api_route(
     path="/property",
-    methods=["POST", "PUT"],
+    methods=["POST"],
     response_model=UUID,
     endpoint=add_property,
     description="Add a new property"

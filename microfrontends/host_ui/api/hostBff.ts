@@ -43,26 +43,63 @@ export function useHostBff() {
   const user = useUserStore()
 
   function authHeaders() {
-    return user.token ? { Authorization: `Bearer ${user.token}` } : {}
+    if (user.token) {
+      return { Authorization: `Bearer ${user.token}` }
+    }
+    // Dev-only convenience: include X-User-Id when no token and a devUserId is configured
+    const devUserId = (config.public as any).devUserId as string | undefined
+    return devUserId ? { 'X-User-Id': devUserId } : {}
   }
 
   async function getProperties(): Promise<PropertyDetail[]> {
-    return await $fetch<PropertyDetail[]>(`${baseURL}/properties` as string)
+    return await $fetch<PropertyDetail[]>(`${baseURL}/properties` as string, {
+      headers: authHeaders(),
+    })
   }
 
   async function addProperty(body: PropertyDetail): Promise<string> {
+    const devUserId = (config.public as any).devUserId as string | undefined
+    const payload: any = {
+      user_uuid: body.userUuid || devUserId,
+      name: body.name,
+      description: body.description,
+      country: body.country,
+      state: body.state,
+      city: body.city,
+      county: body.county,
+      address: body.address,
+      full_address: body.fullAddress,
+      latitude: body.latitude,
+      longitude: body.longitude,
+      stars: body.stars,
+      place_id: (body as any).placeId,
+      rooms: body.rooms
+    }
     const res = await $fetch<string | { uuid: string }>(`${baseURL}/property` as string, {
       method: 'POST',
-      body: body,
+      body: payload,
       headers: authHeaders(),
     })
     return typeof res === 'string' ? res : res.uuid
   }
 
   async function addRoom(body: Room): Promise<string> {
+    // Map to backend schema (snake_case)
+    const payload: any = {
+      uuid: body.uuid || undefined,
+      property_uuid: body.propertyUuid,
+      name: body.name,
+      description: body.description,
+      capacity: body.capacity,
+      room_type: body.roomType,
+      price_per_night: body.pricePerNight,
+      min_price_per_night: body.minPricePerNight,
+      max_price_per_night: body.maxPricePerNight,
+      amenities: body.amenities,
+    }
     const res = await $fetch<string | { uuid: string }>(`${baseURL}/room` as string, {
       method: 'POST',
-      body: body,
+      body: payload,
       headers: authHeaders(),
     })
     return typeof res === 'string' ? res : res.uuid
@@ -77,7 +114,7 @@ export function useHostBff() {
   }
 
   async function deleteProperty(property_uuid: string): Promise<string> {
-    const res = await $fetch<string | { uuid: string }>(`${baseURL}/room/${property_uuid}` as string, {
+    const res = await $fetch<string | { uuid: string }>(`${baseURL}/property/${property_uuid}` as string, {
       method: 'DELETE',
       headers: authHeaders(),
     })

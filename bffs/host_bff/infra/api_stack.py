@@ -58,7 +58,12 @@ class HostBffStack(Stack):
             default_cors_preflight_options={
                 "allow_origins": Cors.ALL_ORIGINS,
                 "allow_methods": Cors.ALL_METHODS,
-                "allow_headers": Cors.DEFAULT_HEADERS,
+                # Allow custom dev header used by UI when no token
+                "allow_headers": [
+                    *Cors.DEFAULT_HEADERS,
+                    "X-User-Id",
+                    "x-user-id",
+                ],
             },
         )
 

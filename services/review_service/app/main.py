@@ -1,13 +1,21 @@
 import logging
 import os
+import sys
 from fastapi import FastAPI
 from routes import router
 from db_client import ReviewDBClient
 from config import AppMetadata, review_service_int_configuration, review_service_prod_configuration
 from mangum import Mangum
 
+
 logger = logging.getLogger()
+
+if not logger.hasHandlers():
+    logger.addHandler(logging.StreamHandler())
+
 logger.setLevel(logging.INFO)
+
+    
 
 def create_app() -> FastAPI:
     app_metadata = AppMetadata()

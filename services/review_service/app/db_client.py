@@ -22,7 +22,7 @@ class ReviewDBClient:
 
     
     def add_review(self, review: Review) -> UUID:
-        review_dict = review.model_dump()
+        review_dict = review.model_dump(exclude_none=True)
         review_uuid = uuid4()
         review_dict["uuid"] = review_uuid
         if not review_dict["timestamp"]:
