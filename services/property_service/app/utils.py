@@ -3,7 +3,6 @@ from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
 
-from decimal import Decimal
 
 def to_dynamodb_item(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
     dynamodb_item = {}
@@ -31,10 +30,6 @@ def to_dynamodb_item(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
             raise TypeError(f"Unsupported type for key '{key}': {type(value)}")
 
     return dynamodb_item
-
-from decimal import Decimal
-from uuid import UUID
-from datetime import datetime
 
 def from_dynamodb_item(item: dict[str, dict[str, Any]]) -> dict[str, Any]:
     python_dict: dict[str, Any] = {}

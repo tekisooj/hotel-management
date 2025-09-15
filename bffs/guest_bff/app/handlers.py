@@ -393,14 +393,14 @@ async def get_filtered_rooms(
         if rooms_result.status_code != 200:
             raise HTTPException(status_code=rooms_result.status_code, detail=rooms_result.text)
         rooms_result = rooms_result.json()
-        prop_detail = PropertyDetail(**property.model_dump(mode="json"))
+        prop_detail = PropertyDetail(**property.model_dump())
         prop_detail.rooms = [Room(**room) for room in rooms_result]
         room_results.append(prop_detail)
 
 
     available_room_entries: list[PropertyDetail] = []
     for prop in room_results:
-        property_detail = PropertyDetail(**prop.model_dump(mode="json"))
+        property_detail = PropertyDetail(**prop.model_dump())
         if not prop.rooms:
             continue
         for room in prop.rooms:
