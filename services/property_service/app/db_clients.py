@@ -20,14 +20,14 @@ class PropertyTableClient:
         self.property_db_client = boto3.client("dynamodb")
 
     def add_property(self, property: Property) -> UUID:
-        data = property.model_dump(mode="json")
+        data = property.model_dump()
         if not data.get("uuid"):
             data["uuid"] = uuid4()
         if not data.get("created_at"):
             data["created_at"] = datetime.now()
         data["updated_at"] = datetime.now()
 
-        logger.info("DB CLIENT", self.property_table_name, self.property_db_client)
+        logger.info("DB CLIENT", self.property_table_name)
 
         self.property_db_client.put_item(
             TableName=self.property_table_name,
@@ -191,7 +191,7 @@ class RoomTableClient:
         self.room_db_client = boto3.client("dynamodb")
 
     def add_room(self, room: Room) -> UUID:
-        data = room.model_dump(mode="json")
+        data = room.model_dump()
         if not data.get("uuid"):
             data["uuid"] = uuid4()
         if not data.get("created_at"):
