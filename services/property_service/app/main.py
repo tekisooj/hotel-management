@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from fastapi import FastAPI
 from routes import router
 from db_clients import PropertyTableClient, RoomTableClient
@@ -8,6 +9,12 @@ from mangum import Mangum
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+if not logger.hasHandlers():
+    handler = logging.StreamHandler(sys.stdout)
+    logger.addHandler(handler)
+
+    
 
 def create_app() -> FastAPI:
     app_metadata = AppMetadata()

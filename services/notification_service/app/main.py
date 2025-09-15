@@ -1,10 +1,18 @@
 import logging
+import sys
 from config import AppConfiguration
 
 from ses_client import NotificationClient
 
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+if not logger.hasHandlers():
+    logger_handler = logging.StreamHandler(sys.stdout)
+    logger.addHandler(logger_handler)
+
+    
 
 def handler(event, context) -> None:
     app_config = AppConfiguration()

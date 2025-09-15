@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
@@ -7,11 +8,17 @@ from routes import router
 from config import AppMetadata, host_bff_prod_configuration, host_bff_int_configuration
 from handlers import JWTVerifier
 from httpx import AsyncClient
+import time
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+if not logger.hasHandlers():
+    handler = logging.StreamHandler(sys.stdout)
+    logger.addHandler(handler)
+
+    
 def create_app() -> FastAPI:
     app_metadata = AppMetadata()
     app_config = host_bff_prod_configuration if app_metadata.host_bff_env == "prod" else host_bff_int_configuration
@@ -41,6 +48,23 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(router)
+
+    @app.middleware("http")
+    async def logging_middleware(request, call_next):
+        start = time.time()
+        ua = request.headers.get("user-agent", "-")
+        trace = request.headers.get("x-amzn-trace-id") or request.headers.get("x-request-id") or "-"
+        path = request.url.path
+        method = request.method
+        try:
+            response = await call_next(request)
+            duration_ms = int((time.time() - start) * 1000)
+            logger.info(f"{method} {path} -> {response.status_code} {duration_ms}ms ua={ua} trace={trace}")
+            return response
+        except Exception:
+            duration_ms = int((time.time() - start) * 1000)
+            logger.exception(f"Unhandled error for {method} {path} after {duration_ms}ms ua={ua} trace={trace}")
+            raise
 
     return app
 

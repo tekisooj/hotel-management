@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
@@ -11,6 +12,10 @@ from httpx import AsyncClient
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+if not logger.hasHandlers():
+    handler = logging.StreamHandler(sys.stdout)
+    logger.addHandler(handler)
 
 def create_app() -> FastAPI:
     app_metadata = AppMetadata()
