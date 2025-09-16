@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   ],
   app: {
     head: {
-      title: 'Host UI',
+      title: 'Auth UI',
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       ],
@@ -34,9 +34,9 @@ export default defineNuxtConfig({
     public: {
       apiBase: process.env.HOST_API_BASE || process.env.HOST_API_DOMAIN || '',
       awsRegion: process.env.VITE_AWS_REGION || '',
-      awsPlaceIndex: process.env.VITE_AWS_PLACE_INDEX || '',
-      awsLocationApiKey: process.env.VITE_AWS_LOCATION_API_KEY || '',
-      devUserId: process.env.DEV_USER_ID || ''
+      cognitoApiDomain: process.env.COGNITO_API_DOMAIN || '',
+      congitoUserPoolID: process.env.COGNITO_USER_POOL_ID || '',
+      cognitoAppClientId: process.env.COGNITO_APP_CLIENT_ID || ''
     },
   },
 })
