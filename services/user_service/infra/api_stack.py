@@ -34,6 +34,7 @@ class UserServiceStack(Stack):
 
         jwks_url = f"https://cognito-idp.us-east-1.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
 
+        app_client_id = "7226gqpnghn0q22ec2ill399lv" if self.env_name == "prod" else "la13fgbn7avmni0f84pu5lk79"
 
         lambda_function = Function(
             self, f"UserServiceFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
@@ -47,7 +48,8 @@ class UserServiceStack(Stack):
                 "USER_SERVICE_ENV": self.env_name,
                 "HOTEL_MANAGEMENT_DATABASE_SECRET_NAME": secret_name,
                 "AUDIENCE": audience,
-                "JWKS_URL": jwks_url
+                "JWKS_URL": jwks_url,
+                "APP_CLIENT_ID": app_client_id
             }
         )
 

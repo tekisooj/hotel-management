@@ -6,11 +6,18 @@ class UserType(str, Enum):
     STAFF = "staff"
     GUEST = "guest"
 
-class UserCreate(BaseModel):
+class SignUpRequest(BaseModel):
     name: str = Field(description="Name of a user")
     last_name: str = Field(description="Last name of a user")
     email: EmailStr = Field(description="Email of a user")
     password: str = Field(description="Password")
+    user_type: UserType = Field(description="User type", default=UserType.GUEST)
+
+
+class UserCreate(BaseModel):
+    name: str = Field(description="Name of a user")
+    last_name: str = Field(description="Last name of a user")
+    email: EmailStr = Field(description="Email of a user")
     user_type: UserType = Field(description="User type", default=UserType.GUEST)
 
     class Config:
@@ -32,7 +39,6 @@ class UserUpdate(BaseModel):
     name: str | None = Field(default=None, description="Name of a user")
     last_name: str | None = Field(default=None, description="Last name of a user")
     email: EmailStr | None = Field(default=None, description="Email of a user")
-    password: str | None = Field(default=None, description="Password")
     user_type: UserType | None = Field(default=None, description="User type")
 
     class Config:

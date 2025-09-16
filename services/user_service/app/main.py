@@ -8,6 +8,8 @@ from auth import CognitoAuthMiddleware
 from config import AppMetadata, user_service_int_configuration, user_service_prod_configuration
 from mangum import Mangum
 
+from services.user_service.app.cognito_client import CognitoClient
+
 
 logger = logging.getLogger()
 
@@ -29,6 +31,7 @@ def create_app() -> FastAPI:
     app.state.user_table_client = HotelManagementDBClient(app_config.hotel_management_database_secret_name, app_config.region)
     app.state.audience = app_config.audience
     app.state.jwks_url = app_config.jwks_url
+    app.state.cognito_client = CognitoClient(app_config.region, app_config.app_client_id)
     app.include_router(router)
 
     app.add_middleware(CognitoAuthMiddleware)
