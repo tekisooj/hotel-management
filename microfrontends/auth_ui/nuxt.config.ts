@@ -38,7 +38,9 @@ export default defineNuxtConfig({
       awsRegion: process.env.AWS_REGION || '',
       cognitoApiDomain: process.env.COGNITO_API_DOMAIN || '',
       congitoUserPoolID: process.env.COGNITO_USER_POOL_ID || '',
-      cognitoAppClientId: process.env.COGNITO_APP_CLIENT_ID || ''
+      cognitoAppClientId: process.env.COGNITO_APP_CLIENT_ID || '',
+      guestUiUrl: process.env.GUEST_UI_URL || '',
+      hostUiUrl: process.env.HOST_UI_URL || ''
     },
   },
 })

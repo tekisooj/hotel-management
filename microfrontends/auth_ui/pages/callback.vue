@@ -23,9 +23,9 @@ onMounted(async () => {
   store.setUser(res, user.id_token);
 
   if (res.user_type === "guest") {
-    window.location.href = "https://guest.example.com";
+    window.location.href = config.public.guestUiUrl;
   } else if (res.user_type === "staff") {
-    window.location.href = "https://host.example.com";
+    window.location.href = config.public.hostUiUrl;
   }
 });
 </script>

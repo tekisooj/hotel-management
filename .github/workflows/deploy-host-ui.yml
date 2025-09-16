@@ -37,6 +37,8 @@ jobs:
           USER_API_BASE: ${{ secrets.USER_API_BASE_INT }}
           HOST_API_BASE: ${{ secrets.HOST_API_BASE_INT }}
           GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_INT }}
+          GUSET_UI_URL: ${{ secrets.GUEST_UI_URL_INT }}
+          HOST_UI_URL: ${{ secrets.HOST_UI_URL_INT }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -84,6 +86,8 @@ jobs:
           USER_API_BASE: ${{ secrets.USER_API_BASE_INT }}
           HOST_API_BASE: ${{ secrets.HOST_API_BASE_INT }}
           GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_INT }}
+          GUSET_UI_URL: ${{ secrets.GUEST_UI_URL_INT }}
+          HOST_UI_URL: ${{ secrets.HOST_UI_URL_INT }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -131,6 +135,8 @@ jobs:
           USER_API_BASE: ${{ secrets.USER_API_BASE_PROD }}
           HOST_API_BASE: ${{ secrets.HOST_API_BASE_PROD }}
           GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_PROD }}
+          GUSET_UI_URL: ${{ secrets.GUEST_UI_URL_PROD }}
+          HOST_UI_URL: ${{ secrets.HOST_UI_URL_PROD }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
