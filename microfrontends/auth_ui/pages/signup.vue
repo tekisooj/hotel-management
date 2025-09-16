@@ -36,7 +36,7 @@ const config = useRuntimeConfig()
 
 async function signup() {
   try {
-    await $fetch("/auth/signup", {
+    await $fetch("/user", {
       method: "POST",
       baseURL: config.public.userApiBase,
       body: form.value,
