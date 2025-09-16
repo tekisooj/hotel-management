@@ -1,0 +1,164 @@
+name: Deploy Auth UI
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'microfrontends/auth_ui/**'
+
+  push:
+    branches: [ main ]
+    paths:
+      - 'microfrontends/auth_ui/**'
+
+env:
+  AWS_REGION: us-east-1
+  CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy-pr:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps and generate static site
+        working-directory: microfrontends/auth_ui
+        env:
+          Auth_API_BASE: ${{ secrets.Auth_API_BASE_INT }}
+          COGNITO_API_DOMAIN: ${{ secrets.COGNITO_API_DOMAIN_INT }}
+          COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID_INT }}
+          COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID_INT }}
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
+          npm run generate
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: npm install -g aws-cdk
+
+      - name: Install infra requirements
+        working-directory: microfrontends/auth_ui/infra
+        run: pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Auth UI (PR)
+        working-directory: microfrontends/auth_ui/infra
+        run: |
+          cdk deploy "AuthUiStack-pr-${{ github.event.pull_request.number }}" \
+            --app "python3 app.py" \
+            --context env=pr \
+            --context pr_number=${{ github.event.pull_request.number }} \
+            --require-approval never
+
+  build-and-deploy-int:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps and generate static site
+        working-directory: microfrontends/auth_ui
+        env:
+          Auth_API_BASE: ${{ secrets.Auth_API_BASE_INT }}
+          COGNITO_API_DOMAIN: ${{ secrets.COGNITO_API_DOMAIN_INT }}
+          COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID_INT }}
+          COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID_INT }}
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
+          npm run generate
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: npm install -g aws-cdk
+
+      - name: Install infra requirements
+        working-directory: microfrontends/auth_ui/infra
+        run: pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Auth UI (INT)
+        working-directory: microfrontends/auth_ui/infra
+        run: |
+          cdk deploy "AuthUiStack-int" \
+            --app "python3 app.py" \
+            --context env=int \
+            --require-approval never
+
+  build-and-deploy-prod:
+    if: ${{ github.event_name == 'push' }}
+    needs: build-and-deploy-int
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps and generate static site
+        working-directory: microfrontends/auth_ui
+        env:
+          Auth_API_BASE: ${{ secrets.Auth_API_BASE_PROD }}
+          COGNITO_API_DOMAIN: ${{ secrets.COGNITO_API_DOMAIN_PROD }}
+          COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID_PROD }}
+          COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID_PROD }}
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
+          npm run generate
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: npm install -g aws-cdk
+
+      - name: Install infra requirements
+        working-directory: microfrontends/auth_ui/infra
+        run: pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Auth UI (PROD)
+        working-directory: microfrontends/auth_ui/infra
+        run: |
+          cdk deploy "AuthUiStack-prod" \
+            --app "python3 app.py" \
+            --context env=prod \
+            --require-approval never

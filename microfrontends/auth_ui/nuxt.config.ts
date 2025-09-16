@@ -33,7 +33,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: process.env.HOST_API_BASE || process.env.HOST_API_DOMAIN || '',
-      awsRegion: process.env.VITE_AWS_REGION || '',
+      awsRegion: process.env.AWS_REGION || '',
       cognitoApiDomain: process.env.COGNITO_API_DOMAIN || '',
       congitoUserPoolID: process.env.COGNITO_USER_POOL_ID || '',
       cognitoAppClientId: process.env.COGNITO_APP_CLIENT_ID || ''
