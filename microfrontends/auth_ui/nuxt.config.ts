@@ -32,7 +32,9 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBase: process.env.HOST_API_BASE || process.env.HOST_API_DOMAIN || '',
+      userApiBase: process.env.USER_API_BASE || '',
+      hostApiBase: process.env.HOST_API_BASE || '',
+      guestApiBase: process.env.GUEST_API_BASE || '',
       awsRegion: process.env.AWS_REGION || '',
       cognitoApiDomain: process.env.COGNITO_API_DOMAIN || '',
       congitoUserPoolID: process.env.COGNITO_USER_POOL_ID || '',

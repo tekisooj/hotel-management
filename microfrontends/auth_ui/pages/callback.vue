@@ -3,17 +3,20 @@
 </template>
 
 <script setup lang="ts">
+import { config } from "maplibre-gl";
+import { useRuntimeConfig } from "nuxt/app";
 import { onMounted } from "vue";
 import { userManager } from "~/api/authClient";
 import { useUserStore } from "~/stores/user";
 import type { User } from "~/types/User";
 
 onMounted(async () => {
+  const config = useRuntimeConfig()
   const store = useUserStore();
   const user = await userManager.signinCallback();
 
   const res = await $fetch<User>("/me", {
-    baseURL: "https://api.example.com", // user-service URL
+    baseURL: config.public.userApiBase,
     headers: { Authorization: `Bearer ${user.id_token}` },
   });
 

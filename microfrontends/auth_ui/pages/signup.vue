@@ -19,6 +19,7 @@
 </template>
 
 <script setup lang="ts">
+import { useRuntimeConfig } from "nuxt/app";
 import { ref } from "vue";
 import type { UserType } from "~/types/UserType";
 
@@ -31,12 +32,13 @@ const form = ref({
 });
 
 const error = ref("");
+const config = useRuntimeConfig()
 
 async function signup() {
   try {
     await $fetch("/auth/signup", {
       method: "POST",
-      baseURL: "https://api.example.com", // backend wrapper for Cognito + user-service
+      baseURL: config.public.userApiBase,
       body: form.value,
     });
 
