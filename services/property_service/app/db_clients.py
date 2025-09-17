@@ -264,14 +264,17 @@ class RoomTableClient:
         ) -> list[Room]:
 
         filters = []
-        attribute_values = {}
+        attribute_values= {}
+        attribute_names = {}
         if capacity is not None:
-            filters.append("capacity >= :cap")
+            filters.append("#capacity >= :cap")
             attribute_values[":cap"] = {"N": str(capacity)}
-        
+            attribute_names["#capacity"] = "capacity"
+
         if max_price_per_night is not None:
-            filters.append("price_per_night <= :maxp")
+            filters.append("#price_per_night <= :maxp")
             attribute_values[":maxp"] = {"N": str(max_price_per_night)}
+            attribute_names["#price_per_night"] = "price_per_night"
 
         if amenities:
             for i, amenity in enumerate(amenities):
@@ -284,7 +287,10 @@ class RoomTableClient:
         }
         if filters:
             params["FilterExpression"] = " AND ".join(filters)
-            params["ExpressionAttributeValues"] = attribute_values # type: ignore
+            if attribute_values:
+                params["ExpressionAttributeValues"] = attribute_values  # type: ignore
+            if attribute_names:
+                params["ExpressionAttributeNames"] = attribute_names
 
         response = self.room_db_client.scan(**params)
 
@@ -299,14 +305,17 @@ class RoomTableClient:
         max_price_per_night: float | None = None,
         amenities: list[Amenity] | None = None,
     ) -> list[Room]:
-        eav: dict[str, Any] = {":p": {"S": str(property_uuid)}}
-        filters: list[str] = []
+        eav = {":p": {"S": str(property_uuid)}}
+        filters = []
+        ean = {}
         if capacity is not None:
-            filters.append("capacity >= :cap")
+            filters.append("#capacity >= :cap")
             eav[":cap"] = {"N": str(capacity)}
+            ean["#capacity"] = "capacity"
         if max_price_per_night is not None:
-            filters.append("price_per_night <= :maxp")
+            filters.append("#price_per_night <= :maxp")
             eav[":maxp"] = {"N": str(max_price_per_night)}
+            ean["#price_per_night"] = "price_per_night"
         if amenities:
             for i, a in enumerate(amenities):
                 key = f":a{i}"
@@ -321,11 +330,12 @@ class RoomTableClient:
         }
         if filters:
             params["FilterExpression"] = " AND ".join(filters)
+        if ean:
+            params["ExpressionAttributeNames"] = ean
         response = self.room_db_client.query(**params)
         items = response.get("Items", [])
         return [Room(**from_dynamodb_item(it)) for it in items]
         
-
-
         
+
 
