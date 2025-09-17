@@ -1,11 +1,18 @@
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field
 from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class Amenity(BaseModel):
     name: str = Field(description="Name of an amenity")
+
+
+class Image(BaseModel):
+    key: str = Field(description="S3 object key")
+    url: str | None = Field(default=None, description="Pre-signed URL giving temporary access to the image")
+
 
 class RoomType(str, Enum):
     SINGLE = "single"
@@ -30,6 +37,7 @@ class Room(BaseModel):
     created_at: datetime | None = Field(description="Room created at", default=None)
     updated_at: datetime | None = Field(description="Room updated at", default=None)
     amenities: list[Amenity] | None = Field(description="List of all room amenities", default=[])
+    images: list[Image] | None = Field(description="Room images", default=[])
 
 
 class Property(BaseModel):
@@ -50,6 +58,7 @@ class Property(BaseModel):
     updated_at: datetime | None = Field(description="Property updated at", default=None)
     stars: int | None = Field(description="Number of stard", default=1)
     place_id: str | None = Field(description="AWS location place id", default=None)
+    images: list[Image] | None = Field(description="Property images", default=[])
 
 
 class PropertyDetail(Property):

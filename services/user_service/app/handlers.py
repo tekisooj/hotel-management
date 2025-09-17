@@ -3,7 +3,7 @@ from fastapi import Depends, HTTPException, Request, Response
 from models import User
 from schemas import SignUpRequest, UserCreate, UserResponse, UserUpdate
 from db_client import HotelManagementDBClient
-from services.user_service.app.cognito_client import CognitoClient
+from cognito_client import CognitoClient
 
 def get_hotel_management_db_client(request: Request) -> HotelManagementDBClient:
     return request.app.state.hotel_management_db_client

@@ -1,3 +1,4 @@
+import { Image } from "./Image";
 import { Room } from "./Room";
 
 export interface PropertyDetail{
@@ -19,4 +20,5 @@ export interface PropertyDetail{
     averageRating?: number;
     stars: number;
     placeId?: number;
+    images?: Image[];
 }

@@ -1,35 +1,44 @@
 from uuid import UUID
+
 from fastapi import APIRouter
 
 from handlers import (
+    add_property,
+    add_room,
     change_booking_status,
+    create_asset_upload_url,
     delete_property,
     delete_room,
     get_bookings,
+    get_current_user,
     get_property_reviews,
     get_user_properties,
-    get_current_user,
-    add_property,
-    add_room,
-    update_current_user,
     search_places,
+    update_current_user,
 )
+from models.asset import AssetUploadResponse
 from models.booking import Booking
-from models.property import Property, PropertyDetail
-from models.user import UserResponse
+from models.property import Property, PropertyDetail, Room
 from models.review import Review
-from models.property import Room
+from models.user import UserResponse
 
 
 router = APIRouter()
 
+router.add_api_route(
+    path="/assets/upload-url",
+    methods=["POST"],
+    response_model=AssetUploadResponse,
+    endpoint=create_asset_upload_url,
+    description="Request a pre-signed S3 upload URL for property or room assets",
+)
 
 router.add_api_route(
     path="/properties",
     methods=["GET"],
     response_model=list[PropertyDetail],
     endpoint=get_user_properties,
-    description="Get all properties of a user"
+    description="Get all properties of a user",
 )
 
 router.add_api_route(
@@ -37,7 +46,7 @@ router.add_api_route(
     methods=["POST"],
     response_model=UUID,
     endpoint=add_property,
-    description="Add a new property"
+    description="Add a new property",
 )
 
 router.add_api_route(
@@ -45,7 +54,7 @@ router.add_api_route(
     methods=["POST"],
     response_model=UUID,
     endpoint=add_room,
-    description="Add a new room"
+    description="Add a new room",
 )
 
 router.add_api_route(
@@ -53,7 +62,7 @@ router.add_api_route(
     methods=["DELETE"],
     response_model=UUID,
     endpoint=delete_room,
-    description="Delete user room"
+    description="Delete user room",
 )
 
 router.add_api_route(
@@ -61,7 +70,7 @@ router.add_api_route(
     methods=["DELETE"],
     response_model=UUID,
     endpoint=delete_property,
-    description="Delete user property"
+    description="Delete user property",
 )
 
 router.add_api_route(
@@ -69,7 +78,7 @@ router.add_api_route(
     methods=["GET"],
     response_model=list[Booking],
     endpoint=get_bookings,
-    description="Get bookings"
+    description="Get bookings",
 )
 
 router.add_api_route(
@@ -77,7 +86,7 @@ router.add_api_route(
     methods=["PATCH"],
     response_model=Booking,
     endpoint=change_booking_status,
-    description="Change booking status"
+    description="Change booking status",
 )
 
 router.add_api_route(
@@ -85,14 +94,14 @@ router.add_api_route(
     methods=["GET"],
     response_model=list[Review],
     endpoint=get_property_reviews,
-    description="Get property reviews"
+    description="Get property reviews",
 )
 
 router.add_api_route(
     path="/places/search-text",
     methods=["GET"],
     endpoint=search_places,
-    description="Search places by free text via Amazon Location"
+    description="Search places by free text via Amazon Location",
 )
 
 router.add_api_route(
@@ -100,7 +109,7 @@ router.add_api_route(
     methods=["GET"],
     response_model=UserResponse,
     endpoint=get_current_user,
-    description="Get current user"
+    description="Get current user",
 )
 
 router.add_api_route(
@@ -108,5 +117,5 @@ router.add_api_route(
     methods=["PATCH"],
     response_model=UserResponse | None,
     endpoint=update_current_user,
-    description="Update current user"
+    description="Update current user",
 )

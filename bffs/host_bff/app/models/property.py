@@ -1,13 +1,20 @@
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field
 from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 from models.booking import Booking
 
 
 class Amenity(BaseModel):
     name: str = Field(description="Name of an amenity")
+
+
+class Image(BaseModel):
+    key: str = Field(description="S3 object key")
+    url: str | None = Field(default=None, description="Pre-signed URL to access the asset")
+
 
 class RoomType(str, Enum):
     SINGLE = "single"
@@ -21,7 +28,7 @@ class RoomType(str, Enum):
 class Room(BaseModel):
 
     uuid: UUID | None = Field(description="UUID of a room", default=None)
-    property_uuid: UUID | None = Field(description="UUID of a property", default = None)
+    property_uuid: UUID | None = Field(description="UUID of a property", default=None)
     name: str = Field(description="Room name")
     description: str = Field(description="Room description", default=None)
     capacity: int = Field(description="Room capacity")
@@ -32,6 +39,7 @@ class Room(BaseModel):
     created_at: datetime | None = Field(description="Room created at", default=None)
     updated_at: datetime | None = Field(description="Room updated at", default=None)
     amenities: list[Amenity] | None = Field(description="List of all room amenities", default=[])
+    images: list[Image] | None = Field(description="Room images", default=[])
 
 
 class Property(BaseModel):
@@ -53,11 +61,13 @@ class Property(BaseModel):
     updated_at: datetime | None = Field(description="Property updated at", default=None)
     stars: int | None = Field(description="Number of stard", default=1)
     place_id: str | None = Field(description="AWS location place id", default=None)
+    images: list[Image] | None = Field(description="Property images", default=[])
 
 
 class Availability(Room):
     property: Property | None = Field(description="Property detail", default=None)
     bookings: list[Booking] | None = Field(description="Room bookings", default=[])
+
 
 class PropertyDetail(Property):
     rooms: list[Room] | None = Field(description="Property rooms", default=[])

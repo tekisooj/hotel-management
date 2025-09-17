@@ -1,4 +1,5 @@
 import { Amenity } from "./Amenity";
+import { Image } from "./Image";
 import { RoomType } from "./RoomType";
 
 export interface Room{
@@ -14,5 +15,6 @@ export interface Room{
     createdAt?: Date;
     updatedAt?: Date;
     amenities?: Amenity[];
+    images?: Image[];
 
 }

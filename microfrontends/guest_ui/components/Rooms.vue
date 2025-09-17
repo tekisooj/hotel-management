@@ -20,9 +20,16 @@
         :class="['carousel-item', { active: index === 0 }]"
       >
         <div class="card">
+          <img
+            v-if="room.images?.length && room.images[0].url"
+            :src="room.images[0].url"
+            :alt="`${room.name} photo`"
+            class="card-img-top object-fit-cover"
+            style="height: 180px;"
+          />
           <div class="card-body">
             <h5 class="card-title mb-1">{{ room.name }}</h5>
-            <small class="text-muted">Type: {{ room.room_type }} • Capacity: {{ room.capacity }}</small>
+            <small class="text-muted">Type: {{ room.room_type }} - Capacity: {{ room.capacity }}</small>
             <p class="card-text mt-2" v-if="room.description">{{ room.description }}</p>
             <div class="d-flex align-items-center gap-2 mt-2">
               <span class="badge bg-success">${{ room.price_per_night }}</span>
@@ -51,6 +58,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Room } from '@/types/Room'
 
 const props = defineProps<{ rooms: Room[]; id?: string }>()

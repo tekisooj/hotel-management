@@ -69,6 +69,10 @@ class HostBffStack(Stack):
 
         integration = LambdaIntegration(self.lambda_function)
 
+        assets = self.gateway.root.add_resource("assets")
+        assets_url = assets.add_resource("upload-url")
+        assets_url.add_method("POST", integration)
+
         places = self.gateway.root.add_resource("places")
         places_search = places.add_resource("search-text")
         places_search.add_method("GET", integration)

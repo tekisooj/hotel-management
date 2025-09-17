@@ -1,9 +1,10 @@
 import { Amenity } from "./Amenity";
+import { Image } from "./Image";
 import { RoomType } from "./RoomType";
 
 export interface Room{
-    uuid: string;
-    propertyUuid: string;
+    uuid?: string;
+    propertyUuid?: string;
     name: string;
     description: string;
     capacity: number;
@@ -14,5 +15,6 @@ export interface Room{
     createdAt?: Date;
     updatedAt?: Date;
     amenities?: Amenity[];
+    images?: Image[];
 
 }

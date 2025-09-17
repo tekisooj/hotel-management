@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request
 from httpx import AsyncClient, HTTPError
@@ -10,6 +11,7 @@ from models.booking import Booking, BookingStatus
 from models.user import UserResponse, UserUpdate
 from models.property import Property, PropertyDetail, Room
 from models.property import Availability
+from models.asset import AssetUploadRequest, AssetUploadResponse
 import os
 import boto3
 
@@ -99,6 +101,27 @@ def get_place_index(request: Request) -> str | None:
     return place_index or os.environ.get("PLACE_INDEX_NAME")
 
 
+def _extract_image_key(image: Any) -> str | None:
+    if isinstance(image, dict):
+        return image.get("key")
+    return getattr(image, "key", None)
+
+
+def _normalize_images_field(payload: dict[str, Any]) -> None:
+    if "images" not in payload:
+        return
+    images = payload.get("images")
+    if not images:
+        payload["images"] = []
+        return
+    normalized: list[dict[str, str]] = []
+    for image in images:
+        key = _extract_image_key(image)
+        if key:
+            normalized.append({"key": key})
+    payload["images"] = normalized
+
+
 async def search_places(
     text: str,
     index: str | None = None,
@@ -156,18 +179,19 @@ async def add_property(
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
     prop = Property(**property.model_dump())
-    response = await property_service_client.post(f"/property", json = prop.model_dump(mode="json"))
+    prop_payload = prop.model_dump(mode="json", exclude_none=True)
+    _normalize_images_field(prop_payload)
+    response = await property_service_client.post("/property", json=prop_payload)
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     prop_uuid = response.json()
 
-    if not property.rooms:
-        return prop_uuid
-    
-    for room in property.rooms:
-        room_dict = room.model_dump(mode="json")
-        room_dict["property_uuid"] = prop_uuid
-        response = await property_service_client.post(f"/room", json = room_dict)
+    rooms = property.rooms or []
+    for room in rooms:
+        room_payload = room.model_dump(mode="json", exclude_none=True)
+        _normalize_images_field(room_payload)
+        room_payload["property_uuid"] = prop_uuid
+        response = await property_service_client.post("/room", json=room_payload)
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=response.text)
 
@@ -177,11 +201,28 @@ async def add_room(
     room: Room,
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
-    response = await property_service_client.post(f"/room", json = room.model_dump(mode="json"))
+    room_payload = room.model_dump(mode="json", exclude_none=True)
+    _normalize_images_field(room_payload)
+    response = await property_service_client.post("/room", json=room_payload)
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     room_uuid = response.json()
     return room_uuid
+
+async def create_asset_upload_url(
+    payload: AssetUploadRequest,
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+) -> AssetUploadResponse:
+    try:
+        response = await property_service_client.post(
+            "/assets/upload-url",
+            json=payload.model_dump(mode="json", exclude_none=True),
+        )
+    except HTTPError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+    return AssetUploadResponse(**response.json())
 
 async def delete_room(
     room_uuid: UUID,

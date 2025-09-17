@@ -13,11 +13,23 @@ from handlers import (
     get_room,
     add_room,
     get_user_properties,
+    create_asset_upload_url,
 )
-from schemas import Property, Room
+from schemas import (
+    PresignedUploadResponse,
+    Property,
+    Room,
+)
 
 router = APIRouter()
 
+router.add_api_route(
+    path="/assets/upload-url",
+    methods=["POST"],
+    response_model=PresignedUploadResponse,
+    endpoint=create_asset_upload_url,
+    description="Generate a pre-signed S3 upload URL for property or room assets",
+)
 
 router.add_api_route(
     path="/property",
@@ -106,4 +118,3 @@ router.add_api_route(
     endpoint=get_filtered_rooms,
     description="Get filtered rooms"
 )
-

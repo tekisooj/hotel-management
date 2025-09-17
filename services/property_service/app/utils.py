@@ -1,7 +1,40 @@
-from typing import Any
-from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, Iterable
+from uuid import UUID
+
+from schemas import Image
+
+
+def strip_image_urls(images: list[Image] | None) -> None:
+    if not images:
+        return
+    for image in images:
+        if hasattr(image, "url"):
+            image.url = None
+
+
+def create_image_url(images: Iterable[Image] | None, storage) -> None:
+    if not storage or not images:
+        return
+    for image in images:
+        key = getattr(image, "key", None)
+        if key:
+            image.url = storage.create_read_url(key)
+
+
+def add_image_url(model: Any, storage) -> Any:
+    images = getattr(model, "images", None)
+    create_image_url(images, storage)
+    return model
+
+
+def add_image_urls(models: Iterable[Any] | None, storage) -> Iterable[Any]:
+    if not models or not storage:
+        return models or []
+    for model in models:
+        add_image_url(model, storage)
+    return models
 
 
 def to_dynamodb_item(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -30,6 +63,7 @@ def to_dynamodb_item(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
             raise TypeError(f"Unsupported type for key '{key}': {type(value)}")
 
     return dynamodb_item
+
 
 def from_dynamodb_item(item: dict[str, dict[str, Any]]) -> dict[str, Any]:
     python_dict: dict[str, Any] = {}
