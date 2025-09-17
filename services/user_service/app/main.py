@@ -8,7 +8,7 @@ from auth import CognitoAuthMiddleware
 from config import AppMetadata, user_service_int_configuration, user_service_prod_configuration
 from mangum import Mangum
 
-from services.user_service.app.cognito_client import CognitoClient
+from cognito_client import CognitoClient
 
 
 logger = logging.getLogger()

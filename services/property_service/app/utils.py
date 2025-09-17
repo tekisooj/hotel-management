@@ -1,10 +1,40 @@
-from typing import Any
-from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, Iterable
+from uuid import UUID
 
-from schemas import Property, Room
-from storage import S3AssetStorage
+from schemas import Image
+
+
+def strip_image_urls(images: list[Image] | None) -> None:
+    if not images:
+        return
+    for image in images:
+        if hasattr(image, "url"):
+            image.url = None
+
+
+def create_image_url(images: Iterable[Image] | None, storage) -> None:
+    if not storage or not images:
+        return
+    for image in images:
+        key = getattr(image, "key", None)
+        if key:
+            image.url = storage.create_read_url(key)
+
+
+def add_image_url(model: Any, storage) -> Any:
+    images = getattr(model, "images", None)
+    create_image_url(images, storage)
+    return model
+
+
+def add_image_urls(models: Iterable[Any] | None, storage) -> Iterable[Any]:
+    if not models or not storage:
+        return models or []
+    for model in models:
+        add_image_url(model, storage)
+    return models
 
 
 def to_dynamodb_item(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -33,6 +63,7 @@ def to_dynamodb_item(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
             raise TypeError(f"Unsupported type for key '{key}': {type(value)}")
 
     return dynamodb_item
+
 
 def from_dynamodb_item(item: dict[str, dict[str, Any]]) -> dict[str, Any]:
     python_dict: dict[str, Any] = {}
@@ -78,28 +109,3 @@ def from_dynamodb_item(item: dict[str, dict[str, Any]]) -> dict[str, Any]:
             raise TypeError(f"Unsupported DynamoDB type for key '{key}': {value}")
 
     return python_dict
-
-
-def strip_image_urls(images: list | None) -> None:
-    if not images:
-        return
-    for image in images:
-        if hasattr(image, "url"):
-            image.url = None
-
-
-def add_image_url(object: Property | Room, asset_storage: S3AssetStorage | None) -> Property | Room:
-    if not asset_storage:
-        return object
-    if object.images:
-        for image in object.images:
-            if image.key:
-                image.url = asset_storage.create_read_url(image.key)
-    return object
-
-
-
-def add_image_urls(objects: list[Property] | list[Room], asset_storage: S3AssetStorage | None) -> list[Property] | list[Room]:
-    if not asset_storage:
-        return objects
-    return [add_image_url(obj, asset_storage) for obj in objects] # type: ignore

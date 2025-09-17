@@ -11,7 +11,7 @@ from schemas import (
     Property,
     Room,
 )
-from services.property_service.app.utils import add_image_url, add_image_urls, strip_image_urls
+from utils import add_image_url, add_image_urls, strip_image_urls
 from storage import S3AssetStorage
 
 
