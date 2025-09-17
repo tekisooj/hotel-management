@@ -45,7 +45,7 @@ def create_app() -> FastAPI:
     app.state.asset_storage = S3AssetStorage(
         bucket_name=asset_bucket,
         presign_ttl_seconds=app_config.asset_url_ttl_seconds,
-        region_name=region,
+        region_name=app_config.region,
     )
 
 
