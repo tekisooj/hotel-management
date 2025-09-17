@@ -21,6 +21,17 @@ class PropertyTableClient:
 
     def add_property(self, property: Property) -> UUID:
         data = property.model_dump(exclude_none=True)
+        if data.get("images"):
+            normalized_images: list[dict[str, str]] = []
+            for raw_image in data["images"]:
+                key = None
+                if isinstance(raw_image, dict):
+                    key = raw_image.get("key")
+                else:
+                    key = getattr(raw_image, "key", None)
+                if key:
+                    normalized_images.append({"key": key})
+            data["images"] = normalized_images
         if not data.get("uuid"):
             data["uuid"] = uuid4()
         if not data.get("created_at"):
@@ -190,6 +201,17 @@ class RoomTableClient:
 
     def add_room(self, room: Room) -> UUID:
         data = room.model_dump(exclude_none=True)
+        if data.get("images"):
+            normalized_images: list[dict[str, str]] = []
+            for raw_image in data["images"]:
+                key = None
+                if isinstance(raw_image, dict):
+                    key = raw_image.get("key")
+                else:
+                    key = getattr(raw_image, "key", None)
+                if key:
+                    normalized_images.append({"key": key})
+            data["images"] = normalized_images
         if not data.get("uuid"):
             data["uuid"] = uuid4()
         if not data.get("created_at"):

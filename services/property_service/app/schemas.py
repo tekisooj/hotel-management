@@ -1,12 +1,19 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from pydantic import BaseModel, Field
 from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class Amenity(BaseModel):
     name: str = Field(description="Name of an amenity")
+
+
+class Image(BaseModel):
+    key: str = Field(description="S3 object key for the image")
+    url: str | None = Field(default=None, description="Temporary URL exposing the image")
+
 
 class RoomType(str, Enum):
     SINGLE = "single"
@@ -31,6 +38,7 @@ class Room(BaseModel):
     created_at: datetime | None = Field(description="Room created at", default=None)
     updated_at: datetime | None = Field(description="Room updated at", default=None)
     amenities: list[Amenity] | None = Field(description="List of all room amenities", default=[])
+    images: list[Image] | None = Field(description="List of room images stored in S3", default=[])
 
 
 class Property(BaseModel):
@@ -53,3 +61,16 @@ class Property(BaseModel):
     updated_at: datetime | None = Field(description="Property updated at", default=None)
     stars: int | None = Field(description="Number of stard", default=1)
     place_id: str | None = Field(description="AWS location place id", default=None)
+    images: list[Image] | None = Field(description="List of property images stored in S3", default=[])
+
+
+class PresignedUploadRequest(BaseModel):
+    prefix: str = Field(description="Folder prefix under which the asset will be stored")
+    content_type: str = Field(description="Content type of the asset being uploaded")
+    extension: str | None = Field(default=None, description="Optional file extension to append to the generated key")
+
+
+class PresignedUploadResponse(BaseModel):
+    key: str = Field(description="Generated S3 object key")
+    upload_url: str = Field(description="Pre-signed URL to upload the asset")
+    fields: dict[str, str] = Field(description="Form fields required when performing the upload")

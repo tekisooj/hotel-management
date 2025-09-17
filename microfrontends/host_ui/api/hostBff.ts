@@ -1,41 +1,53 @@
-import { Booking } from "types/Booking";
-import { BookingStatus } from "types/BookingStatus"
-import {Room} from "types/Room"
-import { Review } from "types/Review";
 import { NuxtAxiosInstance } from '@nuxtjs/axios';
 
-interface HostBff {    
-    getProperties(): any;
-    addProperty(property: PropertyDetail): any;
-    addRoom(room: Room): any;
-    deleteRoom(roomUuid: string): any;
-    deleteProperty(propertyUuid: string): any;
-    getBookings(propertyUuid: string, checkInDate: Date, checkOutDate: Date): any;
-    changeBookingStatus(bookingUuid: string, status: BookingStatus): any;
-    getPropertyReviews(propertyUuid: string): any;
-    }
+import { PropertyDetail } from '@/types/PropertyDetail';
+import { useRuntimeConfig } from 'nuxt/app';
+import { useUserStore } from '@/stores/user';
+import { Booking } from 'types/Booking';
+import { BookingStatus } from 'types/BookingStatus';
+import { Review } from 'types/Review';
+import { Room } from '@/types/Room';
+
+interface AssetUploadResponse {
+  key: string
+  uploadUrl: string
+  fields: Record<string, string>
+}
+
+interface HostBff {
+  getProperties(): Promise<any>
+  addProperty(property: PropertyDetail): Promise<any>
+  addRoom(room: Room): Promise<any>
+  deleteRoom(roomUuid: string): Promise<any>
+  deleteProperty(propertyUuid: string): Promise<any>
+  getBookings(propertyUuid: string, checkInDate: Date, checkOutDate: Date): Promise<any>
+  changeBookingStatus(bookingUuid: string, status: BookingStatus): Promise<any>
+  getPropertyReviews(propertyUuid: string): Promise<any>
+  createAssetUploadUrl(prefix: string, contentType: string, extension?: string): Promise<AssetUploadResponse>
+}
 
 declare module '@nuxt/types' {
-    interface Context {
-        $hostBff : HostBff;
-    }
+  interface Context {
+    $hostBff: HostBff
+  }
 }
 
 export default (axios: NuxtAxiosInstance): HostBff => ({
-
-    getProperties: async () => axios.$get('properties'),
-    addProperty: async (property: PropertyDetail) => axios.$post('property', property),
-    addRoom: async (room: Room) => axios.$post('room', room),
-    deleteRoom: async (roomUuid: string) => axios.$delete('room/${roomUuid}'),
-    deleteProperty: async (propertyUuid: string) => axios.$delete('property/${propertyUuid}'),
-    getBookings: async (propertyUuid: string, checkInDate: Date, checkOutDate: Date) => axios.$get('bookings', {property_uuid: propertyUuid, check_in: checkInDate, check_out: checkOutDate}),
-    changeBookingStatus: async (bookingUuid: string, status: BookingStatus) => axios.$patch('booking/${bookingUuid}', {booking_status: status}),
-    getPropertyReviews: async (propertyUuid: string) => axios.$get('reviews/{propertyUuid}'),
-    
-});
-import { PropertyDetail } from '@/types/PropertyDetail'
-import { useUserStore } from '@/stores/user'
-import { useRuntimeConfig } from "nuxt/app";
+  getProperties: async () => axios.$get('properties'),
+  addProperty: async (property: PropertyDetail) => axios.$post('property', property),
+  addRoom: async (room: Room) => axios.$post('room', room),
+  deleteRoom: async (roomUuid: string) => axios.$delete(`room/${roomUuid}`),
+  deleteProperty: async (propertyUuid: string) => axios.$delete(`property/${propertyUuid}`),
+  getBookings: async (propertyUuid: string, checkInDate: Date, checkOutDate: Date) =>
+    axios.$get('bookings', { property_uuid: propertyUuid, check_in: checkInDate, check_out: checkOutDate }),
+  changeBookingStatus: async (bookingUuid: string, status: BookingStatus) =>
+    axios.$patch(`booking/${bookingUuid}`, { booking_status: status }),
+  getPropertyReviews: async (propertyUuid: string) => axios.$get(`reviews/${propertyUuid}`),
+  createAssetUploadUrl: async (prefix: string, contentType: string, extension?: string) => {
+    const res = await axios.$post('assets/upload-url', { prefix, content_type: contentType, extension })
+    return { key: res.key, uploadUrl: res.upload_url, fields: res.fields }
+  },
+})
 
 export function useHostBff() {
   const config = useRuntimeConfig()
@@ -46,13 +58,23 @@ export function useHostBff() {
     if (user.token) {
       return { Authorization: `Bearer ${user.token}` }
     }
-    // Dev-only convenience: include X-User-Id when no token and a devUserId is configured
     const devUserId = (config.public as any).devUserId as string | undefined
     return devUserId ? { 'X-User-Id': devUserId } : {}
   }
 
+  function normalizeImages(images?: Array<{ key?: string | null }>) {
+    if (!images) {
+      return undefined
+    }
+    const normalized = images
+      .map((image) => (image?.key ?? '').trim())
+      .filter((key): key is string => key.length > 0)
+      .map((key) => ({ key }))
+    return normalized.length ? normalized : undefined
+  }
+
   async function getProperties(): Promise<PropertyDetail[]> {
-    return await $fetch<PropertyDetail[]>(`${baseURL}/properties` as string, {
+    return await $fetch<PropertyDetail[]>(`${baseURL}/properties`, {
       headers: authHeaders(),
     })
   }
@@ -73,9 +95,22 @@ export function useHostBff() {
       longitude: body.longitude,
       stars: body.stars,
       place_id: (body as any).placeId,
-      rooms: body.rooms
+      images: normalizeImages(body.images),
+      rooms: body.rooms?.map((room) => ({
+        uuid: room.uuid,
+        property_uuid: room.propertyUuid,
+        name: room.name,
+        description: room.description,
+        capacity: room.capacity,
+        room_type: room.roomType,
+        price_per_night: room.pricePerNight,
+        min_price_per_night: room.minPricePerNight,
+        max_price_per_night: room.maxPricePerNight,
+        amenities: room.amenities,
+        images: normalizeImages(room.images),
+      })),
     }
-    const res = await $fetch<string | { uuid: string }>(`${baseURL}/property` as string, {
+    const res = await $fetch<string | { uuid: string }>(`${baseURL}/property`, {
       method: 'POST',
       body: payload,
       headers: authHeaders(),
@@ -84,7 +119,6 @@ export function useHostBff() {
   }
 
   async function addRoom(body: Room): Promise<string> {
-    // Map to backend schema (snake_case)
     const payload: any = {
       uuid: body.uuid || undefined,
       property_uuid: body.propertyUuid,
@@ -96,8 +130,9 @@ export function useHostBff() {
       min_price_per_night: body.minPricePerNight,
       max_price_per_night: body.maxPricePerNight,
       amenities: body.amenities,
+      images: normalizeImages(body.images),
     }
-    const res = await $fetch<string | { uuid: string }>(`${baseURL}/room` as string, {
+    const res = await $fetch<string | { uuid: string }>(`${baseURL}/room`, {
       method: 'POST',
       body: payload,
       headers: authHeaders(),
@@ -106,7 +141,7 @@ export function useHostBff() {
   }
 
   async function deleteRoom(room_uuid: string): Promise<string> {
-    const res = await $fetch<string | { uuid: string }>(`${baseURL}/room/${room_uuid}` as string, {
+    const res = await $fetch<string | { uuid: string }>(`${baseURL}/room/${room_uuid}`, {
       method: 'DELETE',
       headers: authHeaders(),
     })
@@ -114,7 +149,7 @@ export function useHostBff() {
   }
 
   async function deleteProperty(property_uuid: string): Promise<string> {
-    const res = await $fetch<string | { uuid: string }>(`${baseURL}/property/${property_uuid}` as string, {
+    const res = await $fetch<string | { uuid: string }>(`${baseURL}/property/${property_uuid}`, {
       method: 'DELETE',
       headers: authHeaders(),
     })
@@ -122,18 +157,44 @@ export function useHostBff() {
   }
 
   async function getBookings(property_uuid: string, check_in: Date, check_out: Date): Promise<Booking[]> {
-    return await $fetch<PropertyDetail[]>(`${baseURL}/bookings` as string)
+    return await $fetch<Booking[]>(`${baseURL}/bookings`, {
+      headers: authHeaders(),
+      params: { property_uuid, check_in, check_out },
+    })
   }
 
   async function changeBookingStatus(booking_uuid: string, booking_status: BookingStatus): Promise<Booking> {
-    return await $fetch<PropertyDetail[]>(`${baseURL}/booking/${booking_uuid}` as string, {
+    return await $fetch<Booking>(`${baseURL}/booking/${booking_uuid}`, {
       method: 'PATCH',
-      body: {booking_status: booking_status}
-    } )
+      body: { booking_status },
+      headers: authHeaders(),
+    })
   }
 
   async function getPropertyReviews(property_uuid: string): Promise<Review[]> {
-    return await $fetch<PropertyDetail[]>(`${baseURL}/reviews/${property_uuid}` as string)
+    return await $fetch<Review[]>(`${baseURL}/reviews/${property_uuid}`, {
+      headers: authHeaders(),
+    })
+  }
+
+  async function createAssetUploadUrl(prefix: string, contentType: string, extension?: string): Promise<AssetUploadResponse> {
+    const res = await $fetch<{ key: string; upload_url: string; fields: Record<string, string> }>(`${baseURL}/assets/upload-url`, {
+      method: 'POST',
+      body: {
+        prefix,
+        content_type: contentType,
+        ...(extension ? { extension } : {}),
+      },
+      headers: authHeaders(),
+    })
+    return { key: res.key, uploadUrl: res.upload_url, fields: res.fields }
+  }
+
+  async function searchPlaces(text: string) {
+    return await $fetch<any>(`${baseURL}/places/search-text`, {
+      params: { text, index: (config.public as any).awsPlaceIndex },
+      headers: authHeaders(),
+    })
   }
 
   return {
@@ -145,11 +206,8 @@ export function useHostBff() {
     getBookings,
     changeBookingStatus,
     getPropertyReviews,
-    async searchPlaces(text: string) {
-      return await $fetch<any>(`${baseURL}/places/search-text`, {
-        params: { text, index: (config.public as any).awsPlaceIndex },
-        headers: authHeaders(),
-      })
-    },
+    createAssetUploadUrl,
+    searchPlaces,
   }
 }
+
