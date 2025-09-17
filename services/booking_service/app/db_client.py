@@ -24,7 +24,7 @@ class HotelManagementDBClient:
         
         self.engine = create_engine(self.db_url)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
-        Base.metadata.create_all(bind=self.engine, echo=True)
+        Base.metadata.create_all(bind=self.engine)
 
     def get_secret_by_name(self, secret_name: str, region_name: str = "us-east-1") -> dict:
         client = boto3.client("secretsmanager", region_name=region_name)
@@ -164,6 +164,7 @@ class HotelManagementDBClient:
             return overlapping_booking_exists is None
         finally:
             session.close()
+
 
 
 
