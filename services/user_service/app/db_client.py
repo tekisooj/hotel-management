@@ -40,10 +40,19 @@ class HotelManagementDBClient:
 
     def build_db_url_from_secret(self, secret_name: str, region: str) -> str:
         secret = self.get_secret_by_name(secret_name, region)
+        
+        username = str(secret.get('username', '')).strip()
+        password = str(secret.get('password', '')).strip()
+        host = str(secret.get('host', '')).strip()
+        port = str(secret.get('port', '')).strip()
+        dbname = str(secret.get('dbname', '')).strip()
+
+        if not all([username, password, host, port, dbname]):
+            raise ValueError('Database secret is missing required fields.')
 
         return (
-            f"postgresql+psycopg2://{secret['username']}:{secret['password']}"
-            f"@{secret['host']}:{secret['port']}/{secret['dbname']}"
+            f"postgresql+psycopg2://{username}:{password}"
+            f"@{host}:{port}/{dbname}"
         )
 
     def get_session(self) -> Session:
