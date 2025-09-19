@@ -27,7 +27,9 @@ class BookingServiceStack(Stack):
             managed_policies=[
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
                 ManagedPolicy.from_aws_managed_policy_name("AmazonRDSDataFullAccess"),
-                ManagedPolicy.from_aws_managed_policy_name("SecretsManagerReadWrite")
+                ManagedPolicy.from_aws_managed_policy_name("SecretsManagerReadWrite"),
+                ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaVPCAccessExecutionRole")
+
             ]
             
         )
