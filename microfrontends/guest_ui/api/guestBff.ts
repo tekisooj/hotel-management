@@ -113,6 +113,21 @@ export function useGuestBff() {
     })
   }
 
+  async function getRoom(room_uuid: string) {
+      const url = `${baseURL}/room/${room_uuid}` as string
+      return await $fetch<any>(url, { headers: authHeaders() })
+    }
+  async function getProperty(property_uuid: string) {
+    const url = `${baseURL}/property/${property_uuid}` as string
+    return await $fetch<any>(url, { headers: authHeaders() })
+  }
+  async function searchPlaces(text: string) {
+    return await $fetch<any>(`${baseURL}/places/search-text`, {
+      params: { text},
+      headers: authHeaders(),
+    })
+  }
+
   return {
     searchRooms,
     addReview,
@@ -122,11 +137,8 @@ export function useGuestBff() {
     cancelMyBooking,
     getMe,
     updateMe,
-    async searchPlaces(text: string) {
-      return await $fetch<any>(`${baseURL}/places/search-text`, {
-        params: { text},
-        headers: authHeaders(),
-      })
-    },
+    getRoom,
+    getProperty,
+    searchPlaces
   }
 }
