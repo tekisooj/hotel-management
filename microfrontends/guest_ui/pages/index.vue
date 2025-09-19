@@ -57,8 +57,10 @@
 import { computed, ref } from 'vue'
 import { useGuestBff } from '@/api/guestBff'
 import HotelList from '@/components/HotelList.vue'
+import { useSearchStore } from '@/stores/search'
 
 const { searchRooms } = useGuestBff()
+const store = useSearchStore()
 const country = ref('')
 const city = ref('')
 const state = ref('')
@@ -93,6 +95,9 @@ async function submit() {
       max_price: maxPrice.value || undefined,
     })
     propertyDetails.value = Array.isArray(res) ? res : []
+    if (Array.isArray(propertyDetails.value)) {
+      store.ingestSearch(propertyDetails.value)
+    }
     if (propertyDetails.value.length) {
       requestAnimationFrame(() => {
         resultsRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })

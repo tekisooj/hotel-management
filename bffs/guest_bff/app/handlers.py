@@ -120,6 +120,26 @@ async def search_places(text: str,  index_name: str = Depends(get_place_index)) 
         })
     return results
 
+async def fetch_property(
+    property_uuid: UUID,
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+) -> Property:
+    resp = await property_service_client.get(f"/property/{str(property_uuid)}", timeout=10.0)
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    data = resp.json()
+    return Property(**data)
+
+async def fetch_room(
+    room_uuid: UUID,
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+) -> Room:
+    resp = await property_service_client.get(f"/room/{str(room_uuid)}", timeout=10.0)
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    data = resp.json()
+    return Room(**data)
+
 async def add_review(
     review: Review,
     request: Request,

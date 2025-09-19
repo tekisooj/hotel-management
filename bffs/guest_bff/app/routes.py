@@ -5,6 +5,8 @@ from handlers import (
     add_booking,
     add_review,
     cancel_user_booking,
+    fetch_property,
+    fetch_room,
     get_filtered_rooms,
     get_property_reviews,
     get_user_bookings,
@@ -14,7 +16,7 @@ from handlers import (
     search_places,
 )
 from models.booking import Booking
-from models.property import PropertyDetail
+from models.property import Property, PropertyDetail, Room
 from models.user import UserResponse
 from models.review import Review
 
@@ -76,6 +78,22 @@ router.add_api_route(
     response_model=PropertyDetail,
     endpoint=get_filtered_rooms,
     description="Get filtered rooms"
+)
+
+router.add_api_route(
+    path="/room/{room_uuid}",
+    methods=["GET"],
+    response_model=Room,
+    endpoint=fetch_room,
+    description="Get room details"
+)
+
+router.add_api_route(
+    path="/property/{property_uuid}",
+    methods=["GET"],
+    response_model=Property,
+    endpoint=fetch_property,
+    description="Get property details"
 )
 
 router.add_api_route(

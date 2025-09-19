@@ -19,6 +19,7 @@
         :key="room.uuid || index"
         :class="['carousel-item', { active: index === 0 }]"
       >
+        <RouterLink :to="`/room/${room.uuid}?property=${room.propertyUuid || (room as any).property_uuid}`" class="text-decoration-none text-reset">
         <div class="card">
           <img
             v-if="room.images?.length && room.images[0].url"
@@ -42,6 +43,7 @@
             </div>
           </div>
         </div>
+        </RouterLink>
       </div>
     </div>
 
