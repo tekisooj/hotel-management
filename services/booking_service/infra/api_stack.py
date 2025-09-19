@@ -18,7 +18,7 @@ class BookingServiceStack(Stack):
 
         security_group = SecurityGroup.from_security_group_id(
             self, "HotelManagementDbSG",
-            security_group_id="sg-0630296e440a48346"
+            security_group_id="sg-018c80394ac5a0590"
         )
 
         lambda_role = Role(
