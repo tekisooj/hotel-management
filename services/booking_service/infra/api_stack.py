@@ -46,14 +46,14 @@ class BookingServiceStack(Stack):
         db_secret = Secret.from_secret_name_v2(self, "DbSecret", secret_name=db_name)
 
         if self.env_name=="prod":
-            db_endpoint="hotel-management-database-prod.cluster-capkwmowwxnt.us-east-1.rds.amazonaws.com"
+            db_endpoint="hotel-management-database-prod-instance-1.capkwmowwxnt.us-east-1.rds.amazonaws.com"
         else:
-            db_endpoint="hotel-management-database-int.cluster-capkwmowwxnt.us-east-1.rds.amazonaws.com"
+            db_endpoint="hotel-management-database-int-instance-1.capkwmowwxnt.us-east-1.rds.amazonaws.com"
 
         db_instance = DatabaseInstance.from_database_instance_attributes(
             self, "ImportedDbInstance",
             instance_endpoint_address=db_endpoint,
-            instance_identifier=db_name,
+            instance_identifier=f"{db_name}-instance-1",
             port=5432,
             security_groups=[db_sg],
             engine=DatabaseInstanceEngine.postgres(
