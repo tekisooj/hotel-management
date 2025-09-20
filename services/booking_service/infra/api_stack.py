@@ -53,8 +53,8 @@ class BookingServiceStack(Stack):
 
         db_cluster = DatabaseCluster.from_database_cluster_attributes(
             self, "ImportedDbCluster",
-            cluster_endpoint_address=db_endpoint,
             cluster_identifier=db_name,
+            cluster_endpoint_address=db_endpoint,
             port=5432,
             security_groups=[db_sg],
             engine=DatabaseClusterEngine.aurora_postgres(
@@ -65,10 +65,14 @@ class BookingServiceStack(Stack):
         db_proxy = DatabaseProxy(
             self, f"BookingDbProxy-{env_name}{f'-{pr_number}' if pr_number else ''}",
             proxy_target=ProxyTarget.from_cluster(db_cluster),
-            vpc=vpc,
             secrets=[db_secret],
-            vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS),
-            security_groups=[db_sg]
+            vpc=vpc,
+            vpc_subnets=SubnetSelection(
+                subnet_type=SubnetType.PRIVATE_WITH_EGRESS
+            ),
+            security_groups=[db_sg],
+            idle_client_timeout=Duration.minutes(30),
+            require_tls=True
         )
 
         lambda_function = Function(
