@@ -36,6 +36,16 @@ class BookingServiceStack(Stack):
         db_name = f"hotel-management-database-{self.env_name if self.env_name == 'prod' else 'int'}"
         db_secret = Secret.from_secret_name_v2(self, "DbSecret", secret_name=db_name)
 
+        
+        if self.env_name=="prod":
+            proxy_role_arn="arn:aws:iam::914242301564:role/service-role/rds-proxy-role-1758401519769"
+        else:
+            proxy_role_arn="arn:aws:iam::914242301564:role/service-role/rds-proxy-role-1758401469124"
+        
+        proxy_role = Role.from_role_arn(self, "ImportedProxyRole", proxy_role_arn)
+
+        db_secret.grant_read(proxy_role)
+
         if self.env_name == "prod":
             proxy_endpoint = "hotel-management-db-proxy-prod.proxy-capkwmowwxnt.us-east-1.rds.amazonaws.com"
         else:
