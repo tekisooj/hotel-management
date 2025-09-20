@@ -16,7 +16,7 @@ class UserServiceStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
         self.env_name = env_name
 
-        vpc = Vpc.from_lookup(self, "HotelManagementVpc", vpc_id="vpc-00688d23d81374471")
+        vpc = Vpc.from_lookup(self, "HotelManagementVpc", vpc_id="vpc-0b28dea117c8220de")
 
         db_sg = SecurityGroup.from_security_group_id(
             self, "HotelManagementDbSG",
