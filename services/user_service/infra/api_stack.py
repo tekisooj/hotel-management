@@ -20,7 +20,7 @@ class UserServiceStack(Stack):
 
         db_sg = SecurityGroup.from_security_group_id(
             self, "HotelManagementDbSG",
-            security_group_id="sg-018c80394ac5a0590"
+            security_group_id="sg-030e54916d52c0bd0"
         )
 
         lambda_role = Role(
