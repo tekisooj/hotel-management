@@ -18,8 +18,8 @@ logger.setLevel(logging.INFO)
 
 
 host = os.getenv("DB_PROXY_ENDPOINT")
-logger.info("Trying to connect to:", host)
-logger.info("DNS resolved to:", socket.gethostbyname(host))
+logger.info(f"Trying to connect to: {host}")
+logger.info("DNS resolved to: {socket.gethostbyname(host)}")
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.settimeout(5)
 sock.connect((host, 5432))
