@@ -10,13 +10,14 @@ from aws_cdk.aws_secretsmanager import Secret
 from constructs import Construct
 from aws_cdk.aws_ec2 import Vpc, SecurityGroup, SubnetSelection, SubnetType, Port
 from aws_cdk.aws_rds import (
-    DatabaseInstance,
+    DatabaseCluster,
     DatabaseInstanceAttributes,
-    DatabaseInstanceEngine,
+    DatabaseClusterEngine,
     DatabaseProxy,
     ProxyTarget,
     EngineVersion,
-    PostgresEngineVersion
+    PostgresEngineVersion,
+    AuroraPostgresEngineVersion
 )
 
 class BookingServiceStack(Stack):
@@ -46,24 +47,24 @@ class BookingServiceStack(Stack):
         db_secret = Secret.from_secret_name_v2(self, "DbSecret", secret_name=db_name)
 
         if self.env_name=="prod":
-            db_endpoint="hotel-management-database-prod-instance-1.capkwmowwxnt.us-east-1.rds.amazonaws.com"
+            db_endpoint="hotel-management-database-prod.cluster-capkwmowwxnt.us-east-1.rds.amazonaws.com"
         else:
-            db_endpoint="hotel-management-database-int-instance-1.capkwmowwxnt.us-east-1.rds.amazonaws.com"
+            db_endpoint="hotel-management-database-int.cluster-capkwmowwxnt.us-east-1.rds.amazonaws.com"
 
-        db_instance = DatabaseInstance.from_database_instance_attributes(
-            self, "ImportedDbInstance",
-            instance_endpoint_address=db_endpoint,
-            instance_identifier=f"{db_name}-instance-1",
+        db_cluster = DatabaseCluster.from_database_cluster_attributes(
+            self, "ImportedDbCluster",
+            cluster_endpoint_address=db_endpoint,
+            cluster_identifier=db_name,
             port=5432,
             security_groups=[db_sg],
-            engine=DatabaseInstanceEngine.postgres(
-                version=PostgresEngineVersion.VER_16
+            engine=DatabaseClusterEngine.aurora_postgres(
+                version=AuroraPostgresEngineVersion.VER_16_1
             )
         )
 
         db_proxy = DatabaseProxy(
             self, f"BookingDbProxy-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            proxy_target=ProxyTarget.from_instance(db_instance),
+            proxy_target=ProxyTarget.from_cluster(db_cluster),
             vpc=vpc,
             secrets=[db_secret],
             vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS),
