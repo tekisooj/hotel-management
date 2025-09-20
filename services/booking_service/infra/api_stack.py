@@ -12,8 +12,11 @@ from aws_cdk.aws_ec2 import Vpc, SecurityGroup, SubnetSelection, SubnetType, Por
 from aws_cdk.aws_rds import (
     DatabaseInstance,
     DatabaseInstanceAttributes,
+    DatabaseInstanceEngine,
     DatabaseProxy,
-    ProxyTarget
+    ProxyTarget,
+    EngineVersion,
+    PostgresEngineVersion
 )
 
 class BookingServiceStack(Stack):
@@ -52,7 +55,10 @@ class BookingServiceStack(Stack):
             instance_endpoint_address=f"{db_name}.cluster-xxxxxx.us-east-1.rds.amazonaws.com",
             instance_identifier=db_endpoint,
             port=5432,
-            security_groups=[db_sg]
+            security_groups=[db_sg],
+            engine=DatabaseInstanceEngine.postgres(
+                version=PostgresEngineVersion.VER_16
+            )
         )
 
         db_proxy = DatabaseProxy(
