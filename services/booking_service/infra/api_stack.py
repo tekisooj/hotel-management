@@ -8,17 +8,7 @@ from aws_cdk.aws_apigateway import RestApi, LambdaIntegration, EndpointType
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from aws_cdk.aws_secretsmanager import Secret
 from constructs import Construct
-from aws_cdk.aws_ec2 import Vpc, SecurityGroup, SubnetSelection, SubnetType, Port
-from aws_cdk.aws_rds import (
-    DatabaseCluster,
-    DatabaseInstanceAttributes,
-    DatabaseClusterEngine,
-    DatabaseProxy,
-    ProxyTarget,
-    EngineVersion,
-    PostgresEngineVersion,
-    AuroraPostgresEngineVersion
-)
+from aws_cdk.aws_ec2 import Vpc, SecurityGroup, SubnetSelection, SubnetType
 
 class BookingServiceStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, env_name: str, pr_number: str | None = None, **kwargs):
@@ -39,41 +29,17 @@ class BookingServiceStack(Stack):
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
                 ManagedPolicy.from_aws_managed_policy_name("AmazonRDSDataFullAccess"),
                 ManagedPolicy.from_aws_managed_policy_name("SecretsManagerReadWrite"),
-                ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaVPCAccessExecutionRole")
+                ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaVPCAccessExecutionRole"),
             ]
         )
 
         db_name = f"hotel-management-database-{self.env_name if self.env_name == 'prod' else 'int'}"
         db_secret = Secret.from_secret_name_v2(self, "DbSecret", secret_name=db_name)
 
-        if self.env_name=="prod":
-            db_endpoint="hotel-management-database-prod.cluster-capkwmowwxnt.us-east-1.rds.amazonaws.com"
+        if self.env_name == "prod":
+            proxy_endpoint = "hotel-management-db-proxy-prod.proxy-capkwmowwxnt.us-east-1.rds.amazonaws.com"
         else:
-            db_endpoint="hotel-management-database-int.cluster-capkwmowwxnt.us-east-1.rds.amazonaws.com"
-
-        db_cluster = DatabaseCluster.from_database_cluster_attributes(
-            self, "ImportedDbCluster",
-            cluster_identifier=db_name,
-            cluster_endpoint_address=db_endpoint,
-            port=5432,
-            security_groups=[db_sg],
-            engine=DatabaseClusterEngine.aurora_postgres(
-                version=AuroraPostgresEngineVersion.VER_16_1
-            )
-        )
-
-        db_proxy = DatabaseProxy(
-            self, f"BookingDbProxy-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            proxy_target=ProxyTarget.from_cluster(db_cluster),
-            secrets=[db_secret],
-            vpc=vpc,
-            vpc_subnets=SubnetSelection(
-                subnet_type=SubnetType.PRIVATE_WITH_EGRESS
-            ),
-            security_groups=[db_sg],
-            idle_client_timeout=Duration.minutes(30),
-            require_tls=True
-        )
+            proxy_endpoint = "hotel-management-db-proxy-int.proxy-capkwmowwxnt.us-east-1.rds.amazonaws.com"
 
         lambda_function = Function(
             self, f"BookingServiceFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
@@ -86,7 +52,7 @@ class BookingServiceStack(Stack):
             environment={
                 "BOOKING_SERVICE_ENV": self.env_name,
                 "HOTEL_MANAGEMENT_DATABASE_SECRET_NAME": db_name,
-                "DB_PROXY_ENDPOINT": db_proxy.endpoint, 
+                "DB_PROXY_ENDPOINT": proxy_endpoint,
             },
             vpc=vpc,
             security_groups=[db_sg],
@@ -119,4 +85,4 @@ class BookingServiceStack(Stack):
         resource_availability = api.root.add_resource("availability")
         resource_availability.add_method("GET", integration)
 
-        CfnOutput(self, "DbProxyEndpoint", value=db_proxy.endpoint)
+        CfnOutput(self, "DbProxyEndpoint", value=proxy_endpoint)
