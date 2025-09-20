@@ -7,7 +7,7 @@ app = cdk.App()
 env_name = app.node.try_get_context("env") or "int"
 pr_number = app.node.try_get_context("pr_number")
 
-stack_id = f"BookingServiceStack-pr-{pr_number}" if env_name == "pr" and pr_number else f"BookingService-{env_name}"
+stack_id = f"BookingServiceStack-pr-{pr_number}" if env_name == "pr" and pr_number else f"BookingServiceStack-{env_name}"
 
 BookingServiceStack(
     app, 
