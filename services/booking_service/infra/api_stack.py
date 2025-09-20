@@ -52,8 +52,8 @@ class BookingServiceStack(Stack):
 
         db_instance = DatabaseInstance.from_database_instance_attributes(
             self, "ImportedDbInstance",
-            instance_endpoint_address=f"{db_name}.cluster-xxxxxx.us-east-1.rds.amazonaws.com",
-            instance_identifier=db_endpoint,
+            instance_endpoint_address=db_endpoint,
+            instance_identifier=db_name,
             port=5432,
             security_groups=[db_sg],
             engine=DatabaseInstanceEngine.postgres(
@@ -66,9 +66,6 @@ class BookingServiceStack(Stack):
             proxy_target=ProxyTarget.from_instance(db_instance),
             vpc=vpc,
             secrets=[db_secret],
-            require_tls=True,
-            idle_client_timeout=Duration.minutes(30),
-            max_connections_percent=50,
             vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[db_sg]
         )
