@@ -1,4 +1,5 @@
 from datetime import datetime
+import asyncio
 from typing import Any
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request
@@ -261,8 +262,8 @@ async def get_bookings(
     check_out: datetime,
     property_service_client: AsyncClient = Depends(get_property_service_client),
     booking_service_client: AsyncClient = Depends(get_booking_service_client),
+    user_service_client: AsyncClient = Depends(get_user_service_client),
 ) -> list[Availability]:
-    
     property_response = await property_service_client.get(f"/property/{str(property_uuid)}")
     if property_response.status_code != 200:
         raise HTTPException(status_code=property_response.status_code, detail=property_response.text)
@@ -270,7 +271,8 @@ async def get_bookings(
     property_response = property_response.json()
     property_obj = Property(**property_response)
 
-    availabilities = []
+    availabilities: list[Availability] = []
+    unique_user_ids: set[str] = set()
 
     rooms_response = await property_service_client.get(f"/rooms/{str(property_obj.uuid)}")
     if rooms_response.status_code != 200:
@@ -279,19 +281,49 @@ async def get_bookings(
     rooms = [Room(**room) for room in rooms_response]
     params = {
         "check_in": check_in.isoformat(),
-        "check_out": check_out.isoformat()
+        "check_out": check_out.isoformat(),
     }
     for room in rooms:
         params["room_uuid"] = str(room.uuid)
-        bookings_response = await booking_service_client.get(f"/bookings", params=params)
+        bookings_response = await booking_service_client.get("/bookings", params=params)
         if bookings_response.status_code != 200:
             raise HTTPException(status_code=bookings_response.status_code, detail=bookings_response.text)
-        bookings_response=bookings_response.json()
+        bookings_payload = bookings_response.json()
         availability = Availability(**room.model_dump())
-        availability.property=property_obj
-        availability.bookings = [Booking(**booking) for booking in bookings_response]
+        availability.property = property_obj
+        room_bookings = [Booking(**booking) for booking in bookings_payload]
+        availability.bookings = room_bookings
+        for booking in room_bookings:
+            unique_user_ids.add(str(booking.user_uuid))
         availabilities.append(availability)
 
+    user_details: dict[str, dict[str, Any]] = {}
+
+    if unique_user_ids:
+        async def fetch_user(user_uuid: str) -> None:
+            if user_uuid in user_details:
+                return
+            try:
+                response = await user_service_client.get(f"/user/{user_uuid}")
+            except HTTPError:
+                return
+            if response.status_code == 200:
+                user_details[user_uuid] = response.json()
+
+        await asyncio.gather(*(fetch_user(user_uuid) for user_uuid in unique_user_ids), return_exceptions=True)
+
+    for availability in availabilities:
+        if not availability.bookings:
+            continue
+        for booking in availability.bookings:
+            user_info = user_details.get(str(booking.user_uuid))
+            if not user_info:
+                continue
+            full_name = " ".join(
+                part.strip()
+                for part in [user_info.get("name", ""), user_info.get("last_name", "")]
+                if part and part.strip()
+            )
     return availabilities
 
 
@@ -335,3 +367,4 @@ async def get_property_reviews(
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     reviews_response = resp.json() or []
     return [Review(**review) for review in reviews_response]
+

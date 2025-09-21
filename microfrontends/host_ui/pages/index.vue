@@ -1,12 +1,13 @@
 <template>
   <div class="page">
-
-        <button class="btn btn-primary" @click="addNewProperty">Add new Property</button>
+    <div class="d-flex gap-2 mb-3 flex-wrap">
+      <button class="btn btn-outline-secondary" @click="viewBookings">View bookings</button>
+      <button class="btn btn-primary" @click="addNewProperty">Add new Property</button>
+    </div>
 
     <div class="hotels">
       <HotelList :hotels="propertyDetails" />
     </div>
-
   </div>
 </template>
 
@@ -17,7 +18,7 @@ import { onMounted } from 'vue'
 import { ref, computed } from 'vue'
 
 const { getProperties } = useHostBff()
-const router = useRouter() 
+const router = useRouter()
 const country = ref('')
 const city = ref('')
 const state = ref('')
@@ -26,20 +27,23 @@ const checkOut = ref('')
 const capacity = ref(0)
 const maxPrice = ref(undefined)
 
-var propertyDetails = ref<any[]>([])
+const propertyDetails = ref<any[]>([])
 
-onMounted(async () => { 
-    try { 
-        const res = await getProperties();
-        propertyDetails.value = Array.isArray(res) ? res : [] 
-    } 
-    catch (e) { 
-        propertyDetails.value = [] 
-    } 
+onMounted(async () => {
+  try {
+    const res = await getProperties()
+    propertyDetails.value = Array.isArray(res) ? res : []
+  } catch (e) {
+    propertyDetails.value = []
+  }
 })
-async function addNewProperty() { 
-    
-    await router.push({ path: '/add-property' }) 
+
+async function addNewProperty() {
+  await router.push({ path: '/add-property' })
+}
+
+async function viewBookings() {
+  await router.push({ path: '/bookings' })
 }
 
 async function submit() {
@@ -60,9 +64,6 @@ async function submit() {
     propertyDetails.value = []
   }
 }
-
-
-
 </script>
 
 <style scoped>
@@ -70,4 +71,3 @@ async function submit() {
 .actions { margin-top: 16px; }
 button { padding: 8px 12px; }
 </style>
-

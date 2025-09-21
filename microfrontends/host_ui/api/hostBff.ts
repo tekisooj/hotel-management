@@ -1,12 +1,13 @@
-import { NuxtAxiosInstance } from '@nuxtjs/axios';
+import { NuxtAxiosInstance } from '@nuxtjs/axios'
 
-import { PropertyDetail } from '@/types/PropertyDetail';
-import { useRuntimeConfig } from 'nuxt/app';
-import { useUserStore } from '@/stores/user';
-import { Booking } from 'types/Booking';
-import { BookingStatus } from 'types/BookingStatus';
-import { Review } from 'types/Review';
-import { Room } from '@/types/Room';
+import { PropertyDetail } from '@/types/PropertyDetail'
+import { useRuntimeConfig } from 'nuxt/app'
+import { useUserStore } from '@/stores/user'
+import { Booking } from 'types/Booking'
+import { BookingStatus } from 'types/BookingStatus'
+import { Review } from 'types/Review'
+import { Room } from '@/types/Room'
+import { RoomAvailability } from '@/types/Availability'
 
 interface AssetUploadResponse {
   key: string
@@ -20,7 +21,7 @@ interface HostBff {
   addRoom(room: Room): Promise<any>
   deleteRoom(roomUuid: string): Promise<any>
   deleteProperty(propertyUuid: string): Promise<any>
-  getBookings(propertyUuid: string, checkInDate: Date, checkOutDate: Date): Promise<any>
+  getBookings(propertyUuid: string, checkInDate: Date, checkOutDate: Date): Promise<RoomAvailability[]>
   changeBookingStatus(bookingUuid: string, status: BookingStatus): Promise<any>
   getPropertyReviews(propertyUuid: string): Promise<any>
   createAssetUploadUrl(prefix: string, contentType: string, extension?: string): Promise<AssetUploadResponse>
@@ -32,14 +33,63 @@ declare module '@nuxt/types' {
   }
 }
 
+function mapAvailability(raw: any): RoomAvailability {
+  return {
+    uuid: raw.uuid,
+    property_uuid: raw.property_uuid,
+    name: raw.name,
+    description: raw.description,
+    capacity: raw.capacity,
+    room_type: raw.room_type,
+    price_per_night: raw.price_per_night,
+    min_price_per_night: raw.min_price_per_night,
+    max_price_per_night: raw.max_price_per_night,
+    property: raw.property
+      ? {
+          uuid: raw.property.uuid,
+          name: raw.property.name,
+          address: raw.property.address,
+        }
+      : undefined,
+    bookings: Array.isArray(raw.bookings)
+      ? raw.bookings.map((booking: any) => ({
+          uuid: booking.uuid,
+          user_uuid: booking.user_uuid,
+          room_uuid: booking.room_uuid,
+          check_in: booking.check_in,
+          check_out: booking.check_out,
+          total_price: booking.total_price,
+          status: booking.status,
+          created_at: booking.created_at,
+          updated_at: booking.updated_at,
+          guest_name: booking.guest_name,
+          guest_email: booking.guest_email,
+        }))
+      : [],
+  }
+}
+
+function mapAvailabilityList(list: any[]): RoomAvailability[] {
+  return Array.isArray(list) ? list.map(mapAvailability) : []
+}
+
 export default (axios: NuxtAxiosInstance): HostBff => ({
   getProperties: async () => axios.$get('properties'),
   addProperty: async (property: PropertyDetail) => axios.$post('property', property),
   addRoom: async (room: Room) => axios.$post('room', room),
   deleteRoom: async (roomUuid: string) => axios.$delete(`room/${roomUuid}`),
   deleteProperty: async (propertyUuid: string) => axios.$delete(`property/${propertyUuid}`),
-  getBookings: async (propertyUuid: string, checkInDate: Date, checkOutDate: Date) =>
-    axios.$get('bookings', { property_uuid: propertyUuid, check_in: checkInDate, check_out: checkOutDate }),
+  getBookings: async (propertyUuid: string, checkInDate: Date, checkOutDate: Date) => {
+    const res = await axios.$get<any[]>('bookings', {
+      params: {
+        property_uuid: propertyUuid,
+        check_in: checkInDate.toISOString(),
+        check_out: checkOutDate.toISOString(),
+      },
+      headers: authHeaders(),
+    })
+    return mapAvailabilityList(res)
+  },
   changeBookingStatus: async (bookingUuid: string, status: BookingStatus) =>
     axios.$patch(`booking/${bookingUuid}`, { booking_status: status }),
   getPropertyReviews: async (propertyUuid: string) => axios.$get(`reviews/${propertyUuid}`),
@@ -156,11 +206,12 @@ export function useHostBff() {
     return typeof res === 'string' ? res : res.uuid
   }
 
-  async function getBookings(property_uuid: string, check_in: Date, check_out: Date): Promise<Booking[]> {
-    return await $fetch<Booking[]>(`${baseURL}/bookings`, {
+  async function getBookings(property_uuid: string, check_in: Date, check_out: Date): Promise<RoomAvailability[]> {
+    const response = await $fetch<any[]>(`${baseURL}/bookings`, {
       headers: authHeaders(),
-      params: { property_uuid, check_in, check_out },
+      params: { property_uuid, check_in: check_in.toISOString(), check_out: check_out.toISOString() },
     })
+    return mapAvailabilityList(response)
   }
 
   async function changeBookingStatus(booking_uuid: string, booking_status: BookingStatus): Promise<Booking> {
@@ -210,4 +261,5 @@ export function useHostBff() {
     searchPlaces,
   }
 }
+
 

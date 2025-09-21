@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request
 from httpx import AsyncClient, HTTPError
@@ -169,7 +169,7 @@ async def add_review(
         me = await user_service_client.get("/me", headers={"Authorization": auth}, timeout=10.0)
         if me.status_code == 200:
             me_body = me.json()
-            me_obj = User(**me_body)
+            me_obj = UserResponse(**me_body)
             reviewer_name = f"{me_obj.name} {me_obj.last_name}"
         prop_response = await property_service_client.get(f"/property/{str(review.property_uuid)}", timeout=10.0)
         if prop_response.status_code == 200:
@@ -180,7 +180,7 @@ async def add_review(
                 host_resp = await user_service_client.get(f"/user/{str(host_uuid)}", headers={"Authorization": auth}, timeout=10.0)
                 if host_resp.status_code == 200:
                     host_body = host_resp.json() or {}
-                    host_obj = User(**host_body)
+                    host_obj = UserResponse(**host_body)
                     host_email = host_obj.email
     except Exception:
         pass
@@ -248,7 +248,7 @@ async def add_booking(
                             user_resp = await user_service_client.get(f"/user/{str(host_uuid)}", headers={"Authorization": auth}, timeout=10.0)
                             if user_resp.status_code == 200:
                                 user_body = user_resp.json()
-                                user_obj = User(**user_body)
+                                user_obj = UserResponse(**user_body)
                                 host_email = user_obj.email
 
         event_bus.put_event(
@@ -426,9 +426,8 @@ async def get_filtered_rooms(
         for room in prop.rooms:
             if check_in_date and check_out_date:
                 avail_response = await booking_service_client.get(
-                    "/availability",
+                    f"/availability/{str(room.uuid)}",
                     params={
-                        "room_uuid": str(room.uuid),
                         "check_in": check_in_date.isoformat(),
                         "check_out": check_out_date.isoformat(),
                     },
@@ -437,7 +436,7 @@ async def get_filtered_rooms(
                 if avail_response.status_code != 200:
                     raise HTTPException(status_code=avail_response.status_code, detail=avail_response.text)
                 if bool(avail_response.json()):
-                    property_detail.rooms.append(room) # type: ignore
+                    property_detail.rooms.append(room)  # type: ignore
         if property_detail.rooms:
             available_room_entries.append(property_detail)
                 
@@ -460,3 +459,5 @@ async def get_filtered_rooms(
         available_room_entries = list(filter(lambda x: x.average_rating and x.average_rating>=rating_above, available_room_entries))
 
     return available_room_entries
+
+
