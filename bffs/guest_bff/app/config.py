@@ -1,4 +1,4 @@
-import os
+﻿import os
 from pydantic_settings import BaseSettings
 
 class AppMetadata(BaseSettings):
@@ -31,7 +31,7 @@ guest_bff_prod_configuration = AppConfiguration(
 
 guest_bff_int_configuration = AppConfiguration(
     user_service_url="https://g8bpnxtiii.execute-api.us-east-1.amazonaws.com/prod",
-    booking_service_url="https://sn2evwp3ub.execute-api.us-east-1.amazonaws.com/prod/",
+    booking_service_url="https://sn2evwp3ub.execute-api.us-east-1.amazonaws.com/prod",
     property_service_url="https://92znf03thc.execute-api.us-east-1.amazonaws.com/prod",
     review_service_url="https://vdt7h3agnj.execute-api.us-east-1.amazonaws.com/prod",    
     audience=os.environ.get("AUDIENCE", None),
@@ -40,3 +40,4 @@ guest_bff_int_configuration = AppConfiguration(
     place_index=os.environ.get("PLACE_INDEX_NAME", None)
 
 )
+
