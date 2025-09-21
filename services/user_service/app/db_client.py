@@ -1,70 +1,49 @@
+import os
 import json
 from uuid import UUID
-
 import boto3
 from fastapi import HTTPException
-from schemas import UserCreate, UserResponse, UserUpdate
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from models import Base, User
+from schemas import UserCreate, UserResponse, UserUpdate
+from models import User
 
 
 class HotelManagementDBClient:
-    def __init__(
-        self,
-        hotel_management_database_secret_name: str | None,
-        region: str,
-        db_proxy_endpoint: str | None = None,
-    ) -> None:
+    def __init__(self, hotel_management_database_secret_name: str, region: str) -> None:
         if not hotel_management_database_secret_name:
             raise ValueError("Secret name must be provided or set in environment variables.")
 
+        self.secret_name = hotel_management_database_secret_name
+        self.region = region
+        self._engine = None
+        self._SessionLocal = None
 
-        self.db_url = self.build_db_url_from_secret(
-            hotel_management_database_secret_name,
-            region,
-            db_proxy_endpoint,
-        )
+    def _get_secret(self) -> dict:
+        client = boto3.client("secretsmanager", region_name=self.region)
+        response = client.get_secret_value(SecretId=self.secret_name)
+        return json.loads(response["SecretString"])
 
-        if not self.db_url:
-            raise ValueError("Unable to build DB URL.")
+    def _build_db_url(self) -> str:
+        secret = self._get_secret()
+        username = secret["username"].strip()
+        password = secret["password"].strip()
+        port = str(secret["port"]).strip()
+        dbname = secret["dbname"].strip()
 
-        self.engine = create_engine(self.db_url, pool_pre_ping=True)
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
-        Base.metadata.create_all(bind=self.engine)
-
-    def get_secret_by_name(self, secret_name: str, region_name: str = "us-east-1") -> dict:
-        client = boto3.client("secretsmanager", region_name=region_name)
-        try:
-            response = client.get_secret_value(SecretId=secret_name)
-            return json.loads(response["SecretString"])
-        except client.exceptions.ResourceNotFoundException:
-            raise Exception(f"Secret {secret_name} not found.")
-        except client.exceptions.ClientError as e:
-            raise Exception(f"Error retrieving secret: {str(e)}")
-
-    def build_db_url_from_secret(
-        self,
-        secret_name: str,
-        region: str,
-        db_proxy_endpoint: str | None = None,
-    ) -> str:
-        secret = self.get_secret_by_name(secret_name, region)
-
-        username = str(secret.get("username", "")).strip()
-        password = str(secret.get("password", "")).strip()
-        port = str(secret.get("port", "")).strip()
-        dbname = str(secret.get("dbname", "")).strip()
-
-        host = db_proxy_endpoint or str(secret.get("host", "")).strip()
-
-        if not all([username, password, host, port, dbname]):
-            raise ValueError("Database secret is missing required fields.")
+        proxy_endpoint = os.getenv("DB_PROXY_ENDPOINT")
+        host = proxy_endpoint if proxy_endpoint else secret["host"].strip()
 
         return f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}"
 
+    def _init_engine(self):
+        if not self._engine:
+            self._engine = create_engine(self._build_db_url())
+            self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
+
     def get_session(self) -> Session:
-        return self.SessionLocal()
+        self._init_engine()
+        return self._SessionLocal() # type: ignore
 
     def create_user(self, user: UserCreate) -> UUID:
         session = self.get_session()
@@ -108,8 +87,7 @@ class HotelManagementDBClient:
             if not user:
                 return None
 
-            update_fields = update_data.model_dump(exclude_none=True)
-            for field, value in update_fields.items():
+            for field, value in update_data.model_dump(exclude_none=True).items():
                 setattr(user, field, value)
 
             session.commit()

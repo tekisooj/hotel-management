@@ -1,61 +1,49 @@
 import os
-from datetime import datetime
 import json
+from datetime import datetime
 from uuid import UUID
-
 import boto3
-from schemas import Booking, BookingStatus, BookingUpdateRequest
 from sqlalchemy import and_, create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from models import Base, BookingDB
+from schemas import Booking, BookingStatus, BookingUpdateRequest
+from models import BookingDB
 
 
 class HotelManagementDBClient:
-    def __init__(self, hotel_management_database_secret_name: str | None, region: str, proxy_endpoint: str | None) -> None:
+    def __init__(self, hotel_management_database_secret_name: str, region: str) -> None:
         if not hotel_management_database_secret_name:
             raise ValueError("Secret name must be provided or set in environment variables.")
 
-        self.proxy_endpoint=proxy_endpoint
-        self.db_url = self.build_db_url_from_secret(hotel_management_database_secret_name, region)
+        self.secret_name = hotel_management_database_secret_name
+        self.region = region
+        self._engine = None
+        self._SessionLocal = None
 
-        if not self.db_url:
-            raise ValueError("Unable to get db url.")
+    def _get_secret(self) -> dict:
+        client = boto3.client("secretsmanager", region_name=self.region)
+        response = client.get_secret_value(SecretId=self.secret_name)
+        return json.loads(response["SecretString"])
 
-        self.engine = create_engine(self.db_url, pool_pre_ping=True)
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
-        Base.metadata.create_all(bind=self.engine)
+    def _build_db_url(self) -> str:
+        secret = self._get_secret()
+        username = secret["username"].strip()
+        password = secret["password"].strip()
+        port = str(secret["port"]).strip()
+        dbname = secret["dbname"].strip()
 
-    def get_secret_by_name(self, secret_name: str, region_name: str = "us-east-1") -> dict:
-        client = boto3.client("secretsmanager", region_name=region_name)
-        try:
-            response = client.get_secret_value(SecretId=secret_name)
-            return json.loads(response["SecretString"])
-        except client.exceptions.ResourceNotFoundException:
-            raise Exception(f"Secret {secret_name} not found.")
-        except client.exceptions.ClientError as e:
-            raise Exception(f"Error retrieving secret: {str(e)}")
-
-    def build_db_url_from_secret(self, secret_name: str, region: str) -> str:
-        secret = self.get_secret_by_name(secret_name, region)
-
-        username = str(secret.get("username", "")).strip()
-        password = str(secret.get("password", "")).strip()
-        port = str(secret.get("port", "")).strip()
-        dbname = str(secret.get("dbname", "")).strip()
-
-
-        if self.proxy_endpoint:
-            host = self.proxy_endpoint
-        else:
-            host = str(secret.get("host", "")).strip()
-
-        if not all([username, password, host, port, dbname]):
-            raise ValueError("Database secret is missing required fields.")
+        proxy_endpoint = os.getenv("DB_PROXY_ENDPOINT")
+        host = proxy_endpoint if proxy_endpoint else secret["host"].strip()
 
         return f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}"
 
+    def _init_engine(self):
+        if not self._engine:
+            self._engine = create_engine(self._build_db_url())
+            self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
+
     def get_session(self) -> Session:
-        return self.SessionLocal()
+        self._init_engine()
+        return self._SessionLocal() # type: ignore
 
     def add_booking(self, booking: Booking) -> UUID:
         session = self.get_session()
@@ -83,18 +71,14 @@ class HotelManagementDBClient:
         finally:
             session.close()
 
-    def get_filtered_bookings(
-        self,
-        user_uuid: UUID | None = None,
-        room_uuid: UUID | None = None,
-        status: str | None = None,
-        check_in: datetime | None = None,
-        check_out: datetime | None = None,
-    ) -> list[Booking]:
+    def get_filtered_bookings(self, user_uuid: UUID | None = None,
+                              room_uuid: UUID | None = None,
+                              status: str | None = None,
+                              check_in: datetime | None = None,
+                              check_out: datetime | None = None) -> list[Booking]:
         session = self.get_session()
         try:
             query = session.query(BookingDB)
-
             if user_uuid:
                 query = query.filter(BookingDB.user_uuid == user_uuid)
             if room_uuid:
@@ -103,12 +87,8 @@ class HotelManagementDBClient:
                 query = query.filter(BookingDB.status == status)
             if check_in and check_out:
                 query = query.filter(
-                    and_(
-                        BookingDB.check_in <= check_out,
-                        BookingDB.check_out >= check_in,
-                    )
+                    and_(BookingDB.check_in <= check_out, BookingDB.check_out >= check_in)
                 )
-
             return [Booking.model_validate(b) for b in query.all()]
         finally:
             session.close()
@@ -120,14 +100,8 @@ class HotelManagementDBClient:
             if not booking:
                 raise ValueError("Booking not found")
 
-            if update_request.check_in:
-                booking.check_in = update_request.check_in
-            if update_request.check_out:
-                booking.check_out = update_request.check_out
-            if update_request.total_price:
-                booking.total_price = update_request.total_price
-            if update_request.status:
-                booking.status = update_request.status
+            for field, value in update_request.model_dump(exclude_none=True).items():
+                setattr(booking, field, value)
 
             session.commit()
             session.refresh(booking)
@@ -152,12 +126,12 @@ class HotelManagementDBClient:
     def check_availability(self, room_uuid: UUID, check_in: datetime, check_out: datetime) -> bool:
         session = self.get_session()
         try:
-            overlapping_booking_exists = session.query(BookingDB).filter(
+            overlapping = session.query(BookingDB).filter(
                 BookingDB.room_uuid == room_uuid,
                 BookingDB.status != "canceled",
                 BookingDB.check_in < check_out,
                 BookingDB.check_out > check_in,
             ).first()
-            return overlapping_booking_exists is None
+            return overlapping is None
         finally:
             session.close()
