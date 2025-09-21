@@ -10,7 +10,7 @@ from models import BookingDB
 
 
 class HotelManagementDBClient:
-    def __init__(self, hotel_management_database_secret_name: str, region: str, proxy_endpoint: str | None) -> None:
+    def __init__(self, hotel_management_database_secret_name: str | None, region: str, proxy_endpoint: str | None) -> None:
         if not hotel_management_database_secret_name:
             raise ValueError("Secret name must be provided or set in environment variables.")
 
