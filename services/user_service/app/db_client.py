@@ -10,7 +10,7 @@ from models import User
 
 
 class HotelManagementDBClient:
-    def __init__(self, hotel_management_database_secret_name: str, region: str) -> None:
+    def __init__(self, hotel_management_database_secret_name: str, region: str, proxy_endpoint: str | None) -> None:
         if not hotel_management_database_secret_name:
             raise ValueError("Secret name must be provided or set in environment variables.")
 
@@ -18,6 +18,7 @@ class HotelManagementDBClient:
         self.region = region
         self._engine = None
         self._SessionLocal = None
+        self.proxy_endpoint = proxy_endpoint
 
     def _get_secret(self) -> dict:
         client = boto3.client("secretsmanager", region_name=self.region)
@@ -31,8 +32,7 @@ class HotelManagementDBClient:
         port = str(secret["port"]).strip()
         dbname = secret["dbname"].strip()
 
-        proxy_endpoint = os.getenv("DB_PROXY_ENDPOINT")
-        host = proxy_endpoint if proxy_endpoint else secret["host"].strip()
+        host = self.proxy_endpoint if self.proxy_endpoint else secret["host"].strip()
 
         return f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}"
 
