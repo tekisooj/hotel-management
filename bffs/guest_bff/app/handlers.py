@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 import asyncio
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request
@@ -155,7 +155,7 @@ async def add_review(
     payload["user_uuid"] = user_uuid
 
     resp = await review_service_client.post(
-        f"/review/{str(review.property_uuid)}",
+        f"review/{str(review.property_uuid)}",
         json=payload,
         timeout=10.0,
     )
@@ -430,24 +430,28 @@ async def get_filtered_rooms(
             continue
         if date_filtered:
             property_detail.rooms = []  # type: ignore[attr-defined]
-
-            async def fetch_availability(room: Room):
-                response = await booking_service_client.get(
-                    f"availability/{str(room.uuid)}",
-                    params={"check_in": check_in_iso, "check_out": check_out_iso},
+            room_ids = [str(room.uuid) for room in rooms_to_check if room.uuid]
+            if room_ids:
+                payload = {
+                    "room_uuids": room_ids,
+                    "check_in": check_in_iso,
+                    "check_out": check_out_iso,
+                }
+                availability_response = await booking_service_client.post(
+                    "availability/batch",
+                    json=payload,
                     timeout=10.0,
                 )
-                return room, response
-
-            results = await asyncio.gather(*(fetch_availability(room) for room in rooms_to_check), return_exceptions=True)
-            for result in results:
-                if isinstance(result, Exception):
-                    raise HTTPException(status_code=502, detail=str(result))
-                room, avail_response = result
-                if avail_response.status_code != 200:
-                    raise HTTPException(status_code=avail_response.status_code, detail=avail_response.text)
-                if bool(avail_response.json()):
-                    property_detail.rooms.append(room)  # type: ignore[attr-defined]
+                if availability_response.status_code != 200:
+                    raise HTTPException(status_code=availability_response.status_code, detail=availability_response.text)
+                availability_map = availability_response.json() or {}
+                for room in rooms_to_check:
+                    if availability_map.get(str(room.uuid)):
+                        property_detail.rooms.append(room)  # type: ignore[attr-defined]
+            else:
+                property_detail.rooms = rooms_to_check  # type: ignore[attr-defined]
+        else:
+            property_detail.rooms = rooms_to_check  # type: ignore[attr-defined]
         if property_detail.rooms:
             available_room_entries.append(property_detail)
                 
@@ -470,5 +474,6 @@ async def get_filtered_rooms(
         available_room_entries = list(filter(lambda x: x.average_rating and x.average_rating>=rating_above, available_room_entries))
 
     return available_room_entries
+
 
 

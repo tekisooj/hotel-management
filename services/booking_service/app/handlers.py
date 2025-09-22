@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import UUID
 from fastapi import Depends, Request
 from db_client import HotelManagementDBClient
-from schemas import Booking, BookingUpdateRequest
+from schemas import Booking, BookingUpdateRequest, AvailabilityBulkRequest
 
 def get_hotel_management_db_client(request: Request) -> HotelManagementDBClient:
     return request.app.state.hotel_management_db_client
@@ -31,3 +31,10 @@ async def cancel_booking(booking_uuid: UUID, hotel_management_db_client: HotelMa
 
 async def check_availability(room_uuid: UUID, check_in: datetime, check_out: datetime, hotel_management_db_client: HotelManagementDBClient = Depends(get_hotel_management_db_client)) -> bool:
     return hotel_management_db_client.check_availability(room_uuid, check_in, check_out)
+
+async def check_availability_batch(
+    request: AvailabilityBulkRequest,
+    hotel_management_db_client: HotelManagementDBClient = Depends(get_hotel_management_db_client),
+) -> dict[str, bool]:
+    result = hotel_management_db_client.check_availability_bulk(request.room_uuids, request.check_in, request.check_out)
+    return {str(room_uuid): available for room_uuid, available in result.items()}

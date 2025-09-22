@@ -33,3 +33,8 @@ class BookingUpdateRequest(BaseModel):
     check_out: datetime | None = Field(default=None)
     total_price: float | None = Field(default=None)
     status: BookingStatus | None = Field(default=None)
+
+class AvailabilityBulkRequest(BaseModel):
+    room_uuids: list[UUID] = Field(default_factory=list)
+    check_in: datetime = Field(description="Check in time")
+    check_out: datetime = Field(description="Check out time")

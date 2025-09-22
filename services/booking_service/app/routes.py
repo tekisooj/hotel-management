@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import APIRouter
 
-from handlers import add_booking, cancel_booking, check_availability, get_booking, get_filtered_bookings, update_booking
+from handlers import add_booking, cancel_booking, check_availability, check_availability_batch, get_booking, get_filtered_bookings, update_booking
 from schemas import Booking
 
 router = APIRouter()
@@ -53,4 +53,11 @@ router.add_api_route(
     response_model=bool,
     endpoint=check_availability,
     description="Check room availability"
+)
+router.add_api_route(
+    path="/availability/batch",
+    methods=["POST"],
+    response_model=dict[str, bool],
+    endpoint=check_availability_batch,
+    description="Check availability for multiple rooms"
 )

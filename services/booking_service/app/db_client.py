@@ -1,4 +1,4 @@
-import os
+﻿import os
 import json
 from datetime import datetime
 from uuid import UUID
@@ -136,3 +136,19 @@ class HotelManagementDBClient:
             return overlapping is None
         finally:
             session.close()
+    def check_availability_bulk(self, room_uuids: list[UUID], check_in: datetime, check_out: datetime) -> dict[UUID, bool]:
+        if not room_uuids:
+            return {}
+        session = self.get_session()
+        try:
+            overlapping = session.query(BookingDB.room_uuid).filter(
+                BookingDB.room_uuid.in_(room_uuids),
+                BookingDB.status != "canceled",
+                BookingDB.check_in < check_out,
+                BookingDB.check_out > check_in,
+            ).all()
+            occupied = {getattr(row, "room_uuid", row[0]) for row in overlapping}
+            return {room_uuid: room_uuid not in occupied for room_uuid in room_uuids}
+        finally:
+            session.close()
+
