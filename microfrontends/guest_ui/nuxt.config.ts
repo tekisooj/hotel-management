@@ -39,6 +39,8 @@ export default defineNuxtConfig({
       awsPlaceIndex: process.env.VITE_AWS_PLACE_INDEX || '',
       // Optional dev convenience header for BFF when no JWT
       devUserId: process.env.DEV_USER_ID || '',
+      authUiUrl: process.env.AUTH_UI_URL || '',
+      guestUiUrl: process.env.GUEST_UI_URL || '',
     },
   },
 })

@@ -1,31 +1,62 @@
-<template>
-  <div>Redirecting...</div>
+﻿<template>
+  <div class="callback">Redirecting…</div>
 </template>
 
 <script setup lang="ts">
-import { config } from "maplibre-gl";
-import { useRuntimeConfig } from "nuxt/app";
-import { onMounted } from "vue";
-import { userManager } from "~/api/authClient";
-import { useUserStore } from "~/stores/user";
-import type { User } from "~/types/User";
+import { onMounted } from 'vue'
+import { useRuntimeConfig } from 'nuxt/app'
+import { userManager } from '~/api/authClient'
+import { useUserStore } from '~/stores/user'
+import type { User } from '~/types/User'
+
+function buildTargetUrl(base: string, token: string, refreshToken?: string, redirect?: string) {
+  const resolvedBase = base || window.location.origin
+  const url = new URL(resolvedBase)
+  url.pathname = '/auth/callback'
+  url.searchParams.set('id_token', token)
+  if (refreshToken) {
+    url.searchParams.set('refresh_token', refreshToken)
+  }
+  if (redirect) {
+    url.searchParams.set('redirect', redirect)
+  }
+  return url.toString()
+}
 
 onMounted(async () => {
   const config = useRuntimeConfig()
-  const store = useUserStore();
-  const user = await userManager.signinCallback();
+  const store = useUserStore()
+  const signinResponse = await userManager.signinCallback()
+  const state = (() => {
+    try {
+      return signinResponse.state ? JSON.parse(signinResponse.state) : {}
+    } catch {
+      return {}
+    }
+  })() as { app?: string; redirect?: string }
 
-  const res = await $fetch<User>("/me", {
-    baseURL: config.public.userApiBase,
-    headers: { Authorization: `Bearer ${user.id_token}` },
-  });
+  const idToken = signinResponse.id_token
+  const refreshToken = signinResponse.refresh_token || undefined
 
-  store.setUser(res, user.id_token);
+  const me = await $fetch<User>(`${config.public.userApiBase}/me`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  store.setUser(me, idToken)
 
-  if (res.user_type === "guest") {
-    window.location.href = config.public.guestUiUrl;
-  } else if (res.user_type === "staff") {
-    window.location.href = config.public.hostUiUrl;
-  }
-});
+  const targetApp = state.app === 'host' || me.user_type === 'staff' ? 'host' : 'guest'
+  const targetBase = targetApp === 'host' ? config.public.hostUiUrl : config.public.guestUiUrl
+  const redirectUrl = buildTargetUrl(targetBase, idToken, refreshToken, state.redirect)
+  window.location.href = redirectUrl
+})
 </script>
+
+<style scoped>
+.callback {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+</style>
+

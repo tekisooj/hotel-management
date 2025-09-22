@@ -98,4 +98,7 @@ class BookingServiceStack(Stack):
         resource_availability_id = resource_availability.add_resource("{room_uuid}")
         resource_availability_id.add_method("GET", integration)
 
+        resource_availability_batch = resource_availability.add_resource("batch")
+        resource_availability_batch.add_method("POST", integration)
+
         CfnOutput(self, "DbProxyEndpoint", value=proxy_endpoint)
