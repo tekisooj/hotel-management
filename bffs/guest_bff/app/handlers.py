@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request
 from httpx import AsyncClient, HTTPError
@@ -124,7 +124,7 @@ async def fetch_property(
     property_uuid: UUID,
     property_service_client: AsyncClient = Depends(get_property_service_client),
 ) -> Property:
-    resp = await property_service_client.get(f"/property/{str(property_uuid)}", timeout=10.0)
+    resp = await property_service_client.get(f"property/{str(property_uuid)}", timeout=10.0)
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     data = resp.json()
@@ -134,7 +134,7 @@ async def fetch_room(
     room_uuid: UUID,
     property_service_client: AsyncClient = Depends(get_property_service_client),
 ) -> Room:
-    resp = await property_service_client.get(f"/room/{str(room_uuid)}", timeout=10.0)
+    resp = await property_service_client.get(f"room/{str(room_uuid)}", timeout=10.0)
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     data = resp.json()
@@ -166,7 +166,7 @@ async def add_review(
     host_email = None
     try:
         auth = request.headers.get("Authorization", "")
-        me = await user_service_client.get("/me", headers={"Authorization": auth}, timeout=10.0)
+        me = await user_service_client.get("me", headers={"Authorization": auth}, timeout=10.0)
         if me.status_code == 200:
             me_body = me.json()
             me_obj = UserResponse(**me_body)
@@ -177,7 +177,7 @@ async def add_review(
             prop_obj = Property(**prop)
             host_uuid = prop_obj.user_uuid
             if host_uuid:
-                host_resp = await user_service_client.get(f"/user/{str(host_uuid)}", headers={"Authorization": auth}, timeout=10.0)
+                host_resp = await user_service_client.get(f"user/{str(host_uuid)}", headers={"Authorization": auth}, timeout=10.0)
                 if host_resp.status_code == 200:
                     host_body = host_resp.json() or {}
                     host_obj = UserResponse(**host_body)
@@ -195,7 +195,6 @@ async def add_review(
             },
         )
     except Exception:
-        # Don't block the API on event failure
         pass
     return review_uuid
 
@@ -211,7 +210,7 @@ async def add_booking(
 ) -> UUID:
     payload = dict(booking)
     payload["user_uuid"] = str(current_user_uuid)
-    resp = await booking_service_client.post("/booking", json=payload, timeout=15.0)
+    resp = await booking_service_client.post("booking", json=payload, timeout=15.0)
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     body = resp.json()
@@ -221,7 +220,7 @@ async def add_booking(
         auth = request.headers.get("Authorization", "")
         # guest email
         guest_email = None
-        me = await user_service_client.get("/me", headers={"Authorization": auth}, timeout=10.0)
+        me = await user_service_client.get("me", headers={"Authorization": auth}, timeout=10.0)
         if me.status_code == 200:
             me_body = me.json() or {}
             guest_email = me_body.get("email")
@@ -232,20 +231,20 @@ async def add_booking(
         room_uuid = booking.get("room_uuid") if isinstance(booking, dict) else None
         check_in = booking.get("check_in") if isinstance(booking, dict) else None
         if room_uuid:
-            room_response = await property_service_client.get(f"/room/{str(room_uuid)}", timeout=10.0)
+            room_response = await property_service_client.get(f"room/{str(room_uuid)}", timeout=10.0)
             if room_response.status_code == 200:
                 room_body = room_response.json()
                 room_obj = Room(**room_body)
                 prop_uuid =room_obj.property_uuid
                 if prop_uuid:
-                    prop_resp = await property_service_client.get(f"/property/{str(prop_uuid)}", timeout=10.0)
+                    prop_resp = await property_service_client.get(f"property/{str(prop_uuid)}", timeout=10.0)
                     if prop_resp.status_code == 200:
                         prop_body = prop_resp.json()
                         prop_obj = Property(**prop_body)
                         property_name = prop_obj.name
                         host_uuid = prop_obj.user_uuid
                         if host_uuid:
-                            user_resp = await user_service_client.get(f"/user/{str(host_uuid)}", headers={"Authorization": auth}, timeout=10.0)
+                            user_resp = await user_service_client.get(f"user/{str(host_uuid)}", headers={"Authorization": auth}, timeout=10.0)
                             if user_resp.status_code == 200:
                                 user_body = user_resp.json()
                                 user_obj = UserResponse(**user_body)
@@ -271,7 +270,7 @@ async def get_user_bookings(
     booking_service_client: AsyncClient = Depends(get_booking_service_client),
 ) -> list[Booking]:
     resp = await booking_service_client.get(
-        "/bookings",
+        "bookings",
         params={"user_uuid": str(current_user_uuid)},
         timeout=15.0,
     )
@@ -287,7 +286,7 @@ async def cancel_user_booking(
     booking_service_client: AsyncClient = Depends(get_booking_service_client),
 ) -> UUID:
     resp = await booking_service_client.patch(
-        f"/booking/{str(booking_uuid)}/cancel",
+        f"booking/{str(booking_uuid)}/cancel",
         json={"user_uuid": str(current_user_uuid)},
         timeout=15.0,
     )
@@ -302,7 +301,7 @@ async def get_current_user(
     user_service_client: AsyncClient = Depends(get_user_service_client),
 ) -> UserResponse:
     auth = request.headers.get("Authorization", "")
-    resp = await user_service_client.get("/me", headers={"Authorization": auth}, timeout=10.0)
+    resp = await user_service_client.get("me", headers={"Authorization": auth}, timeout=10.0)
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     return UserResponse(**resp.json())
@@ -317,7 +316,7 @@ async def update_current_user(
     auth = request.headers.get("Authorization", "")
     payload = update.model_dump(exclude_none=True)
     resp = await user_service_client.patch(
-        f"/user/{str(current_user_uuid)}",
+        f"user/{str(current_user_uuid)}",
         json=payload,
         headers={"Authorization": auth},
         timeout=10.0,
@@ -332,7 +331,7 @@ async def get_property_reviews(
     property_uuid: UUID,
     review_service_client: AsyncClient = Depends(get_review_service_client),
 ) -> list[Review]:
-    resp = await review_service_client.get(f"/reviews/{str(property_uuid)}", timeout=10.0)
+    resp = await review_service_client.get(f"reviews/{str(property_uuid)}", timeout=10.0)
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     reviews_response = resp.json() or []
@@ -388,7 +387,7 @@ async def get_filtered_rooms(
         params = {"country": country, "city": city}
         if state:
             params["state"] = state
-        property_response = await property_service_client.get("/properties/city", params=params, timeout=10.0)
+        property_response = await property_service_client.get("properties/city", params=params, timeout=10.0)
         if property_response.status_code != 200:
             raise HTTPException(status_code=property_response.status_code, detail=property_response.text)
         property_response = property_response.json()
@@ -409,7 +408,7 @@ async def get_filtered_rooms(
     for property in properties:
         params = {"property_uuid": str(property.uuid)}
         params.update(room_filter_params)
-        rooms_result = await property_service_client.get("/rooms", params=params, timeout=10.0)
+        rooms_result = await property_service_client.get("rooms", params=params, timeout=10.0)
         if rooms_result.status_code != 200:
             raise HTTPException(status_code=rooms_result.status_code, detail=rooms_result.text)
         rooms_result = rooms_result.json()
@@ -426,7 +425,7 @@ async def get_filtered_rooms(
         for room in prop.rooms:
             if check_in_date and check_out_date:
                 avail_response = await booking_service_client.get(
-                    f"/availability/{str(room.uuid)}",
+                    f"availability/{str(room.uuid)}",
                     params={
                         "check_in": check_in_date.isoformat(),
                         "check_out": check_out_date.isoformat(),
