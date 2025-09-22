@@ -1,4 +1,5 @@
 from datetime import datetime
+import asyncio
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request
 from httpx import AsyncClient, HTTPError
@@ -342,7 +343,7 @@ async def get_user_reviews(
     user_uuid: UUID,
     review_service_client: AsyncClient = Depends(get_review_service_client),
 ) -> list[Review]:
-    resp = await review_service_client.get(f"/reviews/{str(user_uuid)}", timeout=10.0)
+    resp = await review_service_client.get(f"reviews/{str(user_uuid)}", timeout=10.0)
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     reviews_response = resp.json() or []
@@ -369,7 +370,7 @@ async def get_filtered_rooms(
     properties = []
     if latitude is not None and longitude is not None and (radius_km is not None):
         prop_resp = await property_service_client.get(
-            "/properties/near",
+            "properties/near",
             params={
                 "latitude": latitude,
                 "longitude": longitude,
@@ -418,31 +419,42 @@ async def get_filtered_rooms(
 
 
     available_room_entries: list[PropertyDetail] = []
+    date_filtered = bool(check_in_date and check_out_date)
+    check_in_iso = check_in_date.isoformat() if check_in_date else None
+    check_out_iso = check_out_date.isoformat() if check_out_date else None
+
     for prop in room_results:
         property_detail = PropertyDetail(**prop.model_dump())
-        if not prop.rooms:
+        rooms_to_check = list(prop.rooms or [])
+        if not rooms_to_check:
             continue
-        for room in prop.rooms:
-            if check_in_date and check_out_date:
-                avail_response = await booking_service_client.get(
+        if date_filtered:
+            property_detail.rooms = []  # type: ignore[attr-defined]
+
+            async def fetch_availability(room: Room):
+                response = await booking_service_client.get(
                     f"availability/{str(room.uuid)}",
-                    params={
-                        "check_in": check_in_date.isoformat(),
-                        "check_out": check_out_date.isoformat(),
-                    },
+                    params={"check_in": check_in_iso, "check_out": check_out_iso},
                     timeout=10.0,
                 )
+                return room, response
+
+            results = await asyncio.gather(*(fetch_availability(room) for room in rooms_to_check), return_exceptions=True)
+            for result in results:
+                if isinstance(result, Exception):
+                    raise HTTPException(status_code=502, detail=str(result))
+                room, avail_response = result
                 if avail_response.status_code != 200:
                     raise HTTPException(status_code=avail_response.status_code, detail=avail_response.text)
                 if bool(avail_response.json()):
-                    property_detail.rooms.append(room)  # type: ignore
+                    property_detail.rooms.append(room)  # type: ignore[attr-defined]
         if property_detail.rooms:
             available_room_entries.append(property_detail)
                 
 
     
     for prop_detail in available_room_entries:
-        rev = await review_service_client.get(f"/reviews/{str(prop_detail.uuid)}", timeout=10.0)
+        rev = await review_service_client.get(f"reviews/{str(prop_detail.uuid)}", timeout=10.0)
         if rev.status_code != 200:
             raise HTTPException(status_code=rev.status_code, detail=rev.text)
         rev = rev.json()

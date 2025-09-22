@@ -70,7 +70,7 @@ class UserServiceStack(Stack):
             code=Code.from_asset("services/user_service/app"),
             role=lambda_role, # type: ignore
             timeout=Duration.seconds(30),
-            memory_size=512,
+            memory_size=1024,
             environment={
                 "USER_SERVICE_ENV": self.env_name,
                 "HOTEL_MANAGEMENT_DATABASE_SECRET_NAME": db_name,
