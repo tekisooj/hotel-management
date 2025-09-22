@@ -7,12 +7,16 @@ from sqlalchemy import and_, create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from schemas import Booking, BookingStatus, BookingUpdateRequest
 from models import BookingDB
+import logging
 
+logger = logging.getLogger()
 
 class HotelManagementDBClient:
     def __init__(self, hotel_management_database_secret_name: str | None, region: str, proxy_endpoint: str | None) -> None:
         if not hotel_management_database_secret_name:
             raise ValueError("Secret name must be provided or set in environment variables.")
+        
+        logger.info("INITIALIZING")
 
         self.secret_name = hotel_management_database_secret_name
         self.region = region
@@ -24,6 +28,7 @@ class HotelManagementDBClient:
     def _get_secret(self) -> dict:
         client = boto3.client("secretsmanager", region_name=self.region)
         response = client.get_secret_value(SecretId=self.secret_name)
+        logger.info("GETTING SECRET")
         return json.loads(response["SecretString"])
 
     def _build_db_url(self) -> str:
@@ -35,6 +40,9 @@ class HotelManagementDBClient:
 
         host = self.proxy_endpoint if self.proxy_endpoint else secret["host"].strip()
 
+        logger.info("BUILDING DB URL ")
+        logger.info(f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}")
+
         return f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}"
 
     def _init_engine(self):
@@ -44,9 +52,11 @@ class HotelManagementDBClient:
 
     def get_session(self) -> Session:
         self._init_engine()
+        logger.info("GETTING SESSION")
         return self._SessionLocal() # type: ignore
 
     def add_booking(self, booking: Booking) -> UUID:
+        logger.info("ADDING BOOKING")
         session = self.get_session()
         try:
             booking_obj = BookingDB(
@@ -60,14 +70,17 @@ class HotelManagementDBClient:
             session.add(booking_obj)
             session.commit()
             session.refresh(booking_obj)
+            logger.info("ADDED BOOKING")
             return Booking.model_validate(booking_obj).uuid
         finally:
             session.close()
 
     def get_booking(self, booking_uuid: UUID) -> Booking | None:
         session = self.get_session()
+        logger.info("GETTING BOOKING")
         try:
             booking = session.query(BookingDB).filter(BookingDB.uuid == booking_uuid).first()
+            logger.info("GOT BOOKING")
             return Booking.model_validate(booking) if booking else None
         finally:
             session.close()
@@ -77,7 +90,9 @@ class HotelManagementDBClient:
                               status: str | None = None,
                               check_in: datetime | None = None,
                               check_out: datetime | None = None) -> list[Booking]:
+        logger.info("SESSION FILTERED BOOKING")
         session = self.get_session()
+        logger.info("GETTING FILTERED BOOKING")
         try:
             query = session.query(BookingDB)
             if user_uuid:
@@ -90,6 +105,7 @@ class HotelManagementDBClient:
                 query = query.filter(
                     and_(BookingDB.check_in <= check_out, BookingDB.check_out >= check_in)
                 )
+            logger.info("FILTERED BOOKING")
             return [Booking.model_validate(b) for b in query.all()]
         finally:
             session.close()
@@ -139,7 +155,9 @@ class HotelManagementDBClient:
     def check_availability_bulk(self, room_uuids: list[UUID], check_in: datetime, check_out: datetime) -> dict[UUID, bool]:
         if not room_uuids:
             return {}
+        logger.info("GETTING BULK BOOKING")
         session = self.get_session()
+        logger.info("SESSION GOT")
         try:
             overlapping = session.query(BookingDB.room_uuid).filter(
                 BookingDB.room_uuid.in_(room_uuids),
@@ -148,6 +166,7 @@ class HotelManagementDBClient:
                 BookingDB.check_out > check_in,
             ).all()
             occupied = {getattr(row, "room_uuid", row[0]) for row in overlapping}
+            logger.info("BULK BOOKING")
             return {room_uuid: room_uuid not in occupied for room_uuid in room_uuids}
         finally:
             session.close()
