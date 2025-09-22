@@ -13,3 +13,4 @@ export default defineNuxtRouteMiddleware((to) => {
     return navigateTo(authUrl.toString(), { external: true })
   }
 })
+

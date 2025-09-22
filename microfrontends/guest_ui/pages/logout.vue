@@ -4,13 +4,12 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { signOutRedirect } from '~/api/authClient'
-import { useUserStore } from '~/stores/user'
+import { useAuthSession } from '@/composables/useAuthSession'
 
-onMounted(async () => {
-  const store = useUserStore()
-  store.clearUser()
-  await signOutRedirect()
+const { logout } = useAuthSession()
+
+onMounted(() => {
+  logout()
 })
 </script>
 

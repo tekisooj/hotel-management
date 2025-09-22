@@ -1,0 +1,20 @@
+﻿import { useUserStore } from '@/stores/user'
+
+export function useAuthSession() {
+  const user = useUserStore()
+  const config = useRuntimeConfig()
+
+  function logout() {
+    user.clear()
+    if (process.client) {
+      window.localStorage.removeItem('id_token')
+      const authUrl = new URL(config.public.authUiUrl || '/')
+      authUrl.pathname = '/logout'
+      authUrl.searchParams.set('app', 'host')
+      authUrl.searchParams.set('redirect', window.location.origin)
+      window.location.href = authUrl.toString()
+    }
+  }
+
+  return { logout }
+}
