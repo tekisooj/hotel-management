@@ -8,8 +8,8 @@ function trimTrailingSlash(value?: string): string {
 }
 
 const fallbackOrigin = typeof window === 'undefined' ? '' : window.location.origin
-const authBase = trimTrailingSlash(config.public.authUiUrl || fallbackOrigin)
-const cognitoDomain = trimTrailingSlash(config.public.cognitoApiDomain)
+const authBase = trimTrailingSlash((config.public.authUiUrl || fallbackOrigin).trim())
+const cognitoDomain = trimTrailingSlash((config.public.cognitoApiDomain || '').trim())
 
 const cognitoAuthConfig = {
   authority: `https://cognito-idp.${config.public.awsRegion}.amazonaws.com/${config.public.congitoUserPoolID}`,

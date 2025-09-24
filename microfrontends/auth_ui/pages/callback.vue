@@ -12,6 +12,8 @@ import type { User } from '~/types/User'
 function buildTargetUrl(base: string, token: string, refreshToken?: string, redirect?: string) {
   const resolvedBase = base || window.location.origin
   const url = new URL(resolvedBase)
+  const basePath = url.pathname.replace(/\/$/, '')
+  url.pathname = ${basePath}/auth/callback
   url.pathname = '/auth/callback'
   url.searchParams.set('id_token', token)
   if (refreshToken) {
@@ -26,7 +28,8 @@ function buildTargetUrl(base: string, token: string, refreshToken?: string, redi
 onMounted(async () => {
   const config = useRuntimeConfig()
   const store = useUserStore()
-  const signinResponse = await userManager.signinCallback()
+  await userManager.clearStaleState().catch(() => undefined)
+  const signinResponse = await userManager.signinCallback(window.location.href)
   const state = (() => {
     try {
       return signinResponse.state ? JSON.parse(signinResponse.state) : {}

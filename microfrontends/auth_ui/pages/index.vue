@@ -39,9 +39,7 @@ async function login() {
     app: selectedApp.value,
     redirect: redirectTarget.value,
   }
-  await userManager.signinRedirect({
-    state: JSON.stringify(state),
-  })
+  await signInRedirect({ state: JSON.stringify(state) })
 }
 </script>
 

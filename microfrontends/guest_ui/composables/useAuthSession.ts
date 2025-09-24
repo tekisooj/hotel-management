@@ -8,8 +8,9 @@ export function useAuthSession() {
     user.clear()
     if (process.client) {
       window.localStorage.removeItem('id_token')
-      const authUrl = new URL(config.public.authUiUrl || '/')
-      authUrl.pathname = '/logout'
+      const authUrl = new URL(config.public.authUiUrl || window.location.origin)
+      const basePath = authUrl.pathname.replace(/\/$/, '')
+      authUrl.pathname = ${basePath}/logout
       authUrl.searchParams.set('app', 'guest')
       authUrl.searchParams.set('redirect', window.location.origin)
       window.location.href = authUrl.toString()
