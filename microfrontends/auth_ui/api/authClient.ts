@@ -1,24 +1,33 @@
-import { useRuntimeConfig } from "nuxt/app";
-import { UserManager } from "oidc-client-ts";
+import { useRuntimeConfig } from 'nuxt/app'
+import { UserManager } from 'oidc-client-ts'
 
-const config = useRuntimeConfig();
+const config = useRuntimeConfig()
 
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
+const authBase = trimTrailingSlash((config.public.authUiUrl || '').trim())
+const cognitoDomain = trimTrailingSlash((config.public.cognitoApiDomain || '').trim())
 
 const cognitoAuthConfig = {
-  authority: `https://cognito-idp.${config.public.awsRegion}.amazonaws.com/${config.public.congitoUserPoolID}`,
+  authority: https://cognito-idp..amazonaws.com/,
   client_id: config.public.cognitoAppClientId,
-  redirect_uri: `${config.public.authUiUrl}/callback`,
-  response_type: "code",
-  scope: "openid email profile",
-};
+  redirect_uri: ${authBase}/callback,
+  post_logout_redirect_uri: ${authBase}/logout,
+  response_type: 'code',
+  scope: 'openid email profile',
+}
 
-export const userManager = new UserManager(cognitoAuthConfig);
+export const userManager = new UserManager(cognitoAuthConfig)
+
+export async function signInRedirect(options?: { state?: unknown }) {
+  await userManager.clearStaleState().catch(() => undefined)
+  return userManager.signinRedirect(options)
+}
 
 export async function signOutRedirect() {
-  const clientId = cognitoAuthConfig.client_id;
-  const logoutUri = config.public.authUiUrl;
-  const cognitoDomain = config.public.cognitoApiDomain;
-  window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(
-    logoutUri
-  )}`;
+  const clientId = cognitoAuthConfig.client_id
+  const logoutUri = cognitoAuthConfig.post_logout_redirect_uri
+  window.location.href = ${cognitoDomain}/logout?client_id=&logout_uri=
 }

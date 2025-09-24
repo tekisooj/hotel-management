@@ -20,7 +20,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { userManager } from '~/api/authClient'
+import { signInRedirect } from '~/api/authClient'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,3 +78,4 @@ async function login() {
   margin-bottom: 24px;
 }
 </style>
+
