@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page">
     <section class="search">
       <div class="search_overlay"></div>
@@ -108,7 +108,6 @@ async function submit() {
   }
 }
 
-\n
 </script>
 
 <style scoped>

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="logout">Signing out…</div>
 </template>
 

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="callback">Signing you in…</div>
 </template>
 

@@ -1,4 +1,4 @@
-﻿import { useRuntimeConfig } from "nuxt/app"
+import { useRuntimeConfig } from "nuxt/app"
 import { UserManager } from "oidc-client-ts"
 
 const config = useRuntimeConfig()

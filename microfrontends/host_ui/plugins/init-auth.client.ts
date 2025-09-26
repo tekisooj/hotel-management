@@ -1,4 +1,4 @@
-﻿import { useUserStore } from '@/stores/user'
+import { useUserStore } from '@/stores/user'
 
 export default defineNuxtPlugin(() => {
   if (process.server) return

@@ -1,4 +1,4 @@
-﻿import { useUserStore } from '@/stores/user'
+import { useUserStore } from '@/stores/user'
 
 export function useAuthSession() {
   const user = useUserStore()

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="login-page">
     <div class="card">
       <h1 class="title">Sign in to Hotel Management</h1>

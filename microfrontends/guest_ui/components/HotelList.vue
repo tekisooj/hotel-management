@@ -1,10 +1,9 @@
-<template>
+﻿<template>
   <ul class="list-group">
     <li
       v-for="hotel in hotels"
       :key="hotel.uuid || hotel.name"
       class="list-group-item list-group-item-action"
-
     >
       <HotelElement :hotel="hotel">
         <!-- <template #extra>
@@ -20,10 +19,7 @@
 
 <script setup lang="ts">
 import HotelElement from '@/components/HotelElement.vue'
-import { PropertyDetail } from 'types/PropertyDetail';
+import type { PropertyDetail } from 'types/PropertyDetail'
 
-
-const props = defineProps<{ hotels: PropertyDetail[] }>()
-
+defineProps<{ hotels: PropertyDetail[] }>()
 </script>
-
