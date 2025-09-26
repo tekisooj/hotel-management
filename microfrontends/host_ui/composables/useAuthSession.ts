@@ -19,3 +19,4 @@ export function useAuthSession() {
 
   return { logout }
 }
+
