@@ -1,4 +1,4 @@
-import { defineStore, storeToRefs } from 'pinia'
+﻿import { defineStore, storeToRefs } from 'pinia'
 import { jwtDecode } from 'jwt-decode'
 
 export function getUserUuidFromToken(token: string): string | null {
@@ -64,4 +64,5 @@ export const useUserStore = defineStore('user', {
     },
   },
 })
+
 

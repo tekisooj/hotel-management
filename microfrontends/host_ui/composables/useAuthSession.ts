@@ -10,7 +10,8 @@ export function useAuthSession() {
       window.localStorage.removeItem('id_token')
       const authUrl = new URL(config.public.authUiUrl || window.location.origin)
       const basePath = authUrl.pathname.replace(/\/$/, '')
-      authUrl.pathname = ${basePath}/logout
+      const nextPath = `${basePath}/logout`
+      authUrl.pathname = nextPath.startsWith('/') ? nextPath : `/${nextPath}`
       authUrl.searchParams.set('app', 'host')
       authUrl.searchParams.set('redirect', window.location.origin)
       window.location.href = authUrl.toString()
@@ -19,4 +20,3 @@ export function useAuthSession() {
 
   return { logout }
 }
-

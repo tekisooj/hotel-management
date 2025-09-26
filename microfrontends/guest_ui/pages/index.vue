@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page">
     <section class="search">
       <div class="search_overlay"></div>
@@ -103,14 +103,12 @@ async function submit() {
         resultsRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       })
     }
-  } catch (e) {
+  } catch {
     propertyDetails.value = []
   }
 }
 
-function scrollToResults() {
-  resultsRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
+\n
 </script>
 
 <style scoped>
@@ -411,3 +409,4 @@ function scrollToResults() {
   }
 }
 </style>
+
