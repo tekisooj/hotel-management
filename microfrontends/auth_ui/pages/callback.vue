@@ -13,8 +13,8 @@ function buildTargetUrl(base: string, token: string, refreshToken?: string, redi
   const resolvedBase = base || window.location.origin
   const url = new URL(resolvedBase)
   const basePath = url.pathname.replace(/\/$/, '')
-  url.pathname = ${basePath}/auth/callback
-  url.pathname = '/auth/callback'
+  const nextPath = `${basePath}/auth/callback`
+  url.pathname = nextPath.startsWith('/') ? nextPath : `/${nextPath}`
   url.searchParams.set('id_token', token)
   if (refreshToken) {
     url.searchParams.set('refresh_token', refreshToken)
@@ -62,4 +62,3 @@ onMounted(async () => {
   font-size: 1.2rem;
 }
 </style>
-
