@@ -26,6 +26,27 @@ function buildTargetUrl(base: string, token: string, refreshToken?: string, redi
   return url.toString()
 }
 
+function hasOidcState(): boolean {
+  if (typeof window === 'undefined') return false
+  const authority = userManager.settings.authority
+  const clientId = userManager.settings.client_id
+  const prefix = `oidc.state:${authority}:${clientId}`
+  const candidates = [window.localStorage, window.sessionStorage]
+  return candidates.some((store) => {
+    try {
+      for (let i = 0; i < store.length; i += 1) {
+        const key = store.key(i)
+        if (key && key.startsWith(prefix)) {
+          return true
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return false
+  })
+}
+
 onMounted(async () => {
   const config = useRuntimeConfig()
   const store = useUserStore()
@@ -42,6 +63,12 @@ onMounted(async () => {
 
   try {
     await userManager.clearStaleState().catch(() => undefined)
+
+    if (!hasOidcState()) {
+      await restartLogin()
+      return
+    }
+
     const signinResponse = await userManager.signinCallback(window.location.href)
     const state = (() => {
       try {
