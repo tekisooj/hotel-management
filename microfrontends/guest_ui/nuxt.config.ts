@@ -1,3 +1,5 @@
+import { defineNuxtConfig } from "nuxt/config";
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   ssr: false, // build as SPA (good for S3/CloudFront)
@@ -44,7 +46,7 @@ export default defineNuxtConfig({
       cognitoAppClientId: process.env.AUTH_UI_URL || '',
       cognitoHostedUiDomain: process.env.COGNITO_API_DOMAIN || '',
       awsRegion: process.env.AWS_REGION || '',
-      cognitoUserPoolId: process.env.COGNITO_USER_POOL_ID
+      cognitoUserPoolId: process.env.COGNITO_USER_POOL_ID || ''
     },
   },
 })
