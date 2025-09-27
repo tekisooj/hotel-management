@@ -7,6 +7,11 @@ function trimTrailingSlash(value?: string): string {
   return (value ?? "").replace(/\/+$/, "")
 }
 
+function ensure(value: string, message: string): string {
+  if (!value) throw new Error(message)
+  return value
+}
+
 export function getUserManager(): UserManager {
   if (process.server) {
     throw new Error("UserManager must be created on the client")
@@ -19,17 +24,25 @@ export function getUserManager(): UserManager {
   const authBase = trimTrailingSlash((config.public.authUiUrl || fallbackOrigin).trim())
 
   const hostedUiDomain = trimTrailingSlash((config.public.cognitoHostedUiDomain || "").trim())
+  const authority = trimTrailingSlash((config.public.cognitoOidcAuthority || "").trim())
+  const clientId = (config.public.cognitoAppClientId || "").trim()
+  const scope = (config.public.cognitoScope || "openid email profile").trim()
 
   const redirectUri = `${authBase}/callback`
   const postLogoutRedirectUri = `${authBase}/logout`
 
+  const ensuredAuthority = ensure(authority, "Missing Cognito OIDC authority")
+  const ensuredDomain = ensure(hostedUiDomain, "Missing Cognito hosted UI domain")
+  const ensuredClientId = ensure(clientId, "Missing Cognito app client ID")
+  const ensuredScope = scope || "openid email profile"
+
   _userManager = new UserManager({
-    authority: hostedUiDomain,
-    client_id: config.public.cognitoAppClientId,
+    authority: ensuredAuthority,
+    client_id: ensuredClientId,
     redirect_uri: redirectUri,
     post_logout_redirect_uri: postLogoutRedirectUri,
     response_type: "code",
-    scope: "openid email profile",
+    scope: ensuredScope,
 
     userStore: new WebStorageStateStore({ store: window.localStorage }),
 
@@ -37,8 +50,7 @@ export function getUserManager(): UserManager {
     loadUserInfo: false,
   })
 
-  // @ts-expect-error custom prop
-  _userManager.__cognitoDomain = hostedUiDomain
+  ;(_userManager as unknown as { __cognitoDomain: string }).__cognitoDomain = ensuredDomain
 
   return _userManager
 }
@@ -53,8 +65,7 @@ export async function signInRedirect(options?: { state?: unknown }) {
 export async function signOutRedirect() {
   const um = getUserManager()
   const settings = um.settings
-  // @ts-expect-error read custom prop
-  const domain: string = um.__cognitoDomain
+  const domain: string = (um as unknown as { __cognitoDomain: string }).__cognitoDomain
 
   const clientId = settings.client_id!
   const logoutUri = settings.post_logout_redirect_uri!
