@@ -41,6 +41,10 @@ export default defineNuxtConfig({
       devUserId: process.env.DEV_USER_ID || '',
       authUiUrl: process.env.AUTH_UI_URL || '',
       guestUiUrl: process.env.GUEST_UI_URL || '',
+      cognitoAppClientId: process.env.AUTH_UI_URL || '',
+      cognitoHostedUiDomain: process.env.COGNITO_API_DOMAIN || '',
+      awsRegion: process.env.AWS_REGION || '',
+      cognitoUserPoolId: process.env.COGNITO_USER_POOL_ID
     },
   },
 })

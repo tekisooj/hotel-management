@@ -18,13 +18,13 @@ export function getUserManager(): UserManager {
   const fallbackOrigin = typeof window === "undefined" ? "" : window.location.origin
   const authBase = trimTrailingSlash((config.public.authUiUrl || fallbackOrigin).trim())
 
-  const cognitoDomain = trimTrailingSlash((config.public.cognitoApiDomain || "").trim())
+  const hostedUiDomain = trimTrailingSlash((config.public.cognitoHostedUiDomain || "").trim())
 
   const redirectUri = `${authBase}/callback`
   const postLogoutRedirectUri = `${authBase}/logout`
 
   _userManager = new UserManager({
-    authority: config.public.cognitoApiDomain,
+    authority: hostedUiDomain,
     client_id: config.public.cognitoAppClientId,
     redirect_uri: redirectUri,
     post_logout_redirect_uri: postLogoutRedirectUri,
@@ -37,8 +37,8 @@ export function getUserManager(): UserManager {
     loadUserInfo: false,
   })
 
-  // @ts-expect-error attach custom prop
-  _userManager.__cognitoDomain = cognitoDomain || authBase
+  // @ts-expect-error custom prop
+  _userManager.__cognitoDomain = hostedUiDomain
 
   return _userManager
 }
