@@ -10,7 +10,8 @@ from aws_cdk.aws_apigateway import (
     EndpointType,
     MockIntegration,
     IntegrationResponse,
-    MethodResponse
+    MethodResponse,
+    PassthroughBehavior
 )
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from aws_cdk.aws_secretsmanager import Secret
@@ -111,7 +112,7 @@ class UserServiceStack(Stack):
                             },
                         )
                     ],
-                    passthrough_behavior="WHEN_NO_MATCH",
+                    passthrough_behavior=PassthroughBehavior.WHEN_NO_MATCH,
                     request_templates={"application/json": '{"statusCode": 200}'},
                 ),
                 method_responses=[
