@@ -13,7 +13,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  CDK_DEFAULT_ACCOUNT: 914242301564
+  CDK_DEFAULT_ACCOUNT: "914242301564"
 
 permissions:
   id-token: write

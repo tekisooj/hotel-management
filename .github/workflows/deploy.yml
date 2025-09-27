@@ -11,7 +11,8 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  CDK_DEFAULT_ACCOUNT: 914242301564
+  AWS_ACCOUNT_ID: "914242301564"
+  CDK_DEFAULT_ACCOUNT: "914242301564"
 
 permissions:
   id-token: write
@@ -82,7 +83,6 @@ jobs:
         component: ${{ fromJson(needs.detect-changes.outputs.changed) }}
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
-
     steps:
       - uses: actions/checkout@v4
 
@@ -94,8 +94,7 @@ jobs:
       - run: npm install -g aws-cdk
 
       - name: Install requirements
-        run: |
-          pip install -r ${{ matrix.component }}/infra/requirements.txt
+        run: pip install -r ${{ matrix.component }}/infra/requirements.txt
 
       - name: Vendor Python runtime dependencies
         shell: bash
@@ -103,13 +102,9 @@ jobs:
           SERVICE_PATH=${{ matrix.component }}
           APP_DIR="$SERVICE_PATH/app"
           if [ -f "$APP_DIR/requirements.txt" ]; then
-            echo "Installing app requirements: $APP_DIR/requirements.txt -> $APP_DIR"
             pip install -r "$APP_DIR/requirements.txt" -t "$APP_DIR"
           elif [ -f "$SERVICE_PATH/requirements.txt" ]; then
-            echo "Installing service requirements: $SERVICE_PATH/requirements.txt -> $APP_DIR"
             pip install -r "$SERVICE_PATH/requirements.txt" -t "$APP_DIR"
-          else
-            echo "No runtime requirements.txt found for $SERVICE_PATH; skipping vendoring"
           fi
 
       - name: Configure AWS credentials
@@ -124,8 +119,6 @@ jobs:
           SERVICE_NAME=$(basename "$SERVICE_PATH")
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
           STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
-
-          echo "Deploying stack: $STACK_NAME"
           cdk deploy "$STACK_NAME" \
             --app "python3 ${SERVICE_PATH}/infra/app.py" \
             --context env=pr \
@@ -133,74 +126,14 @@ jobs:
             --require-approval never
 
   deploy-int:
-      if: |
-        github.event_name == 'push' && github.ref == 'refs/heads/main' ||
-        (github.event_name == 'pull_request_target' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')
-      needs: detect-changes
-      runs-on: ubuntu-latest
-      strategy:
-        matrix:
-          component: ${{ fromJson(needs.detect-changes.outputs.changed) }}
-
-      steps:
-        - uses: actions/checkout@v4
-
-        - name: Setup Python and CDK
-          uses: actions/setup-python@v5
-          with:
-            python-version: "3.11"
-
-        - run: npm install -g aws-cdk
-
-        - name: Install requirements
-          run: |
-            pip install -r ${{ matrix.component }}/infra/requirements.txt
-
-        - name: Vendor Python runtime dependencies
-          shell: bash
-          run: |
-            SERVICE_PATH=${{ matrix.component }}
-            APP_DIR="$SERVICE_PATH/app"
-            if [ -f "$APP_DIR/requirements.txt" ]; then
-              echo "Installing app requirements: $APP_DIR/requirements.txt -> $APP_DIR"
-              pip install -r "$APP_DIR/requirements.txt" -t "$APP_DIR"
-            elif [ -f "$SERVICE_PATH/requirements.txt" ]; then
-              echo "Installing service requirements: $SERVICE_PATH/requirements.txt -> $APP_DIR"
-              pip install -r "$SERVICE_PATH/requirements.txt" -t "$APP_DIR"
-            else
-              echo "No runtime requirements.txt found for $SERVICE_PATH; skipping vendoring"
-            fi
-
-        - name: Configure AWS credentials
-          uses: aws-actions/configure-aws-credentials@v4
-          with:
-            role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
-            aws-region: ${{ env.AWS_REGION }}
-
-        - name: Deploy Int Stack
-          run: |
-            SERVICE_PATH=${{ matrix.component }}
-            SERVICE_NAME=$(basename "$SERVICE_PATH")
-            PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
-            STACK_NAME="${PASCAL_CASE_NAME}Stack-int"
-
-            echo "Deploying stack: $STACK_NAME"
-            cdk deploy "$STACK_NAME" \
-              --app "python3 ${SERVICE_PATH}/infra/app.py" \
-              --context env=int \
-              --require-approval never
-
-  deploy-prod:
     if: |
       github.event_name == 'push' && github.ref == 'refs/heads/main' ||
       (github.event_name == 'pull_request_target' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')
-    needs: [detect-changes, deploy-int]
+    needs: detect-changes
     runs-on: ubuntu-latest
     strategy:
       matrix:
         component: ${{ fromJson(needs.detect-changes.outputs.changed) }}
-    
-
     steps:
       - uses: actions/checkout@v4
 
@@ -212,8 +145,7 @@ jobs:
       - run: npm install -g aws-cdk
 
       - name: Install requirements
-        run: |
-          pip install -r ${{ matrix.component }}/infra/requirements.txt
+        run: pip install -r ${{ matrix.component }}/infra/requirements.txt
 
       - name: Vendor Python runtime dependencies
         shell: bash
@@ -221,13 +153,59 @@ jobs:
           SERVICE_PATH=${{ matrix.component }}
           APP_DIR="$SERVICE_PATH/app"
           if [ -f "$APP_DIR/requirements.txt" ]; then
-            echo "Installing app requirements: $APP_DIR/requirements.txt -> $APP_DIR"
             pip install -r "$APP_DIR/requirements.txt" -t "$APP_DIR"
           elif [ -f "$SERVICE_PATH/requirements.txt" ]; then
-            echo "Installing service requirements: $SERVICE_PATH/requirements.txt -> $APP_DIR"
             pip install -r "$SERVICE_PATH/requirements.txt" -t "$APP_DIR"
-          else
-            echo "No runtime requirements.txt found for $SERVICE_PATH; skipping vendoring"
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Int Stack
+        run: |
+          SERVICE_PATH=${{ matrix.component }}
+          SERVICE_NAME=$(basename "$SERVICE_PATH")
+          PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
+          STACK_NAME="${PASCAL_CASE_NAME}Stack-int"
+          cdk deploy "$STACK_NAME" \
+            --app "python3 ${SERVICE_PATH}/infra/app.py" \
+            --context env=int \
+            --require-approval never
+
+  deploy-prod:
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      (github.event_name == 'pull_request_target' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')
+    needs: [detect-changes, deploy-int]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: ${{ fromJson(needs.detect-changes.outputs.changed) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python and CDK
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: npm install -g aws-cdk
+
+      - name: Install requirements
+        run: pip install -r ${{ matrix.component }}/infra/requirements.txt
+
+      - name: Vendor Python runtime dependencies
+        shell: bash
+        run: |
+          SERVICE_PATH=${{ matrix.component }}
+          APP_DIR="$SERVICE_PATH/app"
+          if [ -f "$APP_DIR/requirements.txt" ]; then
+            pip install -r "$APP_DIR/requirements.txt" -t "$APP_DIR"
+          elif [ -f "$SERVICE_PATH/requirements.txt" ]; then
+            pip install -r "$SERVICE_PATH/requirements.txt" -t "$APP_DIR"
           fi
 
       - name: Configure AWS credentials
@@ -242,8 +220,6 @@ jobs:
           SERVICE_NAME=$(basename "$SERVICE_PATH")
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
           STACK_NAME="${PASCAL_CASE_NAME}Stack-prod"
-
-          echo "Deploying stack: $STACK_NAME"
           cdk deploy "$STACK_NAME" \
             --app "python3 ${SERVICE_PATH}/infra/app.py" \
             --context env=prod \
@@ -258,15 +234,13 @@ jobs:
         component: ${{ fromJson(needs.detect-changes.outputs.changed) }}
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
-
     steps:
       - uses: actions/checkout@v4
 
       - run: npm install -g aws-cdk
 
       - name: Install requirements
-        run: |
-          pip install -r ${{ matrix.component }}/infra/requirements.txt
+        run: pip install -r ${{ matrix.component }}/infra/requirements.txt
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -280,6 +254,4 @@ jobs:
           SERVICE_NAME=$(basename "$SERVICE_PATH")
           PASCAL_CASE_NAME=$(echo "$SERVICE_NAME" | awk -F'_' 'BEGIN{OFS=""} { for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print }')
           STACK_NAME="${PASCAL_CASE_NAME}Stack-pr-${PR_NUMBER}"
-
-          echo "Destroying stack: $STACK_NAME"
           cdk destroy "$STACK_NAME" --force
