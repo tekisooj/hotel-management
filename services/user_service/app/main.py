@@ -8,10 +8,12 @@ from config import AppMetadata, user_service_int_configuration, user_service_pro
 from mangum import Mangum
 from cognito_client import CognitoClient
 
+
 logger = logging.getLogger()
 if not logger.hasHandlers():
     logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
+
 
 def create_app() -> FastAPI:
     app_metadata = AppMetadata()
@@ -23,16 +25,16 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title=app_metadata.app_title,
-        description=app_metadata.app_description
+        description=app_metadata.app_description,
     )
 
     allowed_origins = [
-        "https://d3h3g1mttxpuc6.cloudfront.net",  # Auth UI (INT)
-        "https://d2ecdgwxri75mv.cloudfront.net",  # Auth UI (PROD)
-        "https://demfm8bnd6dtk.cloudfront.net",   # Guest UI (INT)
-        "https://dsfjwq83frzww.cloudfront.net",   # Guest UI (PROD)
-        "https://d2hx3vlqyzz4bv.cloudfront.net",  # Host UI (INT)
-        "https://djb3c9odb1pg2.cloudfront.net",   # Host UI (PROD)
+        "https://d3h3g1mttxpuc6.cloudfront.net",  # INT (auth UI)
+        "https://d2ecdgwxri75mv.cloudfront.net",  # PROD (auth UI)
+        "https://demfm8bnd6dtk.cloudfront.net",   # guest INT
+        "https://dsfjwq83frzww.cloudfront.net",   # guest PROD
+        "https://d2hx3vlqyzz4bv.cloudfront.net",  # host INT
+        "https://djb3c9odb1pg2.cloudfront.net",   # host PROD
     ]
 
     app.add_middleware(
@@ -47,7 +49,7 @@ def create_app() -> FastAPI:
     app.state.user_table_client = HotelManagementDBClient(
         hotel_management_database_secret_name=app_config.hotel_management_database_secret_name,
         region=app_config.region,
-        proxy_endpoint=app_config.db_proxy_endpoint
+        proxy_endpoint=app_config.db_proxy_endpoint,
     )
     app.state.audience = app_config.audience
     app.state.jwks_url = app_config.jwks_url
@@ -57,6 +59,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CognitoAuthMiddleware)
 
     return app
+
 
 app = create_app()
 handler = Mangum(app, lifespan="off")
