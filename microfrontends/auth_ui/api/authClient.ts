@@ -1,5 +1,5 @@
 import { useRuntimeConfig } from "nuxt/app"
-import { UserManager } from "oidc-client-ts"
+import { UserManager, WebStorageStateStore } from "oidc-client-ts"
 
 const config = useRuntimeConfig()
 
@@ -18,6 +18,7 @@ const cognitoAuthConfig = {
   post_logout_redirect_uri: `${authBase}/logout`,
   response_type: 'code',
   scope: 'openid email profile',
+  userStore: new WebStorageStateStore({ store: window.localStorage })
 }
 
 export const userManager = new UserManager(cognitoAuthConfig)
