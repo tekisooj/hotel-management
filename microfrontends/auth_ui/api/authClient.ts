@@ -24,7 +24,7 @@ export function getUserManager(): UserManager {
   const postLogoutRedirectUri = `${authBase}/logout`
 
   _userManager = new UserManager({
-    authority: `https://cognito-idp.${config.public.awsRegion}.amazonaws.com/${config.public.congitoUserPoolID}`,
+    authority: config.public.cognitoApiDomain,
     client_id: config.public.cognitoAppClientId,
     redirect_uri: redirectUri,
     post_logout_redirect_uri: postLogoutRedirectUri,
