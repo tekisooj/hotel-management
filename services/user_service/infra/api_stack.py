@@ -25,7 +25,7 @@ class UserServiceStack(Stack):
 
         lambda_role = Role(
             self, f"UserServiceLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            assumed_by=ServicePrincipal("lambda.amazonaws.com"), # type: ignore
+            assumed_by=ServicePrincipal("lambda.amazonaws.com"),  # type: ignore
             managed_policies=[
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
                 ManagedPolicy.from_aws_managed_policy_name("AmazonRDSDataFullAccess"),
@@ -34,17 +34,15 @@ class UserServiceStack(Stack):
             ]
         )
 
-
         db_name = f"hotel-management-database-{self.env_name if self.env_name == 'prod' else 'int'}"
         db_secret = Secret.from_secret_name_v2(self, "DbSecret", secret_name=db_name)
 
-        if self.env_name=="prod":
-            proxy_role_arn="arn:aws:iam::914242301564:role/service-role/rds-proxy-role-1758401519769"
+        if self.env_name == "prod":
+            proxy_role_arn = "arn:aws:iam::914242301564:role/service-role/rds-proxy-role-1758401519769"
         else:
-            proxy_role_arn="arn:aws:iam::914242301564:role/service-role/rds-proxy-role-1758401469124"
-        
-        proxy_role = Role.from_role_arn(self, "ImportedProxyRole", proxy_role_arn)
+            proxy_role_arn = "arn:aws:iam::914242301564:role/service-role/rds-proxy-role-1758401469124"
 
+        proxy_role = Role.from_role_arn(self, "ImportedProxyRole", proxy_role_arn)
         db_secret.grant_read(proxy_role)
 
         if self.env_name == "prod":
@@ -60,7 +58,6 @@ class UserServiceStack(Stack):
             audience = "la13fgbn7avmni0f84pu5lk79"
 
         jwks_url = f"https://cognito-idp.us-east-1.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
-
         app_client_id = "7226gqpnghn0q22ec2ill399lv" if self.env_name == "prod" else "la13fgbn7avmni0f84pu5lk79"
 
         lambda_function = Function(
@@ -68,7 +65,7 @@ class UserServiceStack(Stack):
             runtime=Runtime.PYTHON_3_11,
             handler="main.handler",
             code=Code.from_asset("services/user_service/app"),
-            role=lambda_role, # type: ignore
+            role=lambda_role,  # type: ignore
             timeout=Duration.seconds(30),
             memory_size=1024,
             environment={
@@ -81,9 +78,7 @@ class UserServiceStack(Stack):
             },
             vpc=vpc,
             security_groups=[db_sg],
-            vpc_subnets=SubnetSelection(
-                subnet_type=SubnetType.PRIVATE_WITH_EGRESS
-            )
+            vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS)
         )
 
         api = RestApi(
@@ -92,17 +87,47 @@ class UserServiceStack(Stack):
             description="API Gateway exposing user service Lambda",
             endpoint_types=[EndpointType.REGIONAL],
         )
-        integration = LambdaIntegration(lambda_function, proxy=True) #typing: ignore
+
+        integration = LambdaIntegration(lambda_function, proxy=True)  # type: ignore
+
+        def add_cors_options(resource):
+            resource.add_method(
+                "OPTIONS",
+                None,
+                method_responses=[
+                    {
+                        "statusCode": "200",
+                        "responseParameters": {
+                            "method.response.header.Access-Control-Allow-Headers": True,
+                            "method.response.header.Access-Control-Allow-Origin": True,
+                            "method.response.header.Access-Control-Allow-Methods": True,
+                        },
+                    }
+                ],
+                integration_responses=[
+                    {
+                        "statusCode": "200",
+                        "responseParameters": {
+                            "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
+                            "method.response.header.Access-Control-Allow-Origin": "'*'",
+                            "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,POST,PATCH,DELETE'",
+                        },
+                    }
+                ],
+            )
 
         resource_me = api.root.add_resource("me")
         resource_me.add_method("GET", integration)
+        add_cors_options(resource_me)
 
         resource_user = api.root.add_resource("user")
         resource_user.add_method("POST", integration)
+        add_cors_options(resource_user)
 
         resource_user_id = resource_user.add_resource("{user_uuid}")
         resource_user_id.add_method("GET", integration)
         resource_user_id.add_method("DELETE", integration)
         resource_user_id.add_method("PATCH", integration)
+        add_cors_options(resource_user_id)
 
         CfnOutput(self, "DbProxyEndpoint", value=proxy_endpoint)
