@@ -56,7 +56,7 @@ def create_app() -> FastAPI:
     app.state.cognito_client = CognitoClient(app_config.region, app_config.app_client_id)
 
     app.include_router(router)
-    app.add_middleware(CognitoAuthMiddleware)
+    # app.add_middleware(CognitoAuthMiddleware)
 
     return app
 
