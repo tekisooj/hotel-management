@@ -8,13 +8,10 @@ from aws_cdk.aws_apigateway import RestApi, LambdaIntegration, EndpointType, Moc
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from aws_cdk.aws_secretsmanager import Secret
 from constructs import Construct
-from aws_cdk.aws_ec2 import Vpc, SecurityGroup, SubnetSelection, SubnetType
+from aws_cdk.aws_ec2 import Vpc, SecurityGroup, SubnetSelection, SubnetType, Port
 
 
 def add_cors_options(resource):
-    """
-    Adds a CORS preflight OPTIONS method to the given API Gateway resource.
-    """
     resource.add_method(
         "OPTIONS",
         MockIntegration(
@@ -56,6 +53,20 @@ class UserServiceStack(Stack):
             security_group_id="sg-030e54916d52c0bd0"
         )
 
+        lambda_sg = SecurityGroup(
+            self,
+            f"UserServiceLambdaSG-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            vpc=vpc,
+            allow_all_outbound=True,
+            description="Security group for UserService Lambda",
+        )
+
+        db_sg.add_ingress_rule(
+            peer=lambda_sg,
+            connection=Port.tcp(5432),
+            description="Allow Lambda to connect to RDS Proxy/Postgres"
+        )
+
         lambda_role = Role(
             self, f"UserServiceLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
             assumed_by=ServicePrincipal("lambda.amazonaws.com"),
@@ -94,7 +105,7 @@ class UserServiceStack(Stack):
             handler="main.handler",
             code=Code.from_asset("services/user_service/app"),
             role=lambda_role,
-            timeout=Duration.seconds(30),
+            timeout=Duration.seconds(60),
             memory_size=1024,
             environment={
                 "USER_SERVICE_ENV": self.env_name,
@@ -105,8 +116,8 @@ class UserServiceStack(Stack):
                 "DB_PROXY_ENDPOINT": proxy_endpoint,
             },
             vpc=vpc,
-            security_groups=[db_sg],
-            vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS)
+            security_groups=[lambda_sg],
+            vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS),
         )
 
         api = RestApi(
