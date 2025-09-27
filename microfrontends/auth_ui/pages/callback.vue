@@ -33,6 +33,7 @@ onMounted(async () => {
 
   const restartLogin = async () => {
     await userManager.clearStaleState().catch(() => undefined)
+    store.clearUser?.()
     const app = typeof route.query.app === 'string' ? route.query.app : undefined
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : undefined
     await signInRedirect({
