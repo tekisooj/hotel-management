@@ -1,10 +1,13 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 const awsRegion = process.env.AWS_REGION || ''
 const cognitoUserPoolId = process.env.COGNITO_USER_POOL_ID || ''
-const fallbackAuthority = awsRegion && cognitoUserPoolId
+const fallbackHostedUiDomain = (process.env.COGNITO_HOSTED_UI_DOMAIN || process.env.COGNITO_API_DOMAIN || '').replace(/\/$/, '')
+const fallbackAuthorityFromPool = awsRegion && cognitoUserPoolId
   ? `https://cognito-idp.${awsRegion}.amazonaws.com/${cognitoUserPoolId}`
   : ''
-const fallbackHostedUiDomain = (process.env.COGNITO_HOSTED_UI_DOMAIN || process.env.COGNITO_API_DOMAIN || '').replace(/\/$/, '')
+const computedAuthority = (process.env.COGNITO_OIDC_AUTHORITY || '').replace(/\/$/, '')
+  || fallbackAuthorityFromPool
+  || fallbackHostedUiDomain
 
 export default defineNuxtConfig({
   ssr: false, // build as SPA (good for S3/CloudFront)
@@ -46,7 +49,7 @@ export default defineNuxtConfig({
       cognitoUserPoolId,
       cognitoAppClientId: process.env.COGNITO_APP_CLIENT_ID || '',
       cognitoHostedUiDomain: fallbackHostedUiDomain,
-      cognitoOidcAuthority: process.env.COGNITO_OIDC_AUTHORITY || fallbackAuthority,
+      cognitoOidcAuthority: computedAuthority,
       cognitoScope: process.env.COGNITO_OIDC_SCOPE || 'aws.cognito.signin.user.admin email openid phone profile',
       guestUiUrl: process.env.GUEST_UI_URL || '',
       hostUiUrl: process.env.HOST_UI_URL || '',

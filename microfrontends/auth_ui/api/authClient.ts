@@ -36,6 +36,8 @@ export function getUserManager(): UserManager {
   const ensuredClientId = ensure(clientId, "Missing Cognito app client ID")
   const ensuredScope = scope || "openid email profile"
 
+  const storage = new WebStorageStateStore({ store: window.localStorage })
+
   _userManager = new UserManager({
     authority: ensuredAuthority,
     client_id: ensuredClientId,
@@ -44,7 +46,8 @@ export function getUserManager(): UserManager {
     response_type: "code",
     scope: ensuredScope,
 
-    userStore: new WebStorageStateStore({ store: window.localStorage }),
+    userStore: storage,
+    stateStore: storage,
 
     monitorSession: false,
     loadUserInfo: false,
