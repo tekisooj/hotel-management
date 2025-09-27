@@ -11,7 +11,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+  CDK_DEFAULT_ACCOUNT: 914242301564
 
 permissions:
   id-token: write
@@ -115,7 +115,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy Preview Stack
@@ -174,7 +174,7 @@ jobs:
         - name: Configure AWS credentials
           uses: aws-actions/configure-aws-credentials@v4
           with:
-            role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+            role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
             aws-region: ${{ env.AWS_REGION }}
 
         - name: Deploy Int Stack
@@ -233,7 +233,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy Production Stack
@@ -253,9 +253,9 @@ jobs:
     if: github.event.pull_request.merged == false && github.event.action == 'closed'
     needs: detect-changes
     runs-on: ubuntu-latest
-      strategy:
-        matrix:
-          component: ${{ fromJson(needs.detect-changes.outputs.changed) }}
+    strategy:
+      matrix:
+        component: ${{ fromJson(needs.detect-changes.outputs.changed) }}
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
 
@@ -271,7 +271,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Destroy PR Preview Stack

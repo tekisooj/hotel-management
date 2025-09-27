@@ -16,7 +16,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+  CDK_DEFAULT_ACCOUNT: 914242301564
 
 permissions:
   id-token: write
@@ -88,7 +88,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          role-to-assume: arn:aws:iam::914242301564:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy Stack (manual)

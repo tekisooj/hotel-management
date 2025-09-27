@@ -13,7 +13,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+  CDK_DEFAULT_ACCOUNT: 914242301564
 
 permissions:
   id-token: write
@@ -34,15 +34,15 @@ jobs:
       - name: Install deps and generate static site
         working-directory: microfrontends/auth_ui
         env:
-          COGNITO_API_DOMAIN: ${{ secrets.COGNITO_API_DOMAIN_INT }}
-          COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID_INT }}
-          COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID_INT }}
-          USER_API_BASE: ${{ secrets.USER_API_BASE_INT }}
-          HOST_API_BASE: ${{ secrets.HOST_API_BASE_INT }}
-          GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_INT }}
-          GUSET_UI_URL: ${{ secrets.GUEST_UI_URL_INT }}
-          HOST_UI_URL: ${{ secrets.HOST_UI_URL_INT }}
-          AUTH_UI_URL: ${{ secrets.AUTH_UI_URL_INT }}
+          COGNITO_API_DOMAIN: ${{ env.COGNITO_API_DOMAIN_INT }}
+          COGNITO_USER_POOL_ID: ${{ env.COGNITO_USER_POOL_ID_INT }}
+          COGNITO_APP_CLIENT_ID: ${{ env.COGNITO_APP_CLIENT_ID_INT }}
+          USER_API_BASE: ${{ env.USER_API_BASE_INT }}
+          HOST_API_BASE: ${{ env.HOST_API_BASE_INT }}
+          GUEST_API_BASE: ${{ env.GUEST_API_BASE_INT }}
+          GUSET_UI_URL: ${{ env.GUEST_UI_URL_INT }}
+          HOST_UI_URL: ${{ env.HOST_UI_URL_INT }}
+          AUTH_UI_URL: ${{ env.AUTH_UI_URL_INT }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -61,7 +61,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          role-to-assume: arn:aws:iam::914242301564:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy Auth UI (PR)
@@ -87,15 +87,15 @@ jobs:
       - name: Install deps and generate static site
         working-directory: microfrontends/auth_ui
         env:
-          COGNITO_API_DOMAIN: ${{ secrets.COGNITO_API_DOMAIN_INT }}
-          COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID_INT }}
-          COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID_INT }}
-          USER_API_BASE: ${{ secrets.USER_API_BASE_INT }}
-          HOST_API_BASE: ${{ secrets.HOST_API_BASE_INT }}
-          GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_INT }}
-          GUSET_UI_URL: ${{ secrets.GUEST_UI_URL_INT }}
-          HOST_UI_URL: ${{ secrets.HOST_UI_URL_INT }}
-          AUTH_UI_URL: ${{ secrets.AUTH_UI_URL_INT }}
+          COGNITO_API_DOMAIN: ${{ env.COGNITO_API_DOMAIN_INT }}
+          COGNITO_USER_POOL_ID: ${{ env.COGNITO_USER_POOL_ID_INT }}
+          COGNITO_APP_CLIENT_ID: ${{ env.COGNITO_APP_CLIENT_ID_INT }}
+          USER_API_BASE: ${{ env.USER_API_BASE_INT }}
+          HOST_API_BASE: ${{ env.HOST_API_BASE_INT }}
+          GUEST_API_BASE: ${{ env.GUEST_API_BASE_INT }}
+          GUSET_UI_URL: ${{ env.GUEST_UI_URL_INT }}
+          HOST_UI_URL: ${{ env.HOST_UI_URL_INT }}
+          AUTH_UI_URL: ${{ env.AUTH_UI_URL_INT }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -114,7 +114,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          role-to-assume: arn:aws:iam::914242301564:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy Auth UI (INT)
@@ -140,15 +140,15 @@ jobs:
       - name: Install deps and generate static site
         working-directory: microfrontends/auth_ui
         env:
-          COGNITO_API_DOMAIN: ${{ secrets.COGNITO_API_DOMAIN_PROD }}
-          COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID_PROD }}
-          COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID_PROD }}
-          USER_API_BASE: ${{ secrets.USER_API_BASE_PROD }}
-          HOST_API_BASE: ${{ secrets.HOST_API_BASE_PROD }}
-          GUEST_API_BASE: ${{ secrets.GUEST_API_BASE_PROD }}
-          GUSET_UI_URL: ${{ secrets.GUEST_UI_URL_PROD }}
-          HOST_UI_URL: ${{ secrets.HOST_UI_URL_PROD }}
-          AUTH_UI_URL: ${{ secrets.AUTH_UI_URL_PROD }}
+          COGNITO_API_DOMAIN: ${{ env.COGNITO_API_DOMAIN_PROD }}
+          COGNITO_USER_POOL_ID: ${{ env.COGNITO_USER_POOL_ID_PROD }}
+          COGNITO_APP_CLIENT_ID: ${{ env.COGNITO_APP_CLIENT_ID_PROD }}
+          USER_API_BASE: ${{ env.USER_API_BASE_PROD }}
+          HOST_API_BASE: ${{ env.HOST_API_BASE_PROD }}
+          GUEST_API_BASE: ${{ env.GUEST_API_BASE_PROD }}
+          GUSET_UI_URL: ${{ env.GUEST_UI_URL_PROD }}
+          HOST_UI_URL: ${{ env.HOST_UI_URL_PROD }}
+          AUTH_UI_URL: ${{ env.AUTH_UI_URL_PROD }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-fund --no-audit; fi
           npm run generate
@@ -167,7 +167,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          role-to-assume: arn:aws:iam::914242301564:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy Auth UI (PROD)
