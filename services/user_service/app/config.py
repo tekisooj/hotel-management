@@ -30,6 +30,6 @@ user_service_int_configuration = AppConfiguration(
     hotel_management_database_secret_name=os.environ.get("HOTEL_MANAGEMENT_DATABASE_SECRET_NAME", None),
     audience=os.environ.get("AUDIENCE", None),
     jwks_url=os.environ.get("JWKS_URL", None),
-    app_client_id=os.environ.get("APP_CLIENT_ID", None)
+    app_client_id=os.environ.get("APP_CLIENT_ID", None),
     db_proxy_endpoint=os.environ.get("DB_PROXY_ENDPOINT", None)
 )
