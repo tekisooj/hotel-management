@@ -1,11 +1,12 @@
-<template>
+﻿<template>
   <div class="callback">Redirecting…</div>
 </template>
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useRuntimeConfig } from 'nuxt/app'
-import { userManager } from '~/api/authClient'
+import { userManager, signInRedirect } from '~/api/authClient'
 import { useUserStore } from '~/stores/user'
 import type { User } from '~/types/User'
 
@@ -28,28 +29,44 @@ function buildTargetUrl(base: string, token: string, refreshToken?: string, redi
 onMounted(async () => {
   const config = useRuntimeConfig()
   const store = useUserStore()
-  await userManager.clearStaleState().catch(() => undefined)
-  const signinResponse = await userManager.signinCallback(window.location.href)
-  const state = (() => {
-    try {
-      return signinResponse.state ? JSON.parse(signinResponse.state) : {}
-    } catch {
-      return {}
-    }
-  })() as { app?: string; redirect?: string }
+  const route = useRoute()
 
-  const idToken = signinResponse.id_token
-  const refreshToken = signinResponse.refresh_token || undefined
+  const restartLogin = async () => {
+    await userManager.clearStaleState().catch(() => undefined)
+    const app = typeof route.query.app === 'string' ? route.query.app : undefined
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : undefined
+    await signInRedirect({
+      state: JSON.stringify({ app, redirect }),
+    })
+  }
 
-  const me = await $fetch<User>(`${config.public.userApiBase}/me`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  })
-  store.setUser(me, idToken)
+  try {
+    await userManager.clearStaleState().catch(() => undefined)
+    const signinResponse = await userManager.signinCallback(window.location.href)
+    const state = (() => {
+      try {
+        return signinResponse.state ? JSON.parse(signinResponse.state) : {}
+      } catch {
+        return {}
+      }
+    })() as { app?: string; redirect?: string }
 
-  const targetApp = state.app === 'host' || me.user_type === 'staff' ? 'host' : 'guest'
-  const targetBase = targetApp === 'host' ? config.public.hostUiUrl : config.public.guestUiUrl
-  const redirectUrl = buildTargetUrl(targetBase, idToken, refreshToken, state.redirect)
-  window.location.href = redirectUrl
+    const idToken = signinResponse.id_token
+    const refreshToken = signinResponse.refresh_token || undefined
+
+    const me = await $fetch<User>(`${config.public.userApiBase}/me`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+    })
+    store.setUser(me, idToken)
+
+    const targetApp = state.app === 'host' || me.user_type === 'staff' ? 'host' : 'guest'
+    const targetBase = targetApp === 'host' ? config.public.hostUiUrl : config.public.guestUiUrl
+    const redirectUrl = buildTargetUrl(targetBase, idToken, refreshToken, state.redirect)
+    window.location.href = redirectUrl
+  } catch (error) {
+    console.error('OIDC callback failed, restarting sign-in', error)
+    await restartLogin()
+  }
 })
 </script>
 
