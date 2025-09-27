@@ -4,7 +4,14 @@ from aws_cdk import (
     CfnOutput
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
-from aws_cdk.aws_apigateway import RestApi, LambdaIntegration, EndpointType
+from aws_cdk.aws_apigateway import (
+    RestApi,
+    LambdaIntegration,
+    EndpointType,
+    MockIntegration,
+    IntegrationResponse,
+    MethodResponse
+)
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from aws_cdk.aws_secretsmanager import Secret
 from constructs import Construct
@@ -93,26 +100,29 @@ class UserServiceStack(Stack):
         def add_cors_options(resource):
             resource.add_method(
                 "OPTIONS",
-                None,
+                MockIntegration(
+                    integration_responses=[
+                        IntegrationResponse(
+                            status_code="200",
+                            response_parameters={
+                                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
+                                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,POST,PATCH,DELETE'",
+                            },
+                        )
+                    ],
+                    passthrough_behavior="WHEN_NO_MATCH",
+                    request_templates={"application/json": '{"statusCode": 200}'},
+                ),
                 method_responses=[
-                    {
-                        "statusCode": "200",
-                        "responseParameters": {
+                    MethodResponse(
+                        status_code="200",
+                        response_parameters={
                             "method.response.header.Access-Control-Allow-Headers": True,
                             "method.response.header.Access-Control-Allow-Origin": True,
                             "method.response.header.Access-Control-Allow-Methods": True,
                         },
-                    }
-                ],
-                integration_responses=[
-                    {
-                        "statusCode": "200",
-                        "responseParameters": {
-                            "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
-                            "method.response.header.Access-Control-Allow-Origin": "'*'",
-                            "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,POST,PATCH,DELETE'",
-                        },
-                    }
+                    )
                 ],
             )
 
