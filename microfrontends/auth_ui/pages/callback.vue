@@ -3,26 +3,22 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { useRuntimeConfig } from 'nuxt/app'
-import { userManager, signInRedirect } from '~/api/authClient'
-import { useUserStore } from '~/stores/user'
-import type { User } from '~/types/User'
+import { onMounted } from "vue"
+import { useRoute } from "vue-router"
+import { useRuntimeConfig } from "nuxt/app"
+import { getUserManager, signInRedirect } from "~/api/authClient"
+import { useUserStore } from "~/stores/user"
+import type { User } from "~/types/User"
 
 function buildTargetUrl(base: string, token: string, refreshToken?: string, redirect?: string) {
   const resolvedBase = base || window.location.origin
   const url = new URL(resolvedBase)
-  const basePath = url.pathname.replace(/\/$/, '')
+  const basePath = url.pathname.replace(/\/$/, "")
   const nextPath = `${basePath}/auth/callback`
-  url.pathname = nextPath.startsWith('/') ? nextPath : `/${nextPath}`
-  url.searchParams.set('id_token', token)
-  if (refreshToken) {
-    url.searchParams.set('refresh_token', refreshToken)
-  }
-  if (redirect) {
-    url.searchParams.set('redirect', redirect)
-  }
+  url.pathname = nextPath.startsWith("/") ? nextPath : `/${nextPath}`
+  url.searchParams.set("id_token", token)
+  if (refreshToken) url.searchParams.set("refresh_token", refreshToken)
+  if (redirect) url.searchParams.set("redirect", redirect)
   return url.toString()
 }
 
@@ -30,25 +26,30 @@ onMounted(async () => {
   const config = useRuntimeConfig()
   const store = useUserStore()
   const route = useRoute()
+  const userManager = getUserManager()
+
+  const retriesKey = "auth_retries"
+  const retries = Number(localStorage.getItem(retriesKey) || "0")
 
   const restartLogin = async () => {
     await userManager.clearStaleState().catch(() => undefined)
+    await userManager.removeUser().catch(() => undefined)
     store.clearUser?.()
-    const app = typeof route.query.app === 'string' ? route.query.app : undefined
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : undefined
-    await signInRedirect({
-      state: JSON.stringify({ app, redirect }),
-    })
+
+    const app = typeof route.query.app === "string" ? route.query.app : undefined
+    const redirect = typeof route.query.redirect === "string" ? route.query.redirect : undefined
+
+    localStorage.setItem(retriesKey, String(retries + 1))
+    await signInRedirect({ state: JSON.stringify({ app, redirect }) })
   }
 
   try {
     const signinResponse = await userManager.signinCallback(window.location.href)
+    localStorage.removeItem(retriesKey)
+
     const state = (() => {
-      try {
-        return signinResponse.state ? JSON.parse(signinResponse.state) : {}
-      } catch {
-        return {}
-      }
+      try { return signinResponse.state ? JSON.parse(signinResponse.state) : {} }
+      catch { return {} }
     })() as { app?: string; redirect?: string }
 
     const idToken = signinResponse.id_token
@@ -59,17 +60,25 @@ onMounted(async () => {
     })
     store.setUser(me, idToken)
 
-    const targetApp = state.app === 'host' || me.user_type === 'staff' ? 'host' : 'guest'
-    const targetBase = targetApp === 'host' ? config.public.hostUiUrl : config.public.guestUiUrl
+    const targetApp = state.app === "host" || me.user_type === "staff" ? "host" : "guest"
+    const targetBase = targetApp === "host" ? config.public.hostUiUrl : config.public.guestUiUrl
     const redirectUrl = buildTargetUrl(targetBase, idToken, refreshToken, state.redirect)
     window.location.href = redirectUrl
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('No matching state')) {
+  } catch (error: any) {
+    await userManager.clearStaleState().catch(() => undefined)
+    await userManager.removeUser().catch(() => undefined)
+
+    const msg = String(error?.message || "")
+    if (msg.includes("No matching state") && retries < 2) {
       await restartLogin()
       return
     }
-    console.error('OIDC callback failed', error)
-    await restartLogin()
+
+    if (retries < 2) {
+      await restartLogin()
+      return
+    }
+
   }
 })
 </script>
