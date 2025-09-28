@@ -83,21 +83,25 @@ class UserServiceStack(Stack):
             description="Allow Lambda to connect to RDS Proxy/Postgres"
         )
 
-        InterfaceVpcEndpoint(
-            self, "SecretsManagerEndpoint",
-            vpc=vpc,
-            service=InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-            private_dns_enabled=True,
-            security_groups=[lambda_sg]
-        )
+        try:
+            InterfaceVpcEndpoint.from_interface_vpc_endpoint_attributes(
+                self,
+                "SecretsManagerEndpointImport",
+                vpc_endpoint_id="vpce-0d4457c1b0f9af6d4",
+                port=443
+            )
+        except Exception:
+            pass
 
-        InterfaceVpcEndpoint(
-            self, "CloudWatchLogsEndpoint",
-            vpc=vpc,
-            service=InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-            private_dns_enabled=True,
-            security_groups=[lambda_sg]
-        )
+        try:
+            InterfaceVpcEndpoint.from_interface_vpc_endpoint_attributes(
+                self,
+                "CloudWatchLogsEndpointImport",
+                vpc_endpoint_id="vpce-08a1046a4263511ea",
+                port=443
+            )
+        except Exception:
+            pass
 
         lambda_role = Role(
             self, f"UserServiceLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
