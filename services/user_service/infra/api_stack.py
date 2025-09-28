@@ -4,11 +4,27 @@ from aws_cdk import (
     CfnOutput
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
-from aws_cdk.aws_apigateway import RestApi, LambdaIntegration, EndpointType, MockIntegration, IntegrationResponse, MethodResponse, PassthroughBehavior
+from aws_cdk.aws_apigateway import (
+    RestApi,
+    LambdaIntegration,
+    EndpointType,
+    MockIntegration,
+    IntegrationResponse,
+    MethodResponse,
+    PassthroughBehavior
+)
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from aws_cdk.aws_secretsmanager import Secret
 from constructs import Construct
-from aws_cdk.aws_ec2 import Vpc, SecurityGroup, SubnetSelection, SubnetType, Port
+from aws_cdk.aws_ec2 import (
+    Vpc,
+    SecurityGroup,
+    SubnetSelection,
+    SubnetType,
+    Port,
+    InterfaceVpcEndpoint,
+    InterfaceVpcEndpointAwsService
+)
 
 
 def add_cors_options(resource):
@@ -65,6 +81,22 @@ class UserServiceStack(Stack):
             peer=lambda_sg,
             connection=Port.tcp(5432),
             description="Allow Lambda to connect to RDS Proxy/Postgres"
+        )
+
+        InterfaceVpcEndpoint(
+            self, "SecretsManagerEndpoint",
+            vpc=vpc,
+            service=InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+            private_dns_enabled=True,
+            security_groups=[lambda_sg]
+        )
+
+        InterfaceVpcEndpoint(
+            self, "CloudWatchLogsEndpoint",
+            vpc=vpc,
+            service=InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+            private_dns_enabled=True,
+            security_groups=[lambda_sg]
         )
 
         lambda_role = Role(
