@@ -1,6 +1,6 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastapi import Depends, HTTPException, Request
-from schemas import SignUpRequest, UserCreate, UserResponse, UserUpdate
+from schemas import SignUpRequest, UserCreate, UserResponse, UserType, UserUpdate
 from db_client import HotelManagementDBClient
 from cognito_client import CognitoClient
 import time, logging
@@ -20,27 +20,31 @@ def get_current_user_uuid(request: Request) -> UUID:
         raise HTTPException(status_code=401, detail="Unauthorized")
     return UUID(user_claims["sub"])
 
-async def get_logged_in_user(
-    request: Request,
-    hotel_management_db_client: HotelManagementDBClient = Depends(get_hotel_management_db_client),
-    user_uuid: UUID = Depends(get_current_user_uuid),
-) -> UserResponse:
-    logger.info(f"🔥 /me endpoint invoked, starting processing UUID={user_uuid}")
+async def get_logged_in_user(request: Request) -> UserResponse:
+    logger.info("🔥 Entered /me")
+    return UserResponse(uuid=uuid4(), name="Teodora", last_name="Vasic", email="mejl@mail.com", user_type=UserType.GUEST)
 
-    start = time.time()
-    logger.info(f"➡️ /me called UUID={user_uuid}")
-    try:
-        logger.info("🏁 Entering HotelManagementDBClient.get_user()")
-        user = hotel_management_db_client.get_user(user_uuid)
-        if not user:
-            logger.warning("⚠️ User not found")
-            raise HTTPException(status_code=404, detail="User not found")
-        elapsed = time.time() - start
-        logger.info(f"✅ /me completed in {elapsed:.2f}s")
-        return user
-    except Exception as e:
-        logger.exception(f"❌ Error fetching user {user_uuid}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+# async def get_logged_in_user(
+#     request: Request,
+#     hotel_management_db_client: HotelManagementDBClient = Depends(get_hotel_management_db_client),
+#     user_uuid: UUID = Depends(get_current_user_uuid),
+# ) -> UserResponse:
+#     logger.info(f"🔥 /me endpoint invoked, starting processing UUID={user_uuid}")
+
+#     start = time.time()
+#     logger.info(f"➡️ /me called UUID={user_uuid}")
+#     try:
+#         logger.info("🏁 Entering HotelManagementDBClient.get_user()")
+#         user = hotel_management_db_client.get_user(user_uuid)
+#         if not user:
+#             logger.warning("⚠️ User not found")
+#             raise HTTPException(status_code=404, detail="User not found")
+#         elapsed = time.time() - start
+#         logger.info(f"✅ /me completed in {elapsed:.2f}s")
+#         return user
+#     except Exception as e:
+#         logger.exception(f"❌ Error fetching user {user_uuid}")
+#         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 async def register_user(
     sign_up_data: SignUpRequest,
