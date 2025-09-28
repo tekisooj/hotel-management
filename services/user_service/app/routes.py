@@ -1,17 +1,17 @@
 from uuid import UUID
 from fastapi import APIRouter
 from handlers import get_logged_in_user, get_user, delete_user, register_user, update_user
-from models import User
-from schemas import  UserCreate, UserResponse
+from schemas import UserResponse
 
-router = APIRouter()
+router = APIRouter(prefix="")
 
 router.add_api_route(
     path="/me",
     methods=["GET"],
     response_model=UserResponse,
     endpoint=get_logged_in_user,
-    description="Get a user based on uuid"
+    description="Returns the currently logged-in user's data",
+    tags=["User"]
 )
 
 router.add_api_route(
@@ -19,7 +19,8 @@ router.add_api_route(
     methods=["GET"],
     response_model=UserResponse,
     endpoint=get_user,
-    description="Get a user based on uuid"
+    description="Fetch a user by UUID",
+    tags=["User"]
 )
 
 router.add_api_route(
@@ -27,7 +28,8 @@ router.add_api_route(
     methods=["POST"],
     response_model=UUID,
     endpoint=register_user,
-    description="Add a new user"
+    description="Register a new user",
+    tags=["User"]
 )
 
 router.add_api_route(
@@ -35,7 +37,8 @@ router.add_api_route(
     methods=["DELETE"],
     response_model=None,
     endpoint=delete_user,
-    description="Delete a user based on uuid"
+    description="Delete a user by UUID",
+    tags=["User"]
 )
 
 router.add_api_route(
@@ -43,5 +46,6 @@ router.add_api_route(
     methods=["PATCH"],
     response_model=UserResponse | None,
     endpoint=update_user,
-    description="Delete a user based on uuid"
+    description="Update a user by UUID",
+    tags=["User"]
 )
