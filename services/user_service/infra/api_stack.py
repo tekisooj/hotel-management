@@ -22,7 +22,6 @@ from aws_cdk.aws_ec2 import (
     SubnetSelection,
     SubnetType,
     Port,
-    InterfaceVpcEndpoint,
     InterfaceVpcEndpointAwsService
 )
 
@@ -64,6 +63,16 @@ class UserServiceStack(Stack):
 
         vpc = Vpc.from_lookup(self, "HotelManagementVpc", vpc_id="vpc-0b28dea117c8220de")
 
+        secrets_manager_endpoint = vpc.add_interface_endpoint(
+            f"SecretsManagerEndpoint-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            service=InterfaceVpcEndpointAwsService.SECRETS_MANAGER
+        )
+
+        logs_endpoint = vpc.add_interface_endpoint(
+            f"CloudWatchLogsEndpoint-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            service=InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS
+        )
+
         db_sg = SecurityGroup.from_security_group_id(
             self, "HotelManagementDbSG",
             security_group_id="sg-030e54916d52c0bd0"
@@ -82,26 +91,6 @@ class UserServiceStack(Stack):
             connection=Port.tcp(5432),
             description="Allow Lambda to connect to RDS Proxy/Postgres"
         )
-
-        try:
-            InterfaceVpcEndpoint.from_interface_vpc_endpoint_attributes(
-                self,
-                "SecretsManagerEndpointImport",
-                vpc_endpoint_id="vpce-0d4457c1b0f9af6d4",
-                port=443
-            )
-        except Exception:
-            pass
-
-        try:
-            InterfaceVpcEndpoint.from_interface_vpc_endpoint_attributes(
-                self,
-                "CloudWatchLogsEndpointImport",
-                vpc_endpoint_id="vpce-08a1046a4263511ea",
-                port=443
-            )
-        except Exception:
-            pass
 
         lambda_role = Role(
             self, f"UserServiceLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
