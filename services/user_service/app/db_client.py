@@ -24,10 +24,12 @@ class HotelManagementDBClient:
         self.proxy_endpoint = proxy_endpoint
 
     def _get_secret(self) -> dict:
+        logger.info("🕵️ About to call boto3.get_secret_value()")
         start = time.time()
         logger.info("🔐 Fetching secret from Secrets Manager...")
         client = boto3.client("secretsmanager", region_name=self.region)
         response = client.get_secret_value(SecretId=self.secret_name)
+        logger.info("✅ Secrets Manager response received")
         elapsed = time.time() - start
         logger.info(f"✅ Secret fetched in {elapsed:.2f}s")
         return json.loads(response["SecretString"])

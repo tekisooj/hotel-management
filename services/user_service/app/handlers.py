@@ -25,9 +25,12 @@ async def get_logged_in_user(
     hotel_management_db_client: HotelManagementDBClient = Depends(get_hotel_management_db_client),
     user_uuid: UUID = Depends(get_current_user_uuid),
 ) -> UserResponse:
+    logger.info(f"🔥 /me endpoint invoked, starting processing UUID={user_uuid}")
+
     start = time.time()
     logger.info(f"➡️ /me called UUID={user_uuid}")
     try:
+        logger.info("🏁 Entering HotelManagementDBClient.get_user()")
         user = hotel_management_db_client.get_user(user_uuid)
         if not user:
             logger.warning("⚠️ User not found")
