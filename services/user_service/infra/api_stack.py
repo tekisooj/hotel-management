@@ -75,15 +75,6 @@ class UserServiceStack(Stack):
             service=InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS
         )
 
-        # ✅ Manually define Cognito IDP endpoint
-        vpc.add_interface_endpoint(
-            f"CognitoIdpEndpoint-{env_name}",
-            service=InterfaceVpcEndpointService(
-                name="com.amazonaws.us-east-1.cognito-idp",
-                port=443
-            )
-        )
-
         # (Optional) STS if Cognito uses assume-role flows
         vpc.add_interface_endpoint(
             f"StsEndpoint-{env_name}",
