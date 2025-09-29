@@ -6,8 +6,8 @@ import boto3
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import create_engine
-from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.exc import OperationalError
 from schemas import UserCreate, UserResponse, UserUpdate
 from models import User
 
@@ -24,83 +24,68 @@ class HotelManagementDBClient:
         self.proxy_endpoint = proxy_endpoint
         self._engine = None
         self._SessionLocal = None
-        self._ssl_args = {}
+
+        # ✅ New: Read SSL certificate path from env
+        self.ssl_cert_path = os.getenv("SSL_CERT_PATH", "/var/task/global-bundle.pem")
+        logger.info(f"🔐 Using SSL cert: {self.ssl_cert_path}")
 
     def _get_secret(self) -> dict:
         logger.info("🕵️ About to call boto3.get_secret_value()")
         start = time.time()
         client = boto3.client("secretsmanager", region_name=self.region)
-        logger.info(f"🔐 Fetching secret {self.secret_name} from Secrets Manager...")
         response = client.get_secret_value(SecretId=self.secret_name)
         elapsed = time.time() - start
         logger.info(f"✅ Secret fetched in {elapsed:.2f}s")
         return json.loads(response["SecretString"])
 
-    def _build_db_url(self) -> URL:
+    def _build_db_url(self) -> str:
         secret = self._get_secret()
         username = secret["username"].strip()
         password = secret["password"].strip()
         dbname = secret["dbname"].strip()
         host = self.proxy_endpoint or secret["host"].strip()
-        port = secret.get("port", 5432)
-
-        # ✅ Path to AWS global RDS CA bundle
-        rds_cert_path = os.path.join(os.path.dirname(__file__), "global-bundle.pem")
-
-        if not os.path.exists(rds_cert_path):
-            raise FileNotFoundError(f"❌ RDS cert not found at: {rds_cert_path}")
-
-        logger.info(f"🔗 Using DB Host: {host}:{port}")
-        logger.info(f"🔐 Using SSL cert: {rds_cert_path}")
-
-        # ✅ SSL verification args
-        self._ssl_args = {
-            "sslmode": "verify-full",
-            "sslrootcert": rds_cert_path,
-        }
-
-        return URL.create(
-            "postgresql+psycopg2",
-            username=username,
-            password=password,
-            host=host,
-            port=port,
-            database=dbname,
-        )
+        url = f"postgresql+psycopg2://{username}:{password}@{host}/{dbname}"
+        logger.info(f"🔗 Built DB URL for host {host}")
+        return url
 
     def _init_engine(self):
-        if not self._engine:
-            start = time.time()
-            logger.info("⚙️ Creating SQLAlchemy engine with SSL...")
+        if self._engine:
+            return
+
+        db_url = self._build_db_url()
+        connect_args = {
+            "sslmode": "verify-full",
+            "sslrootcert": self.ssl_cert_path
+        }
+
+        last_err = None
+        for attempt in range(3):
             try:
-                url = self._build_db_url()
-                self._engine = create_engine(
-                    url,
-                    connect_args=self._ssl_args,
-                    pool_pre_ping=True,
+                logger.info(f"⚙️ Creating SQLAlchemy engine (attempt {attempt + 1})...")
+                engine = create_engine(
+                    db_url,
+                    connect_args=connect_args,
+                    pool_pre_ping=True
                 )
-                self._SessionLocal = sessionmaker(
-                    autocommit=False,
-                    autoflush=False,
-                    bind=self._engine,
-                )
-                logger.info(f"✅ Engine created in {time.time() - start:.2f}s")
-            except Exception:
-                logger.exception("❌ Failed to create SQLAlchemy engine")
-                raise
+                # ✅ Test connection
+                with engine.connect() as conn:
+                    logger.info("✅ Connection test succeeded.")
+                self._engine = engine
+                self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+                return
+            except OperationalError as e:
+                logger.error(f"⚠️ DB connection attempt {attempt + 1} failed: {e}")
+                last_err = e
+                time.sleep(2)
+
+        logger.error("❌ All DB connection attempts failed.")
+        raise last_err if last_err else RuntimeError("Unable to initialize DB engine.")
 
     def get_session(self) -> Session:
         self._init_engine()
-        try:
-            session = self._SessionLocal()
-            logger.info("✅ DB session opened")
-            return session
-        except Exception:
-            logger.exception("❌ Failed to open DB session")
-            raise
+        return self._SessionLocal()
 
     def create_user(self, user: UserCreate) -> UUID:
-        logger.info("🧩 Creating user...")
         session = self.get_session()
         try:
             user_obj = User(
@@ -112,48 +97,36 @@ class HotelManagementDBClient:
             session.add(user_obj)
             session.commit()
             session.refresh(user_obj)
-            logger.info(f"✅ User created UUID={user_obj.uuid}")
+            logger.info(f"✅ User created: {user_obj.uuid}")
             return UserResponse.model_validate(user_obj).uuid
         finally:
             session.close()
-            logger.info("🔒 Session closed after create_user")
 
     def get_user(self, user_uuid: UUID) -> UserResponse | None:
-        start = time.time()
-        logger.info(f"🔍 Fetching user {user_uuid}")
         session = self.get_session()
         try:
+            logger.info(f"🔍 Fetching user {user_uuid}")
             user = session.query(User).filter(User.uuid == user_uuid).first()
-            elapsed = time.time() - start
-            if user:
-                logger.info(f"✅ User found ({user.email}) in {elapsed:.2f}s")
-                return UserResponse.model_validate(user)
-            logger.info(f"⚠️ User {user_uuid} not found after {elapsed:.2f}s")
-            return None
-        except Exception:
-            logger.exception(f"❌ Error fetching user {user_uuid}")
-            raise
+            if not user:
+                logger.warning(f"⚠️ User {user_uuid} not found")
+                return None
+            return UserResponse.model_validate(user)
         finally:
             session.close()
-            logger.info("🔒 Session closed after get_user")
 
     def delete_user(self, user_uuid: UUID) -> None:
-        logger.info(f"🗑️ Deleting user {user_uuid}")
         session = self.get_session()
         try:
             user = session.query(User).filter(User.uuid == user_uuid).first()
             if not user:
-                logger.warning(f"⚠️ User {user_uuid} not found for deletion")
                 raise HTTPException(status_code=404, detail="User not found")
             session.delete(user)
             session.commit()
-            logger.info(f"✅ User {user_uuid} deleted")
+            logger.info(f"🗑️ Deleted user {user_uuid}")
         finally:
             session.close()
-            logger.info("🔒 Session closed after delete_user")
 
     def update_user(self, user_uuid: UUID, update_data: UserUpdate) -> UserResponse | None:
-        logger.info(f"✏️ Updating user {user_uuid}")
         session = self.get_session()
         try:
             user = session.query(User).filter(User.uuid == user_uuid).first()
@@ -164,8 +137,7 @@ class HotelManagementDBClient:
                 setattr(user, field, value)
             session.commit()
             session.refresh(user)
-            logger.info(f"✅ User {user_uuid} updated")
+            logger.info(f"✅ Updated user {user_uuid}")
             return UserResponse.model_validate(user)
         finally:
             session.close()
-            logger.info("🔒 Session closed after update_user")
