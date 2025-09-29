@@ -1,7 +1,7 @@
 from aws_cdk import (
     Stack,
     Duration,
-    CfnOutput,
+    CfnOutput
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
 from aws_cdk.aws_apigateway import (
@@ -11,7 +11,7 @@ from aws_cdk.aws_apigateway import (
     MockIntegration,
     IntegrationResponse,
     MethodResponse,
-    PassthroughBehavior,
+    PassthroughBehavior
 )
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy
 from aws_cdk.aws_secretsmanager import Secret
@@ -22,12 +22,12 @@ from aws_cdk.aws_ec2 import (
     SubnetType,
     Port,
     InterfaceVpcEndpointAwsService,
+    InterfaceVpcEndpointService
 )
 from constructs import Construct
 
 
 def add_cors_options(resource):
-    """Adds CORS preflight OPTIONS method"""
     resource.add_method(
         "OPTIONS",
         MockIntegration(
@@ -61,97 +61,99 @@ class UserServiceStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, env_name: str, pr_number: str | None = None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
 
-        self.env_name = env_name
-
-        # ✅ Use correct VPC
+        # 🔹 Load existing VPC (your default one)
         vpc = Vpc.from_lookup(self, "HotelManagementVpc", vpc_id="vpc-0b28dea117c8220de")
 
-        # ✅ Interface endpoints (for private Lambda access to AWS APIs)
+        # 🔹 Add essential VPC interface endpoints
         vpc.add_interface_endpoint(
             f"SecretsManagerEndpoint-{env_name}",
-            service=InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+            service=InterfaceVpcEndpointAwsService.SECRETS_MANAGER
         )
 
         vpc.add_interface_endpoint(
             f"CloudWatchLogsEndpoint-{env_name}",
-            service=InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+            service=InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS
         )
 
-        vpc.add_interface_endpoint(
-            f"StsEndpoint-{env_name}",
-            service=InterfaceVpcEndpointAwsService.STS,
-        )
-
+        # ✅ Manually define Cognito IDP endpoint
         vpc.add_interface_endpoint(
             f"CognitoIdpEndpoint-{env_name}",
-            service=InterfaceVpcEndpointAwsService.COGNITO_IDP,
+            service=InterfaceVpcEndpointService(
+                name="com.amazonaws.us-east-1.cognito-idp",
+                port=443
+            )
         )
 
-        # ✅ DB security group
+        # (Optional) STS if Cognito uses assume-role flows
+        vpc.add_interface_endpoint(
+            f"StsEndpoint-{env_name}",
+            service=InterfaceVpcEndpointService(
+                name="com.amazonaws.us-east-1.sts",
+                port=443
+            )
+        )
+
+        # 🔐 Database SG and Lambda SG
         db_sg = SecurityGroup.from_security_group_id(
-            self,
-            "HotelManagementDbSG",
-            security_group_id="sg-030e54916d52c0bd0",
+            self, "HotelManagementDbSG",
+            security_group_id="sg-030e54916d52c0bd0"
         )
 
         lambda_sg = SecurityGroup(
             self,
-            f"UserServiceLambdaSG-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            f"UserServiceLambdaSG-{env_name}",
             vpc=vpc,
             allow_all_outbound=True,
             description="Security group for UserService Lambda",
         )
 
-        # Allow Lambda to connect to DB
         db_sg.add_ingress_rule(
             peer=lambda_sg,
             connection=Port.tcp(5432),
-            description="Allow Lambda to access RDS Proxy / PostgreSQL",
+            description="Allow Lambda to connect to RDS Proxy/Postgres"
         )
 
-        # ✅ IAM Role
+        # 🪪 Lambda IAM Role
         lambda_role = Role(
-            self,
-            f"UserServiceLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            self, f"UserServiceLambdaRole-{env_name}",
             assumed_by=ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
                 ManagedPolicy.from_aws_managed_policy_name("AmazonRDSDataFullAccess"),
                 ManagedPolicy.from_aws_managed_policy_name("SecretsManagerReadWrite"),
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaVPCAccessExecutionRole"),
-            ],
+            ]
         )
 
-        # ✅ Secrets
-        db_name = f"hotel-management-database-{self.env_name if self.env_name == 'prod' else 'int'}"
+        # 🧠 Environment-specific settings
+        db_name = f"hotel-management-database-{env_name}"
         db_secret = Secret.from_secret_name_v2(self, "DbSecret", secret_name=db_name)
 
-        if self.env_name == "prod":
+        if env_name == "prod":
             proxy_endpoint = "hotel-management-db-proxy-prod.proxy-capkwmowwxnt.us-east-1.rds.amazonaws.com"
-            proxy_role_arn = "arn:aws:iam::914242301564:role/service-role/rds-proxy-role-1758401519769"
             user_pool_id = "us-east-1_Wtvh2rdSQ"
             audience = "7226gqpnghn0q22ec2ill399lv"
             app_client_id = "7226gqpnghn0q22ec2ill399lv"
         else:
             proxy_endpoint = "hotel-management-db-proxy-int.proxy-capkwmowwxnt.us-east-1.rds.amazonaws.com"
-            proxy_role_arn = "arn:aws:iam::914242301564:role/service-role/rds-proxy-role-1758401469124"
             user_pool_id = "us-east-1_DDS5D565p"
             audience = "la13fgbn7avmni0f84pu5lk79"
             app_client_id = "la13fgbn7avmni0f84pu5lk79"
 
-        proxy_role = Role.from_role_arn(self, "ImportedProxyRole", proxy_role_arn)
-        db_secret.grant_read(proxy_role)
-
+        # 🔑 JWKS Secret
         jwks_secret_name = f"cognito-jwks-{user_pool_id}"
-        jwks_secret = Secret.from_secret_name_v2(self, "CognitoJwksSecret", secret_name=jwks_secret_name)
+        jwks_secret = Secret.from_secret_name_v2(
+            self, "CognitoJwksSecret",
+            secret_name=jwks_secret_name
+        )
         jwks_secret.grant_read(lambda_role)
 
+        # 🌍 JWKS URL
         jwks_url = f"https://cognito-idp.us-east-1.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
 
-        # ✅ Lambda Function
+        # 🧩 Lambda Function
         lambda_function = Function(
-            self,
-            f"UserServiceFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            self, f"UserServiceFunction-{env_name}",
             runtime=Runtime.PYTHON_3_11,
             handler="main.handler",
             code=Code.from_asset("services/user_service/app"),
@@ -159,7 +161,7 @@ class UserServiceStack(Stack):
             timeout=Duration.seconds(60),
             memory_size=1024,
             environment={
-                "USER_SERVICE_ENV": self.env_name,
+                "USER_SERVICE_ENV": env_name,
                 "HOTEL_MANAGEMENT_DATABASE_SECRET_NAME": db_name,
                 "AUDIENCE": audience,
                 "JWKS_URL": jwks_url,
@@ -170,26 +172,26 @@ class UserServiceStack(Stack):
                 "JWKS_SECRET_NAME": jwks_secret_name,
             },
             vpc=vpc,
-            security_groups=[lambda_sg],
-            # ✅ Use private subnets with NAT access
             vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS),
+            security_groups=[lambda_sg],
         )
 
-        # ✅ API Gateway
+        # 🌐 API Gateway
         api = RestApi(
-            self,
-            f"UserServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            rest_api_name=f"user-service-api-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            description="API Gateway exposing user service Lambda",
+            self, f"UserServiceApi-{env_name}",
+            rest_api_name=f"user-service-api-{env_name}",
+            description="API Gateway exposing User Service Lambda",
             endpoint_types=[EndpointType.REGIONAL],
         )
 
         integration = LambdaIntegration(lambda_function, proxy=True)
 
+        # Define routes
         resource_me = api.root.add_resource("me")
         resource_user = api.root.add_resource("user")
         resource_user_id = resource_user.add_resource("{user_uuid}")
 
+        # Add methods
         resource_me.add_method("GET", integration)
         add_cors_options(resource_me)
 
@@ -201,5 +203,6 @@ class UserServiceStack(Stack):
         resource_user_id.add_method("PATCH", integration)
         add_cors_options(resource_user_id)
 
-        # ✅ Outputs
+        # Output
         CfnOutput(self, "DbProxyEndpoint", value=proxy_endpoint)
+        CfnOutput(self, "ApiUrl", value=api.url)
