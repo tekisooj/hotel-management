@@ -28,7 +28,7 @@ class HotelManagementDBClient:
         # ✅ Absolute PEM path (Lambda-safe)
         self.ssl_cert_path = os.getenv(
             "SSL_CERT_PATH",
-            os.path.join(os.path.dirname(__file__), "global-bundle.pem")
+            os.path.join(os.path.dirname(__file__), "AmazonRootCA1.pem")
         )
 
         # ✅ Log path + existence check
