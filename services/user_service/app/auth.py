@@ -7,91 +7,73 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 
 class CognitoAuthMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware for validating Cognito JWT tokens.
-    Loads JWKS keys from AWS Secrets Manager (no internet required).
-    """
+    """Middleware for validating AWS Cognito JWT tokens."""
 
     def __init__(self, app):
         super().__init__(app)
 
-        # --- Environment Variables ---
+        # --- Environment ---
         self.region = os.getenv("COGNITO_REGION")
         self.audience = os.getenv("AUDIENCE")
         self.secret_name = os.getenv("JWKS_SECRET_NAME")
 
         if not self.region or not self.secret_name or not self.audience:
-            raise Exception("❌ Missing required environment variables for Cognito verification.")
+            raise Exception("❌ Missing env vars: COGNITO_REGION, JWKS_SECRET_NAME, AUDIENCE")
 
-        # --- Load JWKS from Secrets Manager ---
+        # --- Load JWKS ---
         self.jwks = self._load_jwks_from_secrets_manager()
-        if not self.jwks:
-            raise Exception("❌ Failed to load JWKS keys from Secrets Manager.")
-
-        # Optional log for verification (you can remove later)
-        print("✅ Loaded JWKS key IDs:", [k.get("kid") for k in self.jwks])
+        print(f"✅ JWKS loaded successfully ({len(self.jwks)} keys): {[k['kid'] for k in self.jwks]}")
 
     def _load_jwks_from_secrets_manager(self):
-        """Load and safely decode JWKS from Secrets Manager."""
-        try:
-            sm = boto3.client("secretsmanager", region_name=self.region)
-            secret = sm.get_secret_value(SecretId=self.secret_name)
-            raw_secret = secret["SecretString"]
+        """Retrieve JWKS secret from AWS Secrets Manager."""
+        sm = boto3.client("secretsmanager", region_name=self.region)
+        secret = sm.get_secret_value(SecretId=self.secret_name)
 
-            # Try to parse once
-            parsed = json.loads(raw_secret)
+        raw = secret.get("SecretString")
+        if not raw:
+            raise Exception("SecretString is missing in JWKS secret")
 
-            # Handle double-encoded JSON (common issue)
-            if isinstance(parsed, str):
-                parsed = json.loads(parsed)
+        data = json.loads(raw)
+        if not isinstance(data, dict) or "keys" not in data:
+            raise Exception("JWKS secret must contain a 'keys' field")
 
-            keys = parsed.get("keys")
-            if not keys:
-                print("⚠️ JWKS secret does not contain 'keys' array.")
-            return keys
-
-        except Exception as e:
-            print(f"❌ Failed to load or parse JWKS secret: {str(e)}")
-            return None
+        return data["keys"]
 
     async def dispatch(self, request: Request, call_next):
-        """Verify JWT token on each request."""
+        """Validate Cognito JWT from Authorization header."""
         auth_header = request.headers.get("Authorization")
-
-        # --- Check header ---
         if not auth_header or not auth_header.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
 
         token = auth_header.split(" ")[1]
 
         try:
-            # --- Decode header & find matching key ---
             header = jwt.get_unverified_header(token)
-            key = next(k for k in self.jwks if k["kid"] == header["kid"])
+            token_kid = header.get("kid")
+            if not token_kid:
+                raise HTTPException(status_code=403, detail="Missing KID in token header")
 
-            # --- Decode and verify JWT ---
+            key = next(k for k in self.jwks if k["kid"] == token_kid)
+
             payload = jwt.decode(
                 token,
                 key,
                 algorithms=["RS256"],
                 audience=self.audience,
-                options={"verify_exp": True}
+                options={
+                    "verify_exp": True,
+                    "verify_at_hash": False  # ✅ Disable at_hash validation for ID tokens
+                }
             )
 
-            token_use = payload.get("token_use")
-            if token_use not in ("id", "access"):
-                raise HTTPException(status_code=401, detail=f"Invalid token type: {token_use}")
+            if payload.get("token_use") not in ("id", "access"):
+                raise HTTPException(status_code=401, detail=f"Invalid token type: {payload.get('token_use')}")
 
-            # --- Store payload in request.state ---
             request.state.user = payload
 
-        except StopIteration:
-            raise HTTPException(status_code=403, detail="Unknown KID — JWKS mismatch")
         except HTTPException:
             raise
         except Exception as e:
-            # Any unexpected validation failure
             raise HTTPException(status_code=403, detail=f"Token validation failed: {str(e)}")
 
-        # --- Continue with request ---
         return await call_next(request)
