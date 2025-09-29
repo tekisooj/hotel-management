@@ -22,7 +22,8 @@ from aws_cdk.aws_ec2 import (
     SubnetSelection,
     SubnetType,
     Port,
-    InterfaceVpcEndpointAwsService
+    InterfaceVpcEndpointAwsService,
+    Subnet
 )
 
 
@@ -61,18 +62,34 @@ class UserServiceStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
         self.env_name = env_name
 
-        vpc = Vpc.from_lookup(self, "HotelManagementVpc", vpc_id="vpc-0b28dea117c8220de")
+        # ✅ FIX: Use the SAME VPC as RDS Proxy
+        # Go to RDS Console → Proxy → Network & Security → copy the VPC ID here:
+        vpc = Vpc.from_lookup(
+            self,
+            "HotelManagementVpc",
+            vpc_id="vpc-0b28dea117c8220de"
+        )
 
-        secrets_manager_endpoint = vpc.add_interface_endpoint(
+        # ✅ Use PRIVATE subnets (with NAT) for Lambda
+        subnet_selection = SubnetSelection(
+            subnets=[
+                Subnet.from_subnet_id(self, "PrivateSubnet1", "subnet-096c716c27f2a15b4"),
+                Subnet.from_subnet_id(self, "PrivateSubnet2", "subnet-0ef682ee356c235b2")
+            ]
+        )
+
+        # ✅ Ensure endpoints exist for Secrets Manager & CloudWatch Logs
+        vpc.add_interface_endpoint(
             f"SecretsManagerEndpoint-{env_name}{f'-{pr_number}' if pr_number else ''}",
             service=InterfaceVpcEndpointAwsService.SECRETS_MANAGER
         )
 
-        logs_endpoint = vpc.add_interface_endpoint(
+        vpc.add_interface_endpoint(
             f"CloudWatchLogsEndpoint-{env_name}{f'-{pr_number}' if pr_number else ''}",
             service=InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS
         )
 
+        # ✅ Security groups
         db_sg = SecurityGroup.from_security_group_id(
             self, "HotelManagementDbSG",
             security_group_id="sg-030e54916d52c0bd0"
@@ -92,6 +109,7 @@ class UserServiceStack(Stack):
             description="Allow Lambda to connect to RDS Proxy/Postgres"
         )
 
+        # ✅ IAM Role
         lambda_role = Role(
             self, f"UserServiceLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
             assumed_by=ServicePrincipal("lambda.amazonaws.com"),
@@ -120,7 +138,11 @@ class UserServiceStack(Stack):
             app_client_id = "la13fgbn7avmni0f84pu5lk79"
 
         jwks_secret_name = f"cognito-jwks-{user_pool_id}"
-        jwks_secret = Secret.from_secret_name_v2(self, "CognitoJwksSecret", secret_name="cognito-jwks-us-east-1_DDS5D565p")
+        jwks_secret = Secret.from_secret_name_v2(
+            self,
+            "CognitoJwksSecret",
+            secret_name="cognito-jwks-us-east-1_DDS5D565p"
+        )
         jwks_secret.grant_read(lambda_role)
 
         proxy_role = Role.from_role_arn(self, "ImportedProxyRole", proxy_role_arn)
@@ -128,6 +150,7 @@ class UserServiceStack(Stack):
 
         jwks_url = f"https://cognito-idp.us-east-1.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
 
+        # ✅ Lambda in same VPC and subnets as RDS Proxy
         lambda_function = Function(
             self, f"UserServiceFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
             runtime=Runtime.PYTHON_3_11,
@@ -146,13 +169,13 @@ class UserServiceStack(Stack):
                 "COGNITO_REGION": "us-east-1",
                 "USER_POOL_ID": user_pool_id,
                 "JWKS_SECRET_NAME": jwks_secret_name
-
             },
             vpc=vpc,
             security_groups=[lambda_sg],
-            vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS),
+            vpc_subnets=subnet_selection,
         )
 
+        # ✅ API Gateway setup
         api = RestApi(
             self, f"UserServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
             rest_api_name=f"user-service-api-{env_name}{f'-{pr_number}' if pr_number else ''}",
