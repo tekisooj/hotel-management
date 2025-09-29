@@ -67,7 +67,7 @@ class UserServiceStack(Stack):
         vpc = Vpc.from_lookup(
             self,
             "HotelManagementVpc",
-            vpc_id="vpc-0b28dea117c8220de"
+            vpc_id="vpc-00688d23d81374471"
         )
 
         # ✅ Use PRIVATE subnets (with NAT) for Lambda
