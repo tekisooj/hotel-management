@@ -19,6 +19,7 @@ from constructs import Construct
 from aws_cdk.aws_ec2 import (
     Vpc,
     SecurityGroup,
+    Subnet,
     SubnetSelection,
     Port,
     InterfaceVpcEndpointAwsService
@@ -157,11 +158,13 @@ class UserServiceStack(Stack):
             },
             vpc=vpc,
             # ✅ Use subnets in the same VPC as RDS Proxy
-            vpc_subnets=SubnetSelection(subnet_ids=[
-                "subnet-0d0b9a07131d021a8",  # us-east-1a
-                "subnet-0ab422987b783ffa5",  # us-east-1b
-                "subnet-042e756efa5846361",  # us-east-1c
-            ]),
+            vpc_subnets=SubnetSelection(
+                subnets=[
+                    Subnet.from_subnet_id(self, "SubnetA", "subnet-0d0b9a07131d021a8"),
+                    Subnet.from_subnet_id(self, "SubnetB", "subnet-0ab422987b783ffa5"),
+                    Subnet.from_subnet_id(self, "SubnetC", "subnet-042e756efa5846361"),
+                ]
+            ),
             security_groups=[lambda_sg],
         )
 
