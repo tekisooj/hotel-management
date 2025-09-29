@@ -41,7 +41,8 @@ class HotelManagementDBClient:
         port = str(secret["port"]).strip()
         dbname = secret["dbname"].strip()
         host = self.proxy_endpoint if self.proxy_endpoint else secret["host"].strip()
-        url = f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}"
+        url = f"postgresql+psycopg2://{username}:{password}@{self.proxy_endpoint}/{dbname}?sslmode=require"
+
         logger.info(f"🔗 Built DB URL → {host}:{port}/{dbname}")
         return url
 
