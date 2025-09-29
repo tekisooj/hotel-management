@@ -119,6 +119,10 @@ class UserServiceStack(Stack):
             audience = "la13fgbn7avmni0f84pu5lk79"
             app_client_id = "la13fgbn7avmni0f84pu5lk79"
 
+        jwks_secret_name = f"cognito-jwks-{user_pool_id}"
+        jwks_secret = Secret.from_secret_name_v2(self, "CognitoJwksSecret", secret_name="cognito-jwks-us-east-1_DDS5D565p")
+        jwks_secret.grant_read(lambda_role)
+
         proxy_role = Role.from_role_arn(self, "ImportedProxyRole", proxy_role_arn)
         db_secret.grant_read(proxy_role)
 
@@ -140,7 +144,8 @@ class UserServiceStack(Stack):
                 "APP_CLIENT_ID": app_client_id,
                 "DB_PROXY_ENDPOINT": proxy_endpoint,
                 "COGNITO_REGION": "us-east-1",
-                "USER_POOL_ID": user_pool_id
+                "USER_POOL_ID": user_pool_id,
+                "JWKS_SECRET_NAME": jwks_secret_name
 
             },
             vpc=vpc,
