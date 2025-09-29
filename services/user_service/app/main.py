@@ -11,6 +11,7 @@ from config import (
     user_service_prod_configuration,
 )
 from cognito_client import CognitoClient
+from auth import CognitoAuthMiddleware
 
 
 # --- Logger Setup ---
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
         app_client_id=app_config.app_client_id,
     )
 
+    app.add_middleware(CognitoAuthMiddleware)
     # --- Include Routes ---
     app.include_router(router)
 

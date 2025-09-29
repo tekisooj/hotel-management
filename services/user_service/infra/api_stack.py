@@ -139,6 +139,9 @@ class UserServiceStack(Stack):
                 "JWKS_URL": jwks_url,
                 "APP_CLIENT_ID": app_client_id,
                 "DB_PROXY_ENDPOINT": proxy_endpoint,
+                "COGNITO_REGION": "us-east-1",
+                "USER_POOL_ID": user_pool_id
+
             },
             vpc=vpc,
             security_groups=[lambda_sg],
