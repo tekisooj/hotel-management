@@ -82,7 +82,7 @@ class TestServiceStack(Stack):
                 "REGION": "us-east-1",
                 "DB_SECRET_NAME": db_secret_name,
                 "DB_PROXY_ENDPOINT": proxy_endpoint,
-                "SSL_CERT_PATH": "/var/task/global-bundle.pem"  # ✅ Path inside Lambda container
+                "SSL_CERT_PATH": "/var/task/AmazonRootCA1.pem"  # ✅ Path inside Lambda container
             },
             vpc=vpc,
             security_groups=[lambda_sg],

@@ -71,7 +71,7 @@ class HotelManagementDBClient:
 
             try:
                 connect_args = {
-                    "sslmode": "verify-ca",  # ✅ safer for RDS proxy hostnames
+                    "sslmode": "verify-full",  # ✅ safer for RDS proxy hostnames
                     "sslrootcert": self.ssl_cert_path
                 }
 
