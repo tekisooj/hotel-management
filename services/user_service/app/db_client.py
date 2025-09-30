@@ -21,23 +21,23 @@ class HotelManagementDBClient:
 
         self.secret_name = hotel_management_database_secret_name
         self.region = region
+        self.proxy_endpoint = proxy_endpoint
         self._engine = None
         self._SessionLocal = None
-        self.proxy_endpoint = proxy_endpoint
 
-        # ✅ Absolute PEM path (Lambda-safe)
+        # ✅ Path to SSL certificate
         self.ssl_cert_path = os.getenv(
             "SSL_CERT_PATH",
             os.path.join(os.path.dirname(__file__), "AmazonRootCA1.pem")
         )
 
-        # ✅ Log path + existence check
         logger.info(f"📂 SSL cert path: {self.ssl_cert_path}")
         logger.info(f"📄 PEM file exists: {os.path.exists(self.ssl_cert_path)}")
 
         if not os.path.exists(self.ssl_cert_path):
             logger.warning("⚠️ SSL certificate not found — secure connection may fail.")
 
+    # ✅ Fetch DB credentials
     def _get_secret(self) -> dict:
         logger.info("🕵️ Fetching DB credentials from Secrets Manager...")
         start = time.time()
@@ -47,6 +47,7 @@ class HotelManagementDBClient:
         logger.info(f"✅ Secret fetched in {elapsed:.2f}s")
         return json.loads(response["SecretString"])
 
+    # ✅ Build PostgreSQL URL
     def _build_db_url(self) -> str:
         secret = self._get_secret()
         username = secret["username"].strip()
@@ -58,6 +59,7 @@ class HotelManagementDBClient:
         logger.info(f"🔗 Built DB URL for host {host}")
         return url
 
+    # ✅ Create SQLAlchemy engine with retry logic
     def _init_engine(self):
         if self._engine:
             return
@@ -71,27 +73,29 @@ class HotelManagementDBClient:
 
             try:
                 connect_args = {
-                    # ✅ safer for RDS Proxy, avoids hostname CN mismatch
-                    "sslmode": "require",
+                    "sslmode": "verify-full",           # ✅ Required for RDS Proxy hostnames
                     "sslrootcert": self.ssl_cert_path
                 }
 
                 engine = create_engine(
                     self._build_db_url(),
-                    pool_pre_ping=True,
+                    pool_pre_ping=True,                 # ✅ Avoid stale proxy connections
+                    pool_recycle=300,                   # ✅ Refresh every 5 minutes
                     connect_args=connect_args
                 )
 
-                # ✅ Test the connection immediately
+                # ✅ Test connection immediately
                 with engine.connect() as conn:
+                    conn.execute("SELECT 1")
                     logger.info("✅ Database connection test succeeded.")
-                    self._engine = engine
-                    self._SessionLocal = sessionmaker(
-                        autocommit=False,
-                        autoflush=False,
-                        bind=self._engine
-                    )
-                    return
+
+                self._engine = engine
+                self._SessionLocal = sessionmaker(
+                    autocommit=False,
+                    autoflush=False,
+                    bind=self._engine
+                )
+                return
 
             except Exception as e:
                 last_err = e
@@ -101,6 +105,7 @@ class HotelManagementDBClient:
         logger.error("❌ All DB connection attempts failed.")
         raise last_err if last_err else RuntimeError("Unable to initialize DB engine.")
 
+    # ✅ Session manager
     def get_session(self) -> Session:
         self._init_engine()
         start = time.time()
@@ -112,6 +117,7 @@ class HotelManagementDBClient:
             logger.exception("❌ Failed to open DB session")
             raise
 
+    # ✅ Create user
     def create_user(self, user: UserCreate) -> UUID:
         logger.info("🧩 Creating user...")
         session = self.get_session()
@@ -131,6 +137,7 @@ class HotelManagementDBClient:
             session.close()
             logger.info("🔒 Session closed after create_user")
 
+    # ✅ Get user
     def get_user(self, user_uuid: UUID) -> UserResponse | None:
         logger.info(f"🏁 Entering HotelManagementDBClient.get_user() for {user_uuid}")
         session = self.get_session()
@@ -145,6 +152,7 @@ class HotelManagementDBClient:
             session.close()
             logger.info("🔒 Session closed after get_user")
 
+    # ✅ Delete user
     def delete_user(self, user_uuid: UUID) -> None:
         logger.info(f"🗑️ Deleting user {user_uuid}")
         session = self.get_session()
@@ -159,6 +167,7 @@ class HotelManagementDBClient:
             session.close()
             logger.info("🔒 Session closed after delete_user")
 
+    # ✅ Update user
     def update_user(self, user_uuid: UUID, update_data: UserUpdate) -> UserResponse | None:
         logger.info(f"✏️ Updating user {user_uuid}")
         session = self.get_session()
