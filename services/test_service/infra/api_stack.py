@@ -60,20 +60,19 @@ class TestServiceStack(Stack):
             else "hotel-management-db-proxy-int.proxy-capkwmowwxnt.us-east-1.rds.amazonaws.com"
         )
 
-        # ✅ Bundle PEM file for SSL connection
-        pem_path = os.path.join("services", "test_service", "app", "global-bundle.pem")
+        # ✅ Include PEM file for SSL
+        pem_path = os.path.join("services", "test_service", "app", "AmazonRootCA1.pem")
         if not os.path.exists(pem_path):
             print(f"⚠️ Warning: PEM file not found at {pem_path}. Make sure it exists before deploy.")
 
-        # ✅ Lambda Function definition
+        # ✅ Lambda Function
         lambda_function = Function(
             self, f"TestServiceFunction-{env_name}",
             runtime=Runtime.PYTHON_3_11,
             handler="main.app",
             code=Code.from_asset(
                 "services/test_service/app",
-                exclude=["__pycache__"],
-                # PEM file will be included automatically since it's in the folder
+                exclude=["__pycache__"]
             ),
             role=lambda_role,
             timeout=Duration.seconds(20),
@@ -82,7 +81,7 @@ class TestServiceStack(Stack):
                 "REGION": "us-east-1",
                 "DB_SECRET_NAME": db_secret_name,
                 "DB_PROXY_ENDPOINT": proxy_endpoint,
-                "SSL_CERT_PATH": "/var/task/AmazonRootCA1.pem"  # ✅ Path inside Lambda container
+                "SSL_CERT_PATH": "/var/task/AmazonRootCA1.pem"  # ✅ Lambda container path
             },
             vpc=vpc,
             security_groups=[lambda_sg],

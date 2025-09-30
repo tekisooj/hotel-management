@@ -71,7 +71,8 @@ class HotelManagementDBClient:
 
             try:
                 connect_args = {
-                    "sslmode": "verify-full",  # ✅ safer for RDS proxy hostnames
+                    # ✅ safer for RDS Proxy, avoids hostname CN mismatch
+                    "sslmode": "require",
                     "sslrootcert": self.ssl_cert_path
                 }
 
@@ -85,7 +86,11 @@ class HotelManagementDBClient:
                 with engine.connect() as conn:
                     logger.info("✅ Database connection test succeeded.")
                     self._engine = engine
-                    self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
+                    self._SessionLocal = sessionmaker(
+                        autocommit=False,
+                        autoflush=False,
+                        bind=self._engine
+                    )
                     return
 
             except Exception as e:
