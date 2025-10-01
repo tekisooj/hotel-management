@@ -80,7 +80,7 @@ class HotelManagementDBClient:
                 engine = create_engine(
                     self._build_db_url(),
                     pool_pre_ping=True,                 # ✅ Avoid stale proxy connections
-                    pool_recycle=300,                   # ✅ Refresh every 5 minutes
+                    pool_recycle=60,                   # ✅ Refresh every 5 minutes
                     connect_args=connect_args
                 )
 
