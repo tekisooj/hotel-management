@@ -43,8 +43,11 @@ class HotelManagementDBClient:
     def _discover_cert_bundle(self) -> Optional[str]:
         candidates = [
             os.getenv("SSL_CERT_PATH"),
+            str(Path(os.getenv("LAMBDA_TASK_ROOT", "")) / "us-east-1-bundle.pem"),
             str(Path(os.getenv("LAMBDA_TASK_ROOT", "")) / "certs" / "us-east-1-bundle.pem"),
+            "/app/us-east-1-bundle.pem",
             str(Path("/etc/pki/tls/certs/ca-bundle.crt")),
+            str(Path(__file__).resolve().with_name("us-east-1-bundle.pem")),
             str(Path(__file__).resolve().parent / "certs" / "us-east-1-bundle.pem"),
         ]
         for candidate in candidates:
@@ -152,3 +155,4 @@ class HotelManagementDBClient:
             return UserResponse.model_validate(user)
         finally:
             session.close()
+
