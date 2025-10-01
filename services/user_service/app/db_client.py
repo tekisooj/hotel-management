@@ -84,11 +84,6 @@ class HotelManagementDBClient:
                     connect_args=connect_args
                 )
 
-                # ✅ Test connection immediately
-                with engine.connect() as conn:
-                    conn.execute("SELECT 1")
-                    logger.info("✅ Database connection test succeeded.")
-
                 self._engine = engine
                 self._SessionLocal = sessionmaker(
                     autocommit=False,
