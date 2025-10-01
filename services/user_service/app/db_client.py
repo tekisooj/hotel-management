@@ -21,40 +21,40 @@ class HotelManagementDBClient:
 
         self.secret_name = hotel_management_database_secret_name
         self.region = region
-        self._engine = None
-        self._SessionLocal = None
         self.proxy_endpoint = proxy_endpoint
 
-        # Prefer the official RDS bundle; fall back to AmazonRootCA1 if needed
-        # Paths are relative to the Lambda deployment root (/var/task)
-        default_bundle_candidates = [
+        self._engine = None
+        self._SessionLocal = None
+
+        # Prefer official RDS bundle; fall back to AmazonRootCA1
+        candidates = [
             os.getenv("SSL_CERT_PATH"),
             os.path.join(os.path.dirname(__file__), "rds-combined-ca-bundle.pem"),
             os.path.join(os.path.dirname(__file__), "AmazonRootCA1.pem"),
         ]
-        self.ssl_cert_path = next((p for p in default_bundle_candidates if p and os.path.exists(p)), None)
+        self.ssl_cert_path = next((p for p in candidates if p and os.path.exists(p)), None)
 
         if self.ssl_cert_path:
             logger.info(f"📂 Using SSL bundle: {self.ssl_cert_path}")
         else:
-            logger.warning("⚠️ No SSL bundle found alongside the code. TLS validation may fail.")
+            logger.warning("⚠️ No SSL bundle found. TLS validation may fail.")
 
     def _get_secret(self) -> dict:
         logger.info("🕵️ Fetching DB credentials from Secrets Manager...")
-        start = time.time()
+        t0 = time.time()
         client = boto3.client("secretsmanager", region_name=self.region)
         resp = client.get_secret_value(SecretId=self.secret_name)
-        elapsed = time.time() - start
-        logger.info(f"✅ Secret fetched in {elapsed:.2f}s")
+        logger.info(f"✅ Secret fetched in {time.time() - t0:.2f}s")
         return json.loads(resp["SecretString"])
 
     def _build_db_url(self) -> str:
-        secret = self._get_secret()
-        username = secret["username"].strip()
-        password = secret["password"].strip()
-        dbname = secret["dbname"].strip()
-        host = (self.proxy_endpoint or secret["host"]).strip()
+        s = self._get_secret()
+        username = s["username"].strip()
+        password = s["password"].strip()
+        dbname = s["dbname"].strip()
+        host = (self.proxy_endpoint or s["host"]).strip()
 
+        # IMPORTANT: no query string here (no ?use_native_hstore=...)
         url = f"postgresql+psycopg2://{username}:{password}@{host}/{dbname}"
         logger.info(f"🔗 Built DB URL for host {host}")
         return url
@@ -63,31 +63,26 @@ class HotelManagementDBClient:
         if self._engine:
             return
 
-        retries = 3
-        delay = 2.0
         last_err = None
-
-        for attempt in range(1, retries + 1):
+        for attempt in range(1, 4):
             logger.info(f"⚙️ Creating SQLAlchemy engine (attempt {attempt})...")
-
             try:
-                connect_args = {
-                    "sslmode": "verify-full",  # verify hostname + CA
-                }
+                connect_args = {"sslmode": "verify-full"}
                 if self.ssl_cert_path:
                     connect_args["sslrootcert"] = self.ssl_cert_path
 
-                # IMPORTANT: pass the dialect flag here (not in the DSN / URL)
+                # PASS THE DIALECT OPTION HERE, NOT IN URL/DSN!
                 engine = create_engine(
                     self._build_db_url(),
                     pool_pre_ping=True,
                     connect_args=connect_args,
-                    use_native_hstore=False,   # <-- prevents hstore OID lookup on connect
+                    **{"use_native_hstore": False},  # <- dialect kwarg
                 )
 
                 # Immediate health check
-                with engine.connect() as conn:
+                with engine.connect() as _:
                     logger.info("✅ Database connection test succeeded.")
+
                 self._engine = engine
                 self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
                 return
@@ -95,17 +90,17 @@ class HotelManagementDBClient:
             except Exception as e:
                 last_err = e
                 logger.exception(f"⚠️ DB connection attempt {attempt} failed: {e}")
-                time.sleep(delay)
+                time.sleep(2)
 
         logger.error("❌ All DB connection attempts failed.")
         raise last_err if last_err else RuntimeError("Unable to initialize DB engine.")
 
     def get_session(self) -> Session:
         self._init_engine()
-        start = time.time()
+        t0 = time.time()
         try:
             session = self._SessionLocal()
-            logger.info(f"✅ DB session opened in {time.time() - start:.2f}s")
+            logger.info(f"✅ DB session opened in {time.time() - t0:.2f}s")
             return session
         except Exception:
             logger.exception("❌ Failed to open DB session")
