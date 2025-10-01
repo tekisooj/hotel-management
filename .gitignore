@@ -71,7 +71,6 @@ coverage.xml
 # Secrets (don't commit!)
 .env
 .env.*
-*.pem
 *.key
 *.crt
 secrets.json
