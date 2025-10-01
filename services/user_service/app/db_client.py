@@ -45,14 +45,18 @@ class HotelManagementDBClient:
             )
 
     def _discover_cert_bundle(self) -> Optional[str]:
-        candidates = [
-            os.getenv("SSL_CERT_PATH"),
-            str(Path(os.getenv("LAMBDA_TASK_ROOT", "")) / "global-bundle.pem"),
-            str(Path(os.getenv("LAMBDA_TASK_ROOT", "")) / "certs" / "global-bundle.pem"),
-            "/app/global-bundle.pem",
-            str(Path(__file__).resolve().with_name("global-bundle.pem")),
-            str(Path(__file__).resolve().parent / "certs" / "global-bundle.pem"),
-        ]
+        bundle_names = ["us-east-1-bundle.pem", "global-bundle.pem", "rds-combined-ca-bundle.pem"]
+        task_root_env = os.getenv("LAMBDA_TASK_ROOT", "")
+        task_root = Path(task_root_env) if task_root_env else None
+        candidates = [os.getenv("SSL_CERT_PATH")]
+        for name in bundle_names:
+            if task_root:
+                candidates.append(str(task_root / name))
+                candidates.append(str(task_root / "certs" / name))
+            candidates.append(f"/app/{name}")
+            candidates.append(str(Path(__file__).resolve().with_name(name)))
+            candidates.append(str(Path(__file__).resolve().parent / "certs" / name))
+        candidates.append(str(Path("/etc/pki/tls/certs/ca-bundle.crt")))
         for candidate in candidates:
             if candidate and os.path.exists(candidate):
                 return candidate
