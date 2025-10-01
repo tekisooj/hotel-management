@@ -142,7 +142,6 @@ class UserServiceStack(Stack):
         # 🌍 JWKS URL
         jwks_url = f"https://cognito-idp.us-east-1.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
 
-        # 🧩 Lambda Function
         lambda_function = Function(
             self, f"UserServiceFunction-{env_name}",
             runtime=Runtime.PYTHON_3_11,
@@ -161,6 +160,7 @@ class UserServiceStack(Stack):
                 "COGNITO_REGION": "us-east-1",
                 "USER_POOL_ID": user_pool_id,
                 "JWKS_SECRET_NAME": jwks_secret_name,
+                "SSL_CERT_PATH": "/var/task/AmazonRootCA1.pem",
             },
             vpc=vpc,
             vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS),

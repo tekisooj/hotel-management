@@ -21,23 +21,31 @@ class HotelManagementDBClient:
 
         self.secret_name = hotel_management_database_secret_name
         self.region = region
-        self.proxy_endpoint = proxy_endpoint
         self._engine = None
         self._SessionLocal = None
+        self.proxy_endpoint = proxy_endpoint
 
-        # ✅ Path to SSL certificate
-        self.ssl_cert_path = os.getenv(
-            "SSL_CERT_PATH",
-            os.path.join(os.path.dirname(__file__), "AmazonRootCA1.pem")
-        )
+        env_path = os.getenv("SSL_CERT_PATH")
+        local_dir = os.path.dirname(__file__)
+        default_root = os.path.join(local_dir, "AmazonRootCA1.pem")
+        rds_bundle = os.path.join(local_dir, "rds-combined-ca-bundle.pem")
 
-        logger.info(f"📂 SSL cert path: {self.ssl_cert_path}")
-        logger.info(f"📄 PEM file exists: {os.path.exists(self.ssl_cert_path)}")
+        candidate_paths = [p for p in [env_path, default_root, rds_bundle] if p]
+        chosen = None
+        for p in candidate_paths:
+            if os.path.exists(p):
+                chosen = p
+                break
 
-        if not os.path.exists(self.ssl_cert_path):
-            logger.warning("⚠️ SSL certificate not found — secure connection may fail.")
+        self.ssl_cert_path = chosen
+        logger.info(f"📂 SSL_CERT_PATH env: {env_path!r}")
+        logger.info(f"📄 AmazonRootCA1.pem exists: {os.path.exists(default_root)} at {default_root}")
+        logger.info(f"📄 rds-combined-ca-bundle.pem exists: {os.path.exists(rds_bundle)} at {rds_bundle}")
+        logger.info(f"🔐 Using CA file: {self.ssl_cert_path}")
 
-    # ✅ Fetch DB credentials
+        if not self.ssl_cert_path:
+            logger.warning("⚠️ No CA file found. TLS verification will fail with RDS Proxy.")
+
     def _get_secret(self) -> dict:
         logger.info("🕵️ Fetching DB credentials from Secrets Manager...")
         start = time.time()
@@ -47,19 +55,17 @@ class HotelManagementDBClient:
         logger.info(f"✅ Secret fetched in {elapsed:.2f}s")
         return json.loads(response["SecretString"])
 
-    # ✅ Build PostgreSQL URL
     def _build_db_url(self) -> str:
         secret = self._get_secret()
         username = secret["username"].strip()
         password = secret["password"].strip()
         dbname = secret["dbname"].strip()
-        host = self.proxy_endpoint if self.proxy_endpoint else secret["host"].strip()
+        host = (self.proxy_endpoint or secret["host"]).strip()
 
         url = f"postgresql+psycopg2://{username}:{password}@{host}/{dbname}"
         logger.info(f"🔗 Built DB URL for host {host}")
         return url
 
-    # ✅ Create SQLAlchemy engine with retry logic
     def _init_engine(self):
         if self._engine:
             return
@@ -72,29 +78,30 @@ class HotelManagementDBClient:
             logger.info(f"⚙️ Creating SQLAlchemy engine (attempt {attempt})...")
 
             try:
-                connect_args = {
-                    "sslmode": "verify-full",           # ✅ Required for RDS Proxy hostnames
-                    "sslrootcert": self.ssl_cert_path
-                }
+                connect_args = {}
+                if self.ssl_cert_path:
+                    # With RDS Proxy, verify-ca is the most robust choice
+                    connect_args = {
+                        "sslmode": "verify-ca",
+                        "sslrootcert": self.ssl_cert_path,
+                    }
+                else:
+                    # This will almost certainly fail with RDS Proxy,
+                    # but we log loudly above if no CA file is present.
+                    connect_args = {"sslmode": "require"}
 
                 engine = create_engine(
                     self._build_db_url(),
-                    pool_pre_ping=True,                 # ✅ Avoid stale proxy connections
-                    pool_recycle=300,                   # ✅ Refresh every 5 minutes
-                    connect_args=connect_args
+                    pool_pre_ping=True,
+                    connect_args=connect_args,
                 )
 
-                # ✅ Test connection immediately
-                with engine.connect() as conn:
-                    conn.execute("SELECT 1")
+                # Smoke test: open a connection once
+                with engine.connect() as _conn:
                     logger.info("✅ Database connection test succeeded.")
 
                 self._engine = engine
-                self._SessionLocal = sessionmaker(
-                    autocommit=False,
-                    autoflush=False,
-                    bind=self._engine
-                )
+                self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
                 return
 
             except Exception as e:
@@ -105,7 +112,6 @@ class HotelManagementDBClient:
         logger.error("❌ All DB connection attempts failed.")
         raise last_err if last_err else RuntimeError("Unable to initialize DB engine.")
 
-    # ✅ Session manager
     def get_session(self) -> Session:
         self._init_engine()
         start = time.time()
@@ -117,7 +123,6 @@ class HotelManagementDBClient:
             logger.exception("❌ Failed to open DB session")
             raise
 
-    # ✅ Create user
     def create_user(self, user: UserCreate) -> UUID:
         logger.info("🧩 Creating user...")
         session = self.get_session()
@@ -137,7 +142,6 @@ class HotelManagementDBClient:
             session.close()
             logger.info("🔒 Session closed after create_user")
 
-    # ✅ Get user
     def get_user(self, user_uuid: UUID) -> UserResponse | None:
         logger.info(f"🏁 Entering HotelManagementDBClient.get_user() for {user_uuid}")
         session = self.get_session()
@@ -152,7 +156,6 @@ class HotelManagementDBClient:
             session.close()
             logger.info("🔒 Session closed after get_user")
 
-    # ✅ Delete user
     def delete_user(self, user_uuid: UUID) -> None:
         logger.info(f"🗑️ Deleting user {user_uuid}")
         session = self.get_session()
@@ -167,7 +170,6 @@ class HotelManagementDBClient:
             session.close()
             logger.info("🔒 Session closed after delete_user")
 
-    # ✅ Update user
     def update_user(self, user_uuid: UUID, update_data: UserUpdate) -> UserResponse | None:
         logger.info(f"✏️ Updating user {user_uuid}")
         session = self.get_session()
