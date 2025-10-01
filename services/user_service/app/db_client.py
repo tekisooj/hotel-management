@@ -30,7 +30,7 @@ class HotelManagementDBClient:
         # Look for the correct SSL bundle
         cert_candidates = [
             os.getenv("SSL_CERT_PATH"),
-            os.path.join(os.path.dirname(__file__), "global-bundle.pem"),
+            os.path.join(os.path.dirname(__file__), "us-east-1-bundle.pem"),
         ]
         self.ssl_cert_path = next((p for p in cert_candidates if p and os.path.exists(p)), None)
         if self.ssl_cert_path:
@@ -61,7 +61,7 @@ class HotelManagementDBClient:
         for attempt in range(1, 4):
             try:
                 logger.info(f"🔌 Connecting to DB (attempt {attempt})")
-                connect_args = {"sslmode": "verify-full"}
+                connect_args = {"sslmode": "verify-ca"}
                 if self.ssl_cert_path:
                     connect_args["sslrootcert"] = self.ssl_cert_path
 
