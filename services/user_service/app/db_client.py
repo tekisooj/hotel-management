@@ -41,18 +41,17 @@ class HotelManagementDBClient:
         else:
             logger.warning(
                 "No RDS trust store found; falling back to sslmode=require. "
-                "Set SSL_CERT_PATH or bundle us-east-1-bundle.pem for full verification."
+                "Set SSL_CERT_PATH or bundle global-bundle.pem for full verification."
             )
 
     def _discover_cert_bundle(self) -> Optional[str]:
         candidates = [
             os.getenv("SSL_CERT_PATH"),
-            str(Path(os.getenv("LAMBDA_TASK_ROOT", "")) / "us-east-1-bundle.pem"),
-            str(Path(os.getenv("LAMBDA_TASK_ROOT", "")) / "certs" / "us-east-1-bundle.pem"),
-            "/app/us-east-1-bundle.pem",
-            str(Path("/etc/pki/tls/certs/ca-bundle.crt")),
-            str(Path(__file__).resolve().with_name("us-east-1-bundle.pem")),
-            str(Path(__file__).resolve().parent / "certs" / "us-east-1-bundle.pem"),
+            str(Path(os.getenv("LAMBDA_TASK_ROOT", "")) / "global-bundle.pem"),
+            str(Path(os.getenv("LAMBDA_TASK_ROOT", "")) / "certs" / "global-bundle.pem"),
+            "/app/global-bundle.pem",
+            str(Path(__file__).resolve().with_name("global-bundle.pem")),
+            str(Path(__file__).resolve().parent / "certs" / "global-bundle.pem"),
         ]
         for candidate in candidates:
             if candidate and os.path.exists(candidate):
