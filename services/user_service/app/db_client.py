@@ -25,26 +25,27 @@ class HotelManagementDBClient:
         self._SessionLocal = None
         self.proxy_endpoint = proxy_endpoint
 
+        # Prefer explicit env path; default to the official AWS bundle in /var/task
         env_path = os.getenv("SSL_CERT_PATH")
+        default_task_bundle = "/var/task/rds-combined-ca-bundle.pem"
+
+        # Also check local directory (packaged with code)
         local_dir = os.path.dirname(__file__)
-        default_root = os.path.join(local_dir, "AmazonRootCA1.pem")
-        rds_bundle = os.path.join(local_dir, "rds-combined-ca-bundle.pem")
+        local_bundle = os.path.join(local_dir, "rds-combined-ca-bundle.pem")
+        local_root = os.path.join(local_dir, "AmazonRootCA1.pem")  # fallback only if needed
 
-        candidate_paths = [p for p in [env_path, default_root, rds_bundle] if p]
-        chosen = None
-        for p in candidate_paths:
-            if os.path.exists(p):
-                chosen = p
-                break
+        # Choose first existing path in this order
+        candidates = [p for p in [env_path, default_task_bundle, local_bundle, local_root] if p]
+        self.ssl_cert_path = next((p for p in candidates if os.path.exists(p)), None)
 
-        self.ssl_cert_path = chosen
         logger.info(f"📂 SSL_CERT_PATH env: {env_path!r}")
-        logger.info(f"📄 AmazonRootCA1.pem exists: {os.path.exists(default_root)} at {default_root}")
-        logger.info(f"📄 rds-combined-ca-bundle.pem exists: {os.path.exists(rds_bundle)} at {rds_bundle}")
+        logger.info(f"📄 Exists(default_task_bundle): {os.path.exists(default_task_bundle)} at {default_task_bundle}")
+        logger.info(f"📄 Exists(local_bundle): {os.path.exists(local_bundle)} at {local_bundle}")
+        logger.info(f"📄 Exists(local_root AmazonRootCA1.pem): {os.path.exists(local_root)} at {local_root}")
         logger.info(f"🔐 Using CA file: {self.ssl_cert_path}")
 
         if not self.ssl_cert_path:
-            logger.warning("⚠️ No CA file found. TLS verification will fail with RDS Proxy.")
+            logger.warning("⚠️ No CA file found. TLS verification will likely fail with RDS Proxy.")
 
     def _get_secret(self) -> dict:
         logger.info("🕵️ Fetching DB credentials from Secrets Manager...")
@@ -78,17 +79,15 @@ class HotelManagementDBClient:
             logger.info(f"⚙️ Creating SQLAlchemy engine (attempt {attempt})...")
 
             try:
-                connect_args = {}
+                connect_args = {
+                    # With RDS Proxy, verify-full is recommended; it validates the server cert and hostname.
+                    "sslmode": "verify-full" if self.ssl_cert_path else "require",
+                }
                 if self.ssl_cert_path:
-                    # With RDS Proxy, verify-ca is the most robust choice
-                    connect_args = {
-                        "sslmode": "verify-ca",
-                        "sslrootcert": self.ssl_cert_path,
-                    }
-                else:
-                    # This will almost certainly fail with RDS Proxy,
-                    # but we log loudly above if no CA file is present.
-                    connect_args = {"sslmode": "require"}
+                    connect_args["sslrootcert"] = self.ssl_cert_path
+
+                # Optional: shorter TCP handshake wait
+                connect_args["connect_timeout"] = 10
 
                 engine = create_engine(
                     self._build_db_url(),
@@ -96,7 +95,7 @@ class HotelManagementDBClient:
                     connect_args=connect_args,
                 )
 
-                # Smoke test: open a connection once
+                # Smoke test once so we fail early if trust/host is wrong
                 with engine.connect() as _conn:
                     logger.info("✅ Database connection test succeeded.")
 
