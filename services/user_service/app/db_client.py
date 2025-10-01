@@ -65,6 +65,10 @@ class HotelManagementDBClient:
                 if self.ssl_cert_path:
                     connect_args["sslrootcert"] = self.ssl_cert_path
 
+                    with open(self.ssl_cert_path, "r") as f:
+                        cert_lines = f.readlines()
+                        logger.info(f"🔐 First few lines of cert:\n{''.join(cert_lines[:5])}")
+
                 self._engine = create_engine(
                     self._build_db_url(),
                     connect_args=connect_args,
