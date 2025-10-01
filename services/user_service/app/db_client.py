@@ -7,7 +7,6 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.engine.url import make_url
 from schemas import UserCreate, UserResponse, UserUpdate
 from models import User
 
@@ -29,7 +28,7 @@ class HotelManagementDBClient:
         # Prefer the official RDS bundle; fall back to AmazonRootCA1 if needed
         # Paths are relative to the Lambda deployment root (/var/task)
         default_bundle_candidates = [
-            os.getenv("SSL_CERT_PATH"),                         # explicit env var
+            os.getenv("SSL_CERT_PATH"),
             os.path.join(os.path.dirname(__file__), "rds-combined-ca-bundle.pem"),
             os.path.join(os.path.dirname(__file__), "AmazonRootCA1.pem"),
         ]
@@ -56,20 +55,9 @@ class HotelManagementDBClient:
         dbname = secret["dbname"].strip()
         host = (self.proxy_endpoint or secret["host"]).strip()
 
-        # IMPORTANT: disable psycopg2's hstore OID lookup on connect, which triggers a
-        # catalog query that you see right before the connection is closed by the proxy.
-        # This is safe unless you're using native hstore adapters (you aren’t).
-        base_url = f"postgresql+psycopg2://{username}:{password}@{host}/{dbname}"
-        url = make_url(base_url)
-        # Append dialect options via query
-        query = dict(url.query) if url.query else {}
-        query.update({
-            "use_native_hstore": "0",  # <- key change to avoid OID lookup on connect
-        })
-        url = url.set(query=query)
-
+        url = f"postgresql+psycopg2://{username}:{password}@{host}/{dbname}"
         logger.info(f"🔗 Built DB URL for host {host}")
-        return str(url)
+        return url
 
     def _init_engine(self):
         if self._engine:
@@ -84,19 +72,20 @@ class HotelManagementDBClient:
 
             try:
                 connect_args = {
-                    # Full verification is ideal when you have the RDS bundle + DNS name
-                    "sslmode": "verify-full",
+                    "sslmode": "verify-full",  # verify hostname + CA
                 }
                 if self.ssl_cert_path:
                     connect_args["sslrootcert"] = self.ssl_cert_path
 
+                # IMPORTANT: pass the dialect flag here (not in the DSN / URL)
                 engine = create_engine(
                     self._build_db_url(),
                     pool_pre_ping=True,
                     connect_args=connect_args,
+                    use_native_hstore=False,   # <-- prevents hstore OID lookup on connect
                 )
 
-                # Immediate health check: open/close a connection
+                # Immediate health check
                 with engine.connect() as conn:
                     logger.info("✅ Database connection test succeeded.")
                 self._engine = engine
