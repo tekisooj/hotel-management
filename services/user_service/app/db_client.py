@@ -2,15 +2,12 @@ import os
 import json
 import time
 import logging
-import hashlib
-import ssl as pyssl
 import boto3
 from uuid import UUID
-
 from fastapi import HTTPException
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-
+from sqlalchemy.engine.url import make_url
 from schemas import UserCreate, UserResponse, UserUpdate
 from models import User
 
@@ -25,47 +22,33 @@ class HotelManagementDBClient:
 
         self.secret_name = hotel_management_database_secret_name
         self.region = region
-        self.proxy_endpoint = proxy_endpoint
-
         self._engine = None
         self._SessionLocal = None
+        self.proxy_endpoint = proxy_endpoint
 
-        # --- TLS / SSL settings ---
-        # default to verify-full; can temporarily set to 'require' to isolate trust issues
-        self.sslmode = os.getenv("SSLMODE", "verify-full").strip()
-        # expect bundle to be baked into /var/task (Lambda code root)
-        self.ssl_cert_path = os.getenv(
-            "SSL_CERT_PATH",
+        # Prefer the official RDS bundle; fall back to AmazonRootCA1 if needed
+        # Paths are relative to the Lambda deployment root (/var/task)
+        default_bundle_candidates = [
+            os.getenv("SSL_CERT_PATH"),                         # explicit env var
             os.path.join(os.path.dirname(__file__), "rds-combined-ca-bundle.pem"),
-        )
+            os.path.join(os.path.dirname(__file__), "AmazonRootCA1.pem"),
+        ]
+        self.ssl_cert_path = next((p for p in default_bundle_candidates if p and os.path.exists(p)), None)
 
-        logger.info(f"🔐 SSLMODE env: {self.sslmode}")
-        logger.info(f"📦 Python OpenSSL: {pyssl.OPENSSL_VERSION}")
-        logger.info(f"📂 SSL_CERT_PATH env: {self.ssl_cert_path}")
+        if self.ssl_cert_path:
+            logger.info(f"📂 Using SSL bundle: {self.ssl_cert_path}")
+        else:
+            logger.warning("⚠️ No SSL bundle found alongside the code. TLS validation may fail.")
 
-        exists = os.path.exists(self.ssl_cert_path)
-        logger.info(f"📄 Exists(local_bundle): {exists} at {self.ssl_cert_path}")
-        if exists:
-            try:
-                with open(self.ssl_cert_path, "rb") as f:
-                    pem_bytes = f.read()
-                sha256 = hashlib.sha256(pem_bytes).hexdigest()
-                logger.info(f"🔎 PEM sha256: {sha256}")
-                # quick sanity: file is non-trivial in size
-                logger.info(f"📏 PEM size: {len(pem_bytes)} bytes")
-            except Exception:
-                logger.exception("⚠️ Could not read PEM file")
-
-    # ---- Secrets ----
     def _get_secret(self) -> dict:
         logger.info("🕵️ Fetching DB credentials from Secrets Manager...")
         start = time.time()
         client = boto3.client("secretsmanager", region_name=self.region)
-        response = client.get_secret_value(SecretId=self.secret_name)
-        logger.info(f"✅ Secret fetched in {time.time() - start:.2f}s")
-        return json.loads(response["SecretString"])
+        resp = client.get_secret_value(SecretId=self.secret_name)
+        elapsed = time.time() - start
+        logger.info(f"✅ Secret fetched in {elapsed:.2f}s")
+        return json.loads(resp["SecretString"])
 
-    # ---- URL builder (disable hstore OID lookup) ----
     def _build_db_url(self) -> str:
         secret = self._get_secret()
         username = secret["username"].strip()
@@ -73,13 +56,21 @@ class HotelManagementDBClient:
         dbname = secret["dbname"].strip()
         host = (self.proxy_endpoint or secret["host"]).strip()
 
-        # IMPORTANT: disable psycopg2 native hstore OID probe (causes an extra query on connect)
-        # also keep URL free of ssl params; we pass those via connect_args
-        url = f"postgresql+psycopg2://{username}:{password}@{host}/{dbname}?use_native_hstore=0"
-        logger.info(f"🔗 Built DB URL (host): {host}")
-        return url
+        # IMPORTANT: disable psycopg2's hstore OID lookup on connect, which triggers a
+        # catalog query that you see right before the connection is closed by the proxy.
+        # This is safe unless you're using native hstore adapters (you aren’t).
+        base_url = f"postgresql+psycopg2://{username}:{password}@{host}/{dbname}"
+        url = make_url(base_url)
+        # Append dialect options via query
+        query = dict(url.query) if url.query else {}
+        query.update({
+            "use_native_hstore": "0",  # <- key change to avoid OID lookup on connect
+        })
+        url = url.set(query=query)
 
-    # ---- Engine init with retry & SELECT 1 ----
+        logger.info(f"🔗 Built DB URL for host {host}")
+        return str(url)
+
     def _init_engine(self):
         if self._engine:
             return
@@ -93,32 +84,21 @@ class HotelManagementDBClient:
 
             try:
                 connect_args = {
-                    # TLS controls go here (not in the URL)
-                    "sslmode": self.sslmode,                # 'verify-full' or 'require' (for testing)
-                    "sslrootcert": self.ssl_cert_path,      # path we packaged with the Lambda
-                    # TCP keepalives (helps with proxies/NAT)
-                    "keepalives": 1,
-                    "keepalives_idle": 30,
-                    "keepalives_interval": 10,
-                    "keepalives_count": 5,
+                    # Full verification is ideal when you have the RDS bundle + DNS name
+                    "sslmode": "verify-full",
                 }
+                if self.ssl_cert_path:
+                    connect_args["sslrootcert"] = self.ssl_cert_path
 
                 engine = create_engine(
                     self._build_db_url(),
                     pool_pre_ping=True,
-                    pool_size=1,
-                    max_overflow=2,
-                    pool_recycle=300,
                     connect_args=connect_args,
                 )
 
-                # Establish connection AND run a minimal query
+                # Immediate health check: open/close a connection
                 with engine.connect() as conn:
-                    logger.info("🔌 Connected. Running sanity query...")
-                    conn.execute(text("SELECT 1"))
-                    logger.info("✅ Database connection test succeeded (SELECT 1).")
-
-                # If we got here, keep the engine
+                    logger.info("✅ Database connection test succeeded.")
                 self._engine = engine
                 self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
                 return
@@ -142,7 +122,6 @@ class HotelManagementDBClient:
             logger.exception("❌ Failed to open DB session")
             raise
 
-    # ---- CRUD ----
     def create_user(self, user: UserCreate) -> UUID:
         logger.info("🧩 Creating user...")
         session = self.get_session()
