@@ -22,6 +22,14 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
+def log_cert(host, port):
+    context = ssl.create_default_context()
+    with socket.create_connection((host, port)) as sock:
+        with context.wrap_socket(sock, server_hostname=host) as ssock:
+            cert = ssock.getpeercert()
+            logger.info(f"🔐 CN: {cert.get('subject')}")
+            logger.info(f"🔐 SAN: {cert.get('subjectAltName')}")
+
 class HotelManagementDBClient:
     def __init__(self, hotel_management_database_secret_name: str | None, region: str, proxy_endpoint: str | None) -> None:
         if not hotel_management_database_secret_name:
@@ -70,6 +78,8 @@ class HotelManagementDBClient:
     def _build_db_config(self) -> tuple[URL, str, int]:
         secret = self._get_secret()
         host = (self.proxy_endpoint or secret["host"]).strip()
+        logger.info(f"🔍 Connecting to DB host: {host}")
+
         port = int(secret.get("port", 5432))
         url = URL.create(
             drivername="postgresql+psycopg2",
@@ -142,6 +152,7 @@ class HotelManagementDBClient:
                     use_native_hstore=False,
                 )
                 self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
+                log_cert("hotel-management-db-proxy-int.proxy-capkwmowwxnt.us-east-1.rds.amazonaws.com", 5432)
 
                 with self._engine.connect() as _:
                     logger.info("DB connection successful")
