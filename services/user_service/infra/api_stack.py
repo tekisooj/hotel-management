@@ -160,7 +160,7 @@ class UserServiceStack(Stack):
                 "COGNITO_REGION": "us-east-1",
                 "USER_POOL_ID": user_pool_id,
                 "JWKS_SECRET_NAME": jwks_secret_name,
-                "SSL_CERT_PATH": "/var/task/rds-combined-ca-bundle.pem"
+                "SSL_CERT_PATH": "/var/task/global-bundle.pem"
             },
             vpc=vpc,
             vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS),

@@ -30,7 +30,7 @@ class HotelManagementDBClient:
         # Look for the correct SSL bundle
         cert_candidates = [
             os.getenv("SSL_CERT_PATH"),
-            os.path.join(os.path.dirname(__file__), "rds-combined-ca-bundle.pem"),
+            os.path.join(os.path.dirname(__file__), "global-bundle.pem"),
         ]
         self.ssl_cert_path = next((p for p in cert_candidates if p and os.path.exists(p)), None)
         if self.ssl_cert_path:
