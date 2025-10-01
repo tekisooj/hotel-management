@@ -2,12 +2,16 @@ import os
 import json
 import time
 import logging
+from pathlib import Path
+from typing import Optional
+
 import boto3
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker, Session
+
 from schemas import UserCreate, UserResponse, UserUpdate
 from models import User
 
@@ -26,17 +30,27 @@ class HotelManagementDBClient:
 
         self._engine = None
         self._SessionLocal = None
+        self.ssl_cert_path = self._discover_cert_bundle()
 
-        # Look for the correct SSL bundle
-        cert_candidates = [
-            os.getenv("SSL_CERT_PATH"),
-            os.path.join(os.path.dirname(__file__), "us-east-1-bundle.pem"),
-        ]
-        self.ssl_cert_path = next((p for p in cert_candidates if p and os.path.exists(p)), None)
         if self.ssl_cert_path:
-            logger.info(f"📂 Using SSL cert: {self.ssl_cert_path}")
+            logger.info("Using RDS trust store at %s", self.ssl_cert_path)
         else:
-            logger.warning("⚠️ No SSL cert found. Connection may fail.")
+            logger.warning(
+                "No RDS trust store found; falling back to sslmode=require. "
+                "Set SSL_CERT_PATH or bundle certs/us-east-1-bundle.pem for full verification."
+            )
+
+    def _discover_cert_bundle(self) -> Optional[str]:
+        candidates = [
+            os.getenv("SSL_CERT_PATH"),
+            str(Path(os.getenv("LAMBDA_TASK_ROOT", "")) / "certs" / "us-east-1-bundle.pem"),
+            str(Path("/etc/pki/tls/certs/ca-bundle.crt")),
+            str(Path(__file__).resolve().parent / "certs" / "us-east-1-bundle.pem"),
+        ]
+        for candidate in candidates:
+            if candidate and os.path.exists(candidate):
+                return candidate
+        return None
 
     def _get_secret(self) -> dict:
         client = boto3.client("secretsmanager", region_name=self.region)
@@ -60,30 +74,28 @@ class HotelManagementDBClient:
 
         for attempt in range(1, 4):
             try:
-                logger.info(f"🔌 Connecting to DB (attempt {attempt})")
-                connect_args = {"sslmode": "verify-ca"}
+                logger.info("Connecting to DB (attempt %s)", attempt)
+
+                connect_args = {"sslmode": "verify-full"}
                 if self.ssl_cert_path:
                     connect_args["sslrootcert"] = self.ssl_cert_path
-
-                    with open(self.ssl_cert_path, "r") as f:
-                        cert_lines = f.readlines()
-                        logger.info(f"🔐 First few lines of cert:\n{''.join(cert_lines[:5])}")
+                else:
+                    connect_args["sslmode"] = "require"
 
                 self._engine = create_engine(
                     self._build_db_url(),
                     connect_args=connect_args,
                     pool_pre_ping=True,
-                    use_native_hstore=False,  # must be passed as dialect kwarg
+                    use_native_hstore=False,
                 )
                 self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
 
-                # Quick connection test
                 with self._engine.connect() as _:
-                    logger.info("✅ DB connection successful")
+                    logger.info("DB connection successful")
                 return
 
             except Exception as e:
-                logger.exception(f"❌ Connection failed: {e}")
+                logger.exception("Connection failed: %s", e)
                 time.sleep(2)
 
         raise RuntimeError("All connection attempts failed.")
