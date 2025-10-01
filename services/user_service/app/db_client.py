@@ -2,6 +2,8 @@ import os
 import json
 import time
 import logging
+import socket
+import ssl
 from pathlib import Path
 from typing import Optional
 
@@ -30,6 +32,7 @@ class HotelManagementDBClient:
 
         self._engine = None
         self._SessionLocal = None
+        self._certificate_logged = False
         self.ssl_cert_path = self._discover_cert_bundle()
 
         if self.ssl_cert_path:
@@ -37,7 +40,7 @@ class HotelManagementDBClient:
         else:
             logger.warning(
                 "No RDS trust store found; falling back to sslmode=require. "
-                "Set SSL_CERT_PATH or bundle certs/us-east-1-bundle.pem for full verification."
+                "Set SSL_CERT_PATH or bundle us-east-1-bundle.pem for full verification."
             )
 
     def _discover_cert_bundle(self) -> Optional[str]:
@@ -60,16 +63,44 @@ class HotelManagementDBClient:
         secret = client.get_secret_value(SecretId=self.secret_name)
         return json.loads(secret["SecretString"])
 
-    def _build_db_url(self) -> URL:
+    def _build_db_config(self) -> tuple[URL, str, int]:
         secret = self._get_secret()
-        return URL.create(
+        host = (self.proxy_endpoint or secret["host"]).strip()
+        port = int(secret.get("port", 5432))
+        url = URL.create(
             drivername="postgresql+psycopg2",
             username=secret["username"].strip(),
             password=secret["password"].strip(),
-            host=(self.proxy_endpoint or secret["host"]).strip(),
-            port=int(secret.get("port", 5432)),
+            host=host,
+            port=port,
             database=secret["dbname"].strip(),
         )
+        return url, host, port
+
+    def _verify_proxy_certificate(self, host: str, port: int) -> None:
+        if self._certificate_logged:
+            return
+        try:
+            context = ssl.create_default_context(cafile=self.ssl_cert_path or None)
+            context.check_hostname = True
+            context.verify_mode = ssl.CERT_REQUIRED
+            with socket.create_connection((host, port), timeout=5) as sock:
+                with context.wrap_socket(sock, server_hostname=host) as secure_sock:
+                    cert = secure_sock.getpeercert()
+                    sans = [value for key, value in cert.get("subjectAltName", []) if key == "DNS"]
+                    subject = cert.get("subject", [])
+                    issuer = cert.get("issuer", [])
+                    logger.info(
+                        "RDS proxy certificate for %s:%s subject=%s issuer=%s SANs=%s",
+                        host,
+                        port,
+                        subject,
+                        issuer,
+                        sans,
+                    )
+                    self._certificate_logged = True
+        except Exception:
+            logger.exception("Unable to log certificate details for %s:%s", host, port)
 
     def _init_engine(self):
         if self._engine:
@@ -77,6 +108,8 @@ class HotelManagementDBClient:
 
         for attempt in range(1, 4):
             try:
+                url, host, port = self._build_db_config()
+                self._verify_proxy_certificate(host, port)
                 logger.info("Connecting to DB (attempt %s)", attempt)
 
                 connect_args = {"sslmode": "verify-full"}
@@ -86,7 +119,7 @@ class HotelManagementDBClient:
                     connect_args["sslmode"] = "require"
 
                 self._engine = create_engine(
-                    self._build_db_url(),
+                    url,
                     connect_args=connect_args,
                     pool_pre_ping=True,
                     use_native_hstore=False,
@@ -155,4 +188,3 @@ class HotelManagementDBClient:
             return UserResponse.model_validate(user)
         finally:
             session.close()
-
