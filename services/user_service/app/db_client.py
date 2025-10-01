@@ -6,6 +6,7 @@ import boto3
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import create_engine
+from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker, Session
 from schemas import UserCreate, UserResponse, UserUpdate
 from models import User
@@ -26,14 +27,13 @@ class HotelManagementDBClient:
         self._engine = None
         self._SessionLocal = None
 
-        # Prefer official RDS bundle; fall back to AmazonRootCA1
+        # Prefer official RDS bundle; fall back to AmazonRootCA1 if present.
         candidates = [
             os.getenv("SSL_CERT_PATH"),
             os.path.join(os.path.dirname(__file__), "rds-combined-ca-bundle.pem"),
             os.path.join(os.path.dirname(__file__), "AmazonRootCA1.pem"),
         ]
         self.ssl_cert_path = next((p for p in candidates if p and os.path.exists(p)), None)
-
         if self.ssl_cert_path:
             logger.info(f"📂 Using SSL bundle: {self.ssl_cert_path}")
         else:
@@ -47,16 +47,32 @@ class HotelManagementDBClient:
         logger.info(f"✅ Secret fetched in {time.time() - t0:.2f}s")
         return json.loads(resp["SecretString"])
 
-    def _build_db_url(self) -> str:
+    def _build_db_url(self) -> URL:
         s = self._get_secret()
         username = s["username"].strip()
         password = s["password"].strip()
         dbname = s["dbname"].strip()
-        host = (self.proxy_endpoint or s["host"]).strip()
 
-        # IMPORTANT: no query string here (no ?use_native_hstore=...)
-        url = f"postgresql+psycopg2://{username}:{password}@{host}/{dbname}"
-        logger.info(f"🔗 Built DB URL for host {host}")
+        # Clean host in case something bad was appended (defensive).
+        raw_host = (self.proxy_endpoint or s["host"]).strip()
+        host = raw_host.split("?")[0].split("&")[0]
+
+        # Build a param-free URL object (cannot contain stray DSN options).
+        url = URL.create(
+            drivername="postgresql+psycopg2",
+            username=username,
+            password=password,
+            host=host,
+            database=dbname,
+            port=int(s.get("port") or 5432),
+        )
+
+        logger.info(f"🔗 SQLAlchemy URL: {url.render_as_string(hide_password=True)}")
+        # Assert we are not leaking any options into the DSN.
+        rendered = url.render_as_string(hide_password=True)
+        if "use_native_hstore" in rendered or "sslmode" in rendered or "?" in rendered:
+            raise RuntimeError(f"URL contains forbidden params: {rendered}")
+
         return url
 
     def _init_engine(self):
@@ -71,15 +87,17 @@ class HotelManagementDBClient:
                 if self.ssl_cert_path:
                     connect_args["sslrootcert"] = self.ssl_cert_path
 
-                # PASS THE DIALECT OPTION HERE, NOT IN URL/DSN!
+                # IMPORTANT:
+                # - Do NOT put 'use_native_hstore' in connect_args (that becomes a DSN option!)
+                # - Pass it as a dialect kwarg to create_engine.
                 engine = create_engine(
                     self._build_db_url(),
                     pool_pre_ping=True,
                     connect_args=connect_args,
-                    **{"use_native_hstore": False},  # <- dialect kwarg
+                    use_native_hstore=False,   # dialect kwarg, safe
                 )
 
-                # Immediate health check
+                # Quick health check
                 with engine.connect() as _:
                     logger.info("✅ Database connection test succeeded.")
 
