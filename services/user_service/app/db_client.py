@@ -2,11 +2,15 @@ import os
 import json
 import time
 import logging
+import hashlib
+import ssl as pyssl
 import boto3
 from uuid import UUID
+
 from fastapi import HTTPException
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
+
 from schemas import UserCreate, UserResponse, UserUpdate
 from models import User
 
@@ -21,41 +25,47 @@ class HotelManagementDBClient:
 
         self.secret_name = hotel_management_database_secret_name
         self.region = region
-        self._engine = None
-        self._SessionLocal = None
         self.proxy_endpoint = proxy_endpoint
 
-        # Prefer explicit env path; default to the official AWS bundle in /var/task
-        env_path = os.getenv("SSL_CERT_PATH")
-        default_task_bundle = "/var/task/rds-combined-ca-bundle.pem"
+        self._engine = None
+        self._SessionLocal = None
 
-        # Also check local directory (packaged with code)
-        local_dir = os.path.dirname(__file__)
-        local_bundle = os.path.join(local_dir, "rds-combined-ca-bundle.pem")
-        local_root = os.path.join(local_dir, "AmazonRootCA1.pem")  # fallback only if needed
+        # --- TLS / SSL settings ---
+        # default to verify-full; can temporarily set to 'require' to isolate trust issues
+        self.sslmode = os.getenv("SSLMODE", "verify-full").strip()
+        # expect bundle to be baked into /var/task (Lambda code root)
+        self.ssl_cert_path = os.getenv(
+            "SSL_CERT_PATH",
+            os.path.join(os.path.dirname(__file__), "rds-combined-ca-bundle.pem"),
+        )
 
-        # Choose first existing path in this order
-        candidates = [p for p in [env_path, default_task_bundle, local_bundle, local_root] if p]
-        self.ssl_cert_path = next((p for p in candidates if os.path.exists(p)), None)
+        logger.info(f"🔐 SSLMODE env: {self.sslmode}")
+        logger.info(f"📦 Python OpenSSL: {pyssl.OPENSSL_VERSION}")
+        logger.info(f"📂 SSL_CERT_PATH env: {self.ssl_cert_path}")
 
-        logger.info(f"📂 SSL_CERT_PATH env: {env_path!r}")
-        logger.info(f"📄 Exists(default_task_bundle): {os.path.exists(default_task_bundle)} at {default_task_bundle}")
-        logger.info(f"📄 Exists(local_bundle): {os.path.exists(local_bundle)} at {local_bundle}")
-        logger.info(f"📄 Exists(local_root AmazonRootCA1.pem): {os.path.exists(local_root)} at {local_root}")
-        logger.info(f"🔐 Using CA file: {self.ssl_cert_path}")
+        exists = os.path.exists(self.ssl_cert_path)
+        logger.info(f"📄 Exists(local_bundle): {exists} at {self.ssl_cert_path}")
+        if exists:
+            try:
+                with open(self.ssl_cert_path, "rb") as f:
+                    pem_bytes = f.read()
+                sha256 = hashlib.sha256(pem_bytes).hexdigest()
+                logger.info(f"🔎 PEM sha256: {sha256}")
+                # quick sanity: file is non-trivial in size
+                logger.info(f"📏 PEM size: {len(pem_bytes)} bytes")
+            except Exception:
+                logger.exception("⚠️ Could not read PEM file")
 
-        if not self.ssl_cert_path:
-            logger.warning("⚠️ No CA file found. TLS verification will likely fail with RDS Proxy.")
-
+    # ---- Secrets ----
     def _get_secret(self) -> dict:
         logger.info("🕵️ Fetching DB credentials from Secrets Manager...")
         start = time.time()
         client = boto3.client("secretsmanager", region_name=self.region)
         response = client.get_secret_value(SecretId=self.secret_name)
-        elapsed = time.time() - start
-        logger.info(f"✅ Secret fetched in {elapsed:.2f}s")
+        logger.info(f"✅ Secret fetched in {time.time() - start:.2f}s")
         return json.loads(response["SecretString"])
 
+    # ---- URL builder (disable hstore OID lookup) ----
     def _build_db_url(self) -> str:
         secret = self._get_secret()
         username = secret["username"].strip()
@@ -63,16 +73,19 @@ class HotelManagementDBClient:
         dbname = secret["dbname"].strip()
         host = (self.proxy_endpoint or secret["host"]).strip()
 
-        url = f"postgresql+psycopg2://{username}:{password}@{host}/{dbname}"
-        logger.info(f"🔗 Built DB URL for host {host}")
+        # IMPORTANT: disable psycopg2 native hstore OID probe (causes an extra query on connect)
+        # also keep URL free of ssl params; we pass those via connect_args
+        url = f"postgresql+psycopg2://{username}:{password}@{host}/{dbname}?use_native_hstore=0"
+        logger.info(f"🔗 Built DB URL (host): {host}")
         return url
 
+    # ---- Engine init with retry & SELECT 1 ----
     def _init_engine(self):
         if self._engine:
             return
 
         retries = 3
-        delay = 2
+        delay = 2.0
         last_err = None
 
         for attempt in range(1, retries + 1):
@@ -80,25 +93,32 @@ class HotelManagementDBClient:
 
             try:
                 connect_args = {
-                    # With RDS Proxy, verify-full is recommended; it validates the server cert and hostname.
-                    "sslmode": "verify-full" if self.ssl_cert_path else "require",
+                    # TLS controls go here (not in the URL)
+                    "sslmode": self.sslmode,                # 'verify-full' or 'require' (for testing)
+                    "sslrootcert": self.ssl_cert_path,      # path we packaged with the Lambda
+                    # TCP keepalives (helps with proxies/NAT)
+                    "keepalives": 1,
+                    "keepalives_idle": 30,
+                    "keepalives_interval": 10,
+                    "keepalives_count": 5,
                 }
-                if self.ssl_cert_path:
-                    connect_args["sslrootcert"] = self.ssl_cert_path
-
-                # Optional: shorter TCP handshake wait
-                connect_args["connect_timeout"] = 10
 
                 engine = create_engine(
                     self._build_db_url(),
                     pool_pre_ping=True,
+                    pool_size=1,
+                    max_overflow=2,
+                    pool_recycle=300,
                     connect_args=connect_args,
                 )
 
-                # Smoke test once so we fail early if trust/host is wrong
-                with engine.connect() as _conn:
-                    logger.info("✅ Database connection test succeeded.")
+                # Establish connection AND run a minimal query
+                with engine.connect() as conn:
+                    logger.info("🔌 Connected. Running sanity query...")
+                    conn.execute(text("SELECT 1"))
+                    logger.info("✅ Database connection test succeeded (SELECT 1).")
 
+                # If we got here, keep the engine
                 self._engine = engine
                 self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
                 return
@@ -122,6 +142,7 @@ class HotelManagementDBClient:
             logger.exception("❌ Failed to open DB session")
             raise
 
+    # ---- CRUD ----
     def create_user(self, user: UserCreate) -> UUID:
         logger.info("🧩 Creating user...")
         session = self.get_session()
