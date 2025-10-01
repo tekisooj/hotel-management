@@ -9,8 +9,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from schemas import UserCreate, UserResponse, UserUpdate
 from models import User
-from sqlalchemy.pool import NullPool
-from sqlalchemy.exc import OperationalError, DisconnectionError
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -55,78 +53,69 @@ class HotelManagementDBClient:
         username = secret["username"].strip()
         password = secret["password"].strip()
         dbname = secret["dbname"].strip()
-        # Ensure host uses the Proxy endpoint if provided
         host = self.proxy_endpoint if self.proxy_endpoint else secret["host"].strip()
 
         url = f"postgresql+psycopg2://{username}:{password}@{host}/{dbname}"
         logger.info(f"🔗 Built DB URL for host {host}")
         return url
 
-    # ✅ Create SQLAlchemy engine (without connection test and retry)
+    # ✅ Create SQLAlchemy engine with retry logic
     def _init_engine(self):
         if self._engine:
             return
 
-        # 🔑 No retry loop here. It belongs in the calling functions or get_session().
-        
-        logger.info(f"⚙️ Creating SQLAlchemy engine with NullPool...")
+        retries = 3
+        delay = 2
+        last_err = None
 
-        try:
-            connect_args = {
-                "sslmode": "verify-full", 
-                "sslrootcert": self.ssl_cert_path
-            }
+        for attempt in range(1, retries + 1):
+            logger.info(f"⚙️ Creating SQLAlchemy engine (attempt {attempt})...")
 
-            self._engine = create_engine(
-                self._build_db_url(),
-                poolclass=NullPool,         # 🔑 FIX: Disables SQLAlchemy-side pooling
-                pre_ping=True,              # 🔑 Ensures connection is tested right before use
-                connect_args=connect_args
-            )
+            try:
+                connect_args = {
+                    "sslmode": "verify-full",           # ✅ Required for RDS Proxy hostnames
+                    "sslrootcert": self.ssl_cert_path
+                }
 
-            # 🛑 REMOVED: Immediate connection test (with engine.connect() as conn: conn.execute("SELECT 1"))
-            # This is where the stale connection issue often originates.
-            
-            self._SessionLocal = sessionmaker(
-                autocommit=False,
-                autoflush=False,
-                bind=self._engine
-            )
-            logger.info("✅ Database engine initialized with NullPool.")
-            return
+                engine = create_engine(
+                    self._build_db_url(),
+                    pool_pre_ping=True,                 # ✅ Avoid stale proxy connections
+                    pool_recycle=300,                   # ✅ Refresh every 5 minutes
+                    connect_args=connect_args
+                )
 
-        except Exception as e:
-            logger.exception(f"❌ DB connection initialization failed.")
-            # Re-raise the error to halt the cold start initialization
-            raise
+                # ✅ Test connection immediately
+                with engine.connect() as conn:
+                    conn.execute("SELECT 1")
+                    logger.info("✅ Database connection test succeeded.")
 
-    # ✅ Session manager with retry logic for transient connection errors
+                self._engine = engine
+                self._SessionLocal = sessionmaker(
+                    autocommit=False,
+                    autoflush=False,
+                    bind=self._engine
+                )
+                return
+
+            except Exception as e:
+                last_err = e
+                logger.exception(f"⚠️ DB connection attempt {attempt} failed: {e}")
+                time.sleep(delay)
+
+        logger.error("❌ All DB connection attempts failed.")
+        raise last_err if last_err else RuntimeError("Unable to initialize DB engine.")
+
+    # ✅ Session manager
     def get_session(self) -> Session:
         self._init_engine()
         start = time.time()
-        
-        # 🔑 Resilience for connection failures (OperationalError/DisconnectionError)
-        MAX_RETRIES = 2
-        for attempt in range(MAX_RETRIES):
-            try:
-                session = self._SessionLocal()
-                logger.info(f"✅ DB session opened in {time.time() - start:.2f}s")
-                return session
-            
-            # Catch the common database operational errors
-            except (OperationalError, DisconnectionError) as e:
-                if attempt < MAX_RETRIES - 1:
-                    logger.warning(f"⚠️ DB connection error on session open (attempt {attempt+1}). Disposing engine and retrying.")
-                    
-                    # 🔑 CRITICAL: Dispose the engine to force a brand new connection attempt
-                    self._engine.dispose() 
-                    time.sleep(0.5)
-                else:
-                    logger.exception("❌ Failed to open DB session after all retries.")
-                    raise e
-            except Exception:
-                logger.exception("❌ Failed to open DB session")
-                raise
+        try:
+            session = self._SessionLocal()
+            logger.info(f"✅ DB session opened in {time.time() - start:.2f}s")
+            return session
+        except Exception:
+            logger.exception("❌ Failed to open DB session")
+            raise
 
     # ✅ Create user
     def create_user(self, user: UserCreate) -> UUID:
