@@ -4,6 +4,7 @@ import time
 import logging
 import socket
 import ssl
+import struct
 from pathlib import Path
 from typing import Optional
 
@@ -81,10 +82,23 @@ class HotelManagementDBClient:
         if self._certificate_logged:
             return
         try:
-            context = ssl.create_default_context(cafile=self.ssl_cert_path or None)
-            context.check_hostname = True
-            context.verify_mode = ssl.CERT_REQUIRED
             with socket.create_connection((host, port), timeout=5) as sock:
+                ssl_request = struct.pack("!II", 8, 80877103)
+                sock.sendall(ssl_request)
+                response = sock.recv(1)
+                if response != b"S":
+                    logger.warning(
+                        "RDS proxy at %s:%s did not accept SSL negotiation (response=%s)",
+                        host,
+                        port,
+                        response,
+                    )
+                    return
+
+                context = ssl.create_default_context(cafile=self.ssl_cert_path or None)
+                context.check_hostname = True
+                context.verify_mode = ssl.CERT_REQUIRED
+
                 with context.wrap_socket(sock, server_hostname=host) as secure_sock:
                     cert = secure_sock.getpeercert()
                     sans = [value for key, value in cert.get("subjectAltName", []) if key == "DNS"]
@@ -188,3 +202,4 @@ class HotelManagementDBClient:
             return UserResponse.model_validate(user)
         finally:
             session.close()
+
