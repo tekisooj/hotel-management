@@ -54,13 +54,80 @@ onMounted(async () => {
 
     const idToken = signinResponse.id_token
     const refreshToken = signinResponse.refresh_token || undefined
+    const authHeaders = { Authorization: `Bearer ${idToken}` }
 
-    const me = await $fetch<User>(`${config.public.userApiBase}/me`, {
-      headers: { Authorization: `Bearer ${idToken}` },
-    })
+    const profile = (signinResponse.profile || {}) as Record<string, unknown>
+    const getClaim = (key: string) => {
+      const value = profile[key]
+      return typeof value === "string" ? value : ""
+    }
+
+    const selectedApp = state.app === "host" ? "host" : "guest"
+    const desiredUserType = selectedApp === "host" ? "staff" : "guest"
+
+    const emailClaim = getClaim("email")
+    const emailLocalPart = emailClaim ? emailClaim.split("@")[0] : ""
+    const baseName = getClaim("given_name") || getClaim("name") || emailLocalPart
+    const familyName = getClaim("family_name")
+    const resolvedName = baseName || "New"
+    const resolvedLastName = familyName || resolvedName
+
+    const postPayload = {
+      name: resolvedName,
+      last_name: resolvedLastName,
+      email: emailClaim,
+      user_type: desiredUserType,
+    }
+
+    let me: User
+    try {
+      me = await $fetch<User>(`${config.public.userApiBase}/me`, {
+        headers: authHeaders,
+      })
+    } catch (getError: any) {
+      const status = Number(
+        getError?.status ??
+        getError?.response?.status ??
+        getError?.data?.status ??
+        getError?.cause?.status ??
+        0,
+      )
+
+      const isNotFound = status === 404
+      const canAttemptCreate = Boolean(postPayload.email)
+
+      if (!isNotFound || !canAttemptCreate) {
+        throw getError
+      }
+
+      try {
+        me = await $fetch<User>(`${config.public.userApiBase}/me`, {
+          method: "POST",
+          body: postPayload,
+          headers: authHeaders,
+        })
+      } catch (postError: any) {
+        const postStatus = Number(
+          postError?.status ??
+          postError?.response?.status ??
+          postError?.data?.status ??
+          postError?.cause?.status ??
+          0,
+        )
+
+        if (postStatus === 409) {
+          me = await $fetch<User>(`${config.public.userApiBase}/me`, {
+            headers: authHeaders,
+          })
+        } else {
+          throw postError
+        }
+      }
+    }
+
     store.setUser(me, idToken)
 
-    const targetApp = state.app === "host" || me.user_type === "staff" ? "host" : "guest"
+    const targetApp = selectedApp === "host" || me.user_type === "staff" ? "host" : "guest"
     const targetBase = targetApp === "host" ? config.public.hostUiUrl : config.public.guestUiUrl
     const redirectUrl = buildTargetUrl(targetBase, idToken, refreshToken, state.redirect)
     window.location.href = redirectUrl
