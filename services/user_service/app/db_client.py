@@ -4,7 +4,6 @@ import time
 import logging
 import socket
 import ssl
-import struct
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
@@ -33,21 +32,20 @@ class HotelManagementDBClient:
 
         self._engine = None
         self._SessionLocal = None
-        self._certificate_logged = False
         self.ssl_cert_path = self._discover_cert_bundle()
 
-        if self.ssl_cert_path:
-            logger.info(f"✅ Using RDS trust store at: {self.ssl_cert_path}")
+        if not self.ssl_cert_path:
+            logger.error("❌ Missing RDS SSL cert bundle (e.g., global-bundle.pem)")
+            raise RuntimeError("RDS cert bundle not found. Set SSL_CERT_PATH or include it in your Lambda package.")
         else:
-            logger.warning("❌ No RDS trust store found. You must include global-bundle.pem in Lambda ZIP.")
-            raise RuntimeError("Missing required RDS cert bundle (e.g., global-bundle.pem)")
+            logger.info(f"✅ Using RDS trust store at: {self.ssl_cert_path}")
 
     def _discover_cert_bundle(self) -> Optional[str]:
         candidates = [
             os.getenv("SSL_CERT_PATH"),
-            "/var/task/global-bundle.pem",  # default inside Lambda bundle
+            "/var/task/global-bundle.pem",  # default path inside Lambda
             str(Path(__file__).resolve().with_name("global-bundle.pem")),
-            str(Path("/etc/pki/tls/certs/ca-bundle.crt")),
+            "/etc/pki/tls/certs/ca-bundle.crt",  # fallback Linux path
         ]
         for path in candidates:
             if path and os.path.exists(path):
@@ -56,8 +54,19 @@ class HotelManagementDBClient:
 
     def _get_secret(self) -> dict:
         client = boto3.client("secretsmanager", region_name=self.region)
-        secret = client.get_secret_value(SecretId=self.secret_name)
-        return json.loads(secret["SecretString"])
+        response = client.get_secret_value(SecretId=self.secret_name)
+        return json.loads(response["SecretString"])
+
+    def _verify_proxy_certificate(self, host: str, port: int) -> None:
+        try:
+            context = ssl.create_default_context(cafile=self.ssl_cert_path)
+            with socket.create_connection((host, port), timeout=5) as sock:
+                with context.wrap_socket(sock, server_hostname=host) as ssock:
+                    cert = ssock.getpeercert()
+                    logger.info(f"🔐 Verified RDS proxy cert for {host}, issuer: {cert.get('issuer')}")
+        except Exception as e:
+            logger.exception(f"❌ Failed to verify SSL certificate for {host}:{port}")
+            raise
 
     def _build_db_config(self) -> tuple[URL, str, int]:
         secret = self._get_secret()
@@ -73,33 +82,6 @@ class HotelManagementDBClient:
         )
         return url, host, port
 
-    def _verify_proxy_certificate(self, host: str, port: int) -> None:
-        if self._certificate_logged:
-            return
-        try:
-            with socket.create_connection((host, port), timeout=5) as sock:
-                ssl_request = struct.pack("!II", 8, 80877103)
-                sock.sendall(ssl_request)
-                response = sock.recv(1)
-                if response != b"S":
-                    logger.warning(f"⚠️ RDS proxy at {host}:{port} did not accept SSL negotiation (response={response})")
-                    return
-
-                context = ssl.create_default_context(cafile=self.ssl_cert_path)
-                context.check_hostname = True
-                context.verify_mode = ssl.CERT_REQUIRED
-
-                with context.wrap_socket(sock, server_hostname=host) as secure_sock:
-                    cert = secure_sock.getpeercert()
-                    sans = [value for key, value in cert.get("subjectAltName", []) if key == "DNS"]
-                    logger.info(f"🔐 Proxy Certificate verified for {host}:{port}")
-                    logger.debug(f"🔐 Subject: {cert.get('subject')}")
-                    logger.debug(f"🔐 Issuer: {cert.get('issuer')}")
-                    logger.debug(f"🔐 SANs: {sans}")
-                    self._certificate_logged = True
-        except Exception:
-            logger.exception("❌ Unable to verify RDS proxy certificate.")
-
     def _init_engine(self):
         if self._engine:
             return
@@ -108,6 +90,8 @@ class HotelManagementDBClient:
             try:
                 url, host, port = self._build_db_config()
                 logger.info(f"🔄 Attempting DB connection to {host}:{port} (attempt {attempt})")
+
+                # 🔐 Validate cert chain before connecting
                 self._verify_proxy_certificate(host, port)
 
                 connect_args = {
@@ -119,27 +103,25 @@ class HotelManagementDBClient:
                     url,
                     connect_args=connect_args,
                     pool_pre_ping=True,
-                    use_native_hstore=False,
                 )
                 self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
 
                 with self._engine.connect() as _:
-                    logger.info("✅ DB connection successful.")
+                    logger.info("✅ DB connection established.")
                 return
 
             except Exception as e:
-                logger.exception(f"❌ DB connection failed on attempt {attempt}: {e}")
+                logger.exception(f"❌ DB connection failed on attempt {attempt}")
                 time.sleep(2)
 
-        raise RuntimeError("❌ All DB connection attempts failed.")
+        raise RuntimeError("❌ All attempts to connect to the DB failed.")
 
     def get_session(self) -> Session:
         self._init_engine()
         return self._SessionLocal()
 
     def create_user(self, user: UserCreate) -> UUID:
-        session = self.get_session()
-        try:
+        with self.get_session() as session:
             new_user = User(
                 name=user.name,
                 last_name=user.last_name,
@@ -150,31 +132,22 @@ class HotelManagementDBClient:
             session.commit()
             session.refresh(new_user)
             return UserResponse.model_validate(new_user).uuid
-        finally:
-            session.close()
 
     def get_user(self, user_uuid: UUID) -> UserResponse | None:
-        session = self.get_session()
-        try:
+        with self.get_session() as session:
             user = session.query(User).filter(User.uuid == user_uuid).first()
             return UserResponse.model_validate(user) if user else None
-        finally:
-            session.close()
 
     def delete_user(self, user_uuid: UUID) -> None:
-        session = self.get_session()
-        try:
+        with self.get_session() as session:
             user = session.query(User).filter(User.uuid == user_uuid).first()
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
             session.delete(user)
             session.commit()
-        finally:
-            session.close()
 
     def update_user(self, user_uuid: UUID, update_data: UserUpdate) -> UserResponse | None:
-        session = self.get_session()
-        try:
+        with self.get_session() as session:
             user = session.query(User).filter(User.uuid == user_uuid).first()
             if not user:
                 return None
@@ -183,5 +156,3 @@ class HotelManagementDBClient:
             session.commit()
             session.refresh(user)
             return UserResponse.model_validate(user)
-        finally:
-            session.close()
