@@ -92,7 +92,7 @@ class HotelManagementDBClient:
                 logger.info(f"🔄 Attempting DB connection to {host}:{port} (attempt {attempt})")
 
                 # 🔐 Validate cert chain before connecting
-                self._verify_proxy_certificate(host, port)
+                # self._verify_proxy_certificate(host, port)
 
                 connect_args = {
                     "sslmode": "verify-full",
