@@ -95,7 +95,7 @@ class HotelManagementDBClient:
                 # self._verify_proxy_certificate(host, port)
 
                 connect_args = {
-                    "sslmode": "verify-full",
+                    "sslmode": "require",
                     "sslrootcert": self.ssl_cert_path,
                 }
 
