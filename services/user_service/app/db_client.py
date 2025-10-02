@@ -7,9 +7,9 @@ import ssl
 import struct
 from pathlib import Path
 from typing import Optional
+from uuid import UUID
 
 import boto3
-from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
@@ -21,14 +21,6 @@ from models import User
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-
-def log_cert(host, port):
-    context = ssl.create_default_context()
-    with socket.create_connection((host, port)) as sock:
-        with context.wrap_socket(sock, server_hostname=host) as ssock:
-            cert = ssock.getpeercert()
-            logger.info(f"🔐 CN: {cert.get('subject')}")
-            logger.info(f"🔐 SAN: {cert.get('subjectAltName')}")
 
 class HotelManagementDBClient:
     def __init__(self, hotel_management_database_secret_name: str | None, region: str, proxy_endpoint: str | None) -> None:
@@ -45,29 +37,21 @@ class HotelManagementDBClient:
         self.ssl_cert_path = self._discover_cert_bundle()
 
         if self.ssl_cert_path:
-            logger.info("Using RDS trust store at %s", self.ssl_cert_path)
+            logger.info(f"✅ Using RDS trust store at: {self.ssl_cert_path}")
         else:
-            logger.warning(
-                "No RDS trust store found; falling back to sslmode=require. "
-                "Set SSL_CERT_PATH or bundle global-bundle.pem for full verification."
-            )
+            logger.warning("❌ No RDS trust store found. You must include global-bundle.pem in Lambda ZIP.")
+            raise RuntimeError("Missing required RDS cert bundle (e.g., global-bundle.pem)")
 
     def _discover_cert_bundle(self) -> Optional[str]:
-        bundle_names = ["us-east-1-bundle.pem", "global-bundle.pem", "rds-combined-ca-bundle.pem"]
-        task_root_env = os.getenv("LAMBDA_TASK_ROOT", "")
-        task_root = Path(task_root_env) if task_root_env else None
-        candidates = [os.getenv("SSL_CERT_PATH")]
-        for name in bundle_names:
-            if task_root:
-                candidates.append(str(task_root / name))
-                candidates.append(str(task_root / "certs" / name))
-            candidates.append(f"/app/{name}")
-            candidates.append(str(Path(__file__).resolve().with_name(name)))
-            candidates.append(str(Path(__file__).resolve().parent / "certs" / name))
-        candidates.append(str(Path("/etc/pki/tls/certs/ca-bundle.crt")))
-        for candidate in candidates:
-            if candidate and os.path.exists(candidate):
-                return candidate
+        candidates = [
+            os.getenv("SSL_CERT_PATH"),
+            "/var/task/global-bundle.pem",  # default inside Lambda bundle
+            str(Path(__file__).resolve().with_name("global-bundle.pem")),
+            str(Path("/etc/pki/tls/certs/ca-bundle.crt")),
+        ]
+        for path in candidates:
+            if path and os.path.exists(path):
+                return path
         return None
 
     def _get_secret(self) -> dict:
@@ -78,8 +62,6 @@ class HotelManagementDBClient:
     def _build_db_config(self) -> tuple[URL, str, int]:
         secret = self._get_secret()
         host = (self.proxy_endpoint or secret["host"]).strip()
-        logger.info(f"🔍 Connecting to DB host: {host}")
-
         port = int(secret.get("port", 5432))
         url = URL.create(
             drivername="postgresql+psycopg2",
@@ -100,34 +82,23 @@ class HotelManagementDBClient:
                 sock.sendall(ssl_request)
                 response = sock.recv(1)
                 if response != b"S":
-                    logger.warning(
-                        "RDS proxy at %s:%s did not accept SSL negotiation (response=%s)",
-                        host,
-                        port,
-                        response,
-                    )
+                    logger.warning(f"⚠️ RDS proxy at {host}:{port} did not accept SSL negotiation (response={response})")
                     return
 
-                context = ssl.create_default_context(cafile=self.ssl_cert_path or None)
+                context = ssl.create_default_context(cafile=self.ssl_cert_path)
                 context.check_hostname = True
                 context.verify_mode = ssl.CERT_REQUIRED
 
                 with context.wrap_socket(sock, server_hostname=host) as secure_sock:
                     cert = secure_sock.getpeercert()
                     sans = [value for key, value in cert.get("subjectAltName", []) if key == "DNS"]
-                    subject = cert.get("subject", [])
-                    issuer = cert.get("issuer", [])
-                    logger.info(
-                        "RDS proxy certificate for %s:%s subject=%s issuer=%s SANs=%s",
-                        host,
-                        port,
-                        subject,
-                        issuer,
-                        sans,
-                    )
+                    logger.info(f"🔐 Proxy Certificate verified for {host}:{port}")
+                    logger.debug(f"🔐 Subject: {cert.get('subject')}")
+                    logger.debug(f"🔐 Issuer: {cert.get('issuer')}")
+                    logger.debug(f"🔐 SANs: {sans}")
                     self._certificate_logged = True
         except Exception:
-            logger.exception("Unable to log certificate details for %s:%s", host, port)
+            logger.exception("❌ Unable to verify RDS proxy certificate.")
 
     def _init_engine(self):
         if self._engine:
@@ -136,12 +107,12 @@ class HotelManagementDBClient:
         for attempt in range(1, 4):
             try:
                 url, host, port = self._build_db_config()
+                logger.info(f"🔄 Attempting DB connection to {host}:{port} (attempt {attempt})")
                 self._verify_proxy_certificate(host, port)
-                logger.info("Connecting to DB (attempt %s)", attempt)
 
                 connect_args = {
                     "sslmode": "verify-full",
-                    "sslrootcert": "/var/task/global-bundle.pem",
+                    "sslrootcert": self.ssl_cert_path,
                 }
 
                 self._engine = create_engine(
@@ -151,17 +122,16 @@ class HotelManagementDBClient:
                     use_native_hstore=False,
                 )
                 self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
-                log_cert("hotel-management-db-proxy-int.proxy-capkwmowwxnt.us-east-1.rds.amazonaws.com", 5432)
 
                 with self._engine.connect() as _:
-                    logger.info("DB connection successful")
+                    logger.info("✅ DB connection successful.")
                 return
 
             except Exception as e:
-                logger.exception("Connection failed: %s", e)
+                logger.exception(f"❌ DB connection failed on attempt {attempt}: {e}")
                 time.sleep(2)
 
-        raise RuntimeError("All connection attempts failed.")
+        raise RuntimeError("❌ All DB connection attempts failed.")
 
     def get_session(self) -> Session:
         self._init_engine()
@@ -215,4 +185,3 @@ class HotelManagementDBClient:
             return UserResponse.model_validate(user)
         finally:
             session.close()
-
