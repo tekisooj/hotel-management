@@ -90,6 +90,7 @@ class HotelManagementDBClient:
             try:
                 url, host, port = self._build_db_config()
                 logger.info(f"🔄 Attempting DB connection to {host}:{port} (attempt {attempt})")
+                logger.info(f"DB URL {url}")
 
                 # 🔐 Validate cert chain before connecting
                 # self._verify_proxy_certificate(host, port)
