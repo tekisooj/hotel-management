@@ -139,11 +139,10 @@ class HotelManagementDBClient:
                 self._verify_proxy_certificate(host, port)
                 logger.info("Connecting to DB (attempt %s)", attempt)
 
-                connect_args = {"sslmode": "verify-full"}
-                if self.ssl_cert_path:
-                    connect_args["sslrootcert"] = self.ssl_cert_path
-                else:
-                    connect_args["sslmode"] = "require"
+                connect_args = {
+                    "sslmode": "verify-full",
+                    "sslrootcert": "/var/task/global-bundle.pem",
+                }
 
                 self._engine = create_engine(
                     url,
