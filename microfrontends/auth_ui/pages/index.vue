@@ -7,8 +7,8 @@
       <div class="selector">
         <label class="form-label" for="app">Application</label>
         <select id="app" v-model="selectedApp" class="form-select">
-          <option value="guest">Guest experience</option>
-          <option value="host">Host console</option>
+          <option value="guest">Guest</option>
+          <option value="host">Host</option>
         </select>
       </div>
 

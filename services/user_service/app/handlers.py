@@ -1,6 +1,12 @@
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request
-from schemas import SignUpRequest, UserCreate, UserResponse, UserUpdate
+from schemas import (
+    CurrentUserUpsertRequest,
+    SignUpRequest,
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+)
 from db_client import HotelManagementDBClient
 from cognito_client import CognitoClient
 import time, logging
@@ -41,6 +47,52 @@ async def get_logged_in_user(
     except Exception as e:
         logger.exception(f"❌ Error fetching user {user_uuid}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+async def upsert_logged_in_user(
+    payload: CurrentUserUpsertRequest,
+    hotel_management_db_client: HotelManagementDBClient = Depends(get_hotel_management_db_client),
+    user_uuid: UUID = Depends(get_current_user_uuid),
+) -> UserResponse:
+    logger.info(f"[POST /me] syncing user UUID={user_uuid}")
+
+    existing_user = hotel_management_db_client.get_user(user_uuid)
+    if existing_user:
+        logger.info("[POST /me] existing user found, updating profile")
+        update_payload = UserUpdate(
+            name=payload.name,
+            last_name=payload.last_name,
+            email=payload.email,
+            user_type=payload.user_type,
+        )
+        updated_user = hotel_management_db_client.update_user(user_uuid, update_payload)
+        return updated_user or existing_user
+
+    logger.info("[POST /me] creating new user profile")
+    user_create = UserCreate(
+        name=payload.name,
+        last_name=payload.last_name,
+        email=payload.email,
+        user_type=payload.user_type,
+    )
+
+    try:
+        hotel_management_db_client.create_user(user_create, user_uuid=user_uuid)
+    except HTTPException as exc:
+        if exc.status_code == 409:
+            logger.warning("[POST /me] user already exists, returning current data")
+            existing_user = hotel_management_db_client.get_user(user_uuid)
+            if existing_user:
+                return existing_user
+        raise
+
+    created_user = hotel_management_db_client.get_user(user_uuid)
+    if not created_user:
+        logger.error("[POST /me] creation succeeded but lookup failed")
+        raise HTTPException(status_code=500, detail="Failed to persist user")
+
+    logger.info("[POST /me] user synced successfully")
+    return created_user
+
 
 async def register_user(
     sign_up_data: SignUpRequest,

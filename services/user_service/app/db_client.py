@@ -1,9 +1,9 @@
 import os
 import json
-import time
 import logging
 import socket
 import ssl
+import time
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
@@ -12,7 +12,8 @@ import boto3
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, sessionmaker
 
 from schemas import UserCreate, UserResponse, UserUpdate
 from models import User
@@ -120,16 +121,27 @@ class HotelManagementDBClient:
         self._init_engine()
         return self._SessionLocal()
 
-    def create_user(self, user: UserCreate) -> UUID:
+    def create_user(self, user: UserCreate, user_uuid: UUID | None = None) -> UUID:
         with self.get_session() as session:
-            new_user = User(
+            user_kwargs = dict(
                 name=user.name,
                 last_name=user.last_name,
                 email=user.email,
                 user_type=user.user_type,
+                hashed_password="",
             )
+            if user_uuid is not None:
+                user_kwargs["uuid"] = user_uuid
+
+            new_user = User(**user_kwargs)
             session.add(new_user)
-            session.commit()
+
+            try:
+                session.commit()
+            except IntegrityError as exc:
+                session.rollback()
+                raise HTTPException(status_code=409, detail="User already exists") from exc
+
             session.refresh(new_user)
             return UserResponse.model_validate(new_user).uuid
 

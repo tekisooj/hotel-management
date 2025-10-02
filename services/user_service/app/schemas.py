@@ -43,3 +43,10 @@ class UserUpdate(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CurrentUserUpsertRequest(BaseModel):
+    name: str = Field(description="Name of a user")
+    last_name: str = Field(description="Last name of a user")
+    email: EmailStr = Field(description="Email of a user")
+    user_type: UserType = Field(description="User type", default=UserType.GUEST)

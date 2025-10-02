@@ -1,6 +1,13 @@
 from uuid import UUID
 from fastapi import APIRouter
-from handlers import get_logged_in_user, get_user, delete_user, register_user, update_user
+from handlers import (
+    delete_user,
+    get_logged_in_user,
+    get_user,
+    register_user,
+    update_user,
+    upsert_logged_in_user,
+)
 from schemas import UserResponse
 
 router = APIRouter(prefix="")
@@ -11,6 +18,15 @@ router.add_api_route(
     response_model=UserResponse,
     endpoint=get_logged_in_user,
     description="Returns the currently logged-in user's data",
+    tags=["User"]
+)
+
+router.add_api_route(
+    path="/me",
+    methods=["POST"],
+    response_model=UserResponse,
+    endpoint=upsert_logged_in_user,
+    description="Creates or updates the currently logged-in user's data",
     tags=["User"]
 )
 

@@ -143,6 +143,7 @@ class UserServiceStack(Stack):
         resource_user_id = resource_user.add_resource("{user_uuid}")
 
         resource_me.add_method("GET", integration)
+        resource_me.add_method("POST", integration)
         add_cors_options(resource_me)
 
         resource_user.add_method("POST", integration)

@@ -79,50 +79,32 @@ onMounted(async () => {
       user_type: desiredUserType,
     }
 
-    let me: User
+    let me: User | undefined
     try {
       me = await $fetch<User>(`${config.public.userApiBase}/me`, {
+        method: "POST",
+        body: postPayload,
         headers: authHeaders,
       })
-    } catch (getError: any) {
+    } catch (postError: any) {
       const status = Number(
-        getError?.status ??
-        getError?.response?.status ??
-        getError?.data?.status ??
-        getError?.cause?.status ??
+        postError?.status ??
+        postError?.response?.status ??
+        postError?.data?.status ??
+        postError?.cause?.status ??
         0,
       )
 
-      const isNotFound = status === 404
-      const canAttemptCreate = Boolean(postPayload.email)
-
-      if (!isNotFound || !canAttemptCreate) {
-        throw getError
+      const allowedStatuses = new Set([400, 401, 403, 404, 405, 409, 422])
+      if (!status || !allowedStatuses.has(status)) {
+        throw postError
       }
+    }
 
-      try {
-        me = await $fetch<User>(`${config.public.userApiBase}/me`, {
-          method: "POST",
-          body: postPayload,
-          headers: authHeaders,
-        })
-      } catch (postError: any) {
-        const postStatus = Number(
-          postError?.status ??
-          postError?.response?.status ??
-          postError?.data?.status ??
-          postError?.cause?.status ??
-          0,
-        )
-
-        if (postStatus === 409) {
-          me = await $fetch<User>(`${config.public.userApiBase}/me`, {
-            headers: authHeaders,
-          })
-        } else {
-          throw postError
-        }
-      }
+    if (!me) {
+      me = await $fetch<User>(`${config.public.userApiBase}/me`, {
+        headers: authHeaders,
+      })
     }
 
     store.setUser(me, idToken)
