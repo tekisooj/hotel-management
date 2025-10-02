@@ -97,7 +97,6 @@ class HotelManagementDBClient:
 
                 connect_args = {
                     "sslmode": "require",
-                    "sslrootcert": self.ssl_cert_path,
                 }
 
                 self._engine = create_engine(
