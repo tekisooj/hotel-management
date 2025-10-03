@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from schemas import UserCreate, UserResponse, UserUpdate, UserType
-from models import User
+from models import User, UserType as ModelUserType
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -129,7 +129,7 @@ class HotelManagementDBClient:
             )
             normalized_user_type = raw_user_type.strip().lower()
             try:
-                enum_user_type = UserType(normalized_user_type)
+                enum_user_type = ModelUserType(normalized_user_type)
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail="Invalid user type") from exc
 

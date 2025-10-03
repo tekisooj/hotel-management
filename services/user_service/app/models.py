@@ -2,6 +2,7 @@ from uuid import uuid4
 from sqlalchemy import Column, String, UUID
 from sqlalchemy.ext.declarative import declarative_base
 from enum import Enum
+from schemas import UserType as SchemaUserType
 from sqlalchemy import Enum as SqlEnum
 
 Base = declarative_base()
