@@ -16,7 +16,7 @@ from sqlalchemy.engine import URL
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from schemas import UserCreate, UserResponse, UserUpdate
+from schemas import UserCreate, UserResponse, UserUpdate, UserType
 from models import User
 
 logger = logging.getLogger()
@@ -127,11 +127,17 @@ class HotelManagementDBClient:
             raw_user_type = (
                 user.user_type.value if isinstance(user.user_type, Enum) else str(user.user_type)
             )
+            normalized_user_type = raw_user_type.strip().lower()
+            try:
+                enum_user_type = UserType(normalized_user_type)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="Invalid user type") from exc
+
             user_kwargs = dict(
                 name=user.name,
                 last_name=user.last_name,
                 email=user.email,
-                user_type=raw_user_type.strip().lower(),
+                user_type=enum_user_type,
                 hashed_password="",
             )
             if user_uuid is not None:
