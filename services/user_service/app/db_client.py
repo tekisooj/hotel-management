@@ -6,6 +6,7 @@ import ssl
 import time
 from pathlib import Path
 from typing import Optional
+from enum import Enum
 from uuid import UUID
 
 import boto3
@@ -123,11 +124,14 @@ class HotelManagementDBClient:
 
     def create_user(self, user: UserCreate, user_uuid: UUID | None = None) -> UUID:
         with self.get_session() as session:
+            raw_user_type = (
+                user.user_type.value if isinstance(user.user_type, Enum) else str(user.user_type)
+            )
             user_kwargs = dict(
                 name=user.name,
                 last_name=user.last_name,
                 email=user.email,
-                user_type=user.user_type,
+                user_type=raw_user_type.strip().lower(),
                 hashed_password="",
             )
             if user_uuid is not None:
