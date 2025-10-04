@@ -63,7 +63,7 @@ onMounted(async () => {
     }
 
     const selectedApp = state.app === "host" ? "host" : "guest"
-    const desiredUserType = selectedApp === "host" ? "staff" : "guest"
+    const desiredUserType = selectedApp === "host" ? "STAFF" : "GUEST"
 
     const emailClaim = getClaim("email")
     const emailLocalPart = emailClaim ? emailClaim.split("@")[0] : ""
@@ -109,7 +109,7 @@ onMounted(async () => {
 
     store.setUser(me, idToken)
 
-    const targetApp = selectedApp === "host" || me.user_type === "staff" ? "host" : "guest"
+    const targetApp = selectedApp === "host" || me.user_type === "STAFF" ? "host" : "guest"
     const targetBase = targetApp === "host" ? config.public.hostUiUrl : config.public.guestUiUrl
     const redirectUrl = buildTargetUrl(targetBase, idToken, refreshToken, state.redirect)
     window.location.href = redirectUrl
