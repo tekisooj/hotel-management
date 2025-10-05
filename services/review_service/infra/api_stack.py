@@ -14,8 +14,11 @@ class ReviewServiceStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
         self.env_name = env_name
 
+        suffix = f"-{pr_number}" if pr_number else ""
+
+
         self.lambda_role = Role(
-            self, f"ReviewServiceLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            self, f"ReviewServiceLambdaRole-{env_name}{suffix}",
             assumed_by=ServicePrincipal("lambda.amazonaws.com"), # type: ignore
             managed_policies=[
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
@@ -26,10 +29,9 @@ class ReviewServiceStack(Stack):
         self.review_table = Table(
             self,
             "review_table",
-            table_name=f"review_table_{env_name}{f'-{pr_number}' if pr_number else ''}",
+            table_name=f"review_table_{env_name}{suffix}",
             partition_key=Attribute(name="uuid", type=AttributeType.STRING),
             encryption=TableEncryption.AWS_MANAGED,
-            removal_policy=RemovalPolicy.RETAIN if self.env_name=="prod" else RemovalPolicy.DESTROY,
             billing_mode=BillingMode.PAY_PER_REQUEST
         )
 
@@ -46,7 +48,7 @@ class ReviewServiceStack(Stack):
         )
 
         self.lambda_function = Function(
-            self, f"ReviewServiceFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            self, f"ReviewServiceFunction-{env_name}{suffix}",
             runtime=Runtime.PYTHON_3_11,
             handler="main.handler",
             code=Code.from_asset("services/review_service/app"),
@@ -62,8 +64,8 @@ class ReviewServiceStack(Stack):
         self.review_table.grant_read_write_data(self.lambda_function)
 
         self.api = RestApi(
-            self, f"ReviewServiceApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            rest_api_name=f"review-service-api-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            self, f"ReviewServiceApi-{env_name}{suffix}",
+            rest_api_name=f"review-service-api-{env_name}{suffix}",
             description="API Gateway exposing review service Lambda",
             endpoint_types=[EndpointType.REGIONAL],
         )
