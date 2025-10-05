@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import Depends, HTTPException, Request, Response
+from fastapi import Depends, Request
 from db_client import ReviewDBClient
 from schemas import Review
 

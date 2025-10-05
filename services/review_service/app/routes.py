@@ -1,7 +1,6 @@
 from uuid import UUID
 from fastapi import APIRouter
 
-from handlers import add_property
 from handlers import add_review, get_property_reviews, get_user_reviews
 from schemas import Review
 
