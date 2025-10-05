@@ -29,7 +29,7 @@ class ReviewServiceStack(Stack):
             table_name=f"review_table_{env_name}{f'-{pr_number}' if pr_number else ''}",
             partition_key=Attribute(name="uuid", type=AttributeType.STRING),
             encryption=TableEncryption.AWS_MANAGED,
-            removal_policy=RemovalPolicy.RETAIN if self.env_name=="prop" else RemovalPolicy.DESTROY,
+            removal_policy=RemovalPolicy.RETAIN if self.env_name=="prod" else RemovalPolicy.DESTROY,
             billing_mode=BillingMode.PAY_PER_REQUEST
         )
 
