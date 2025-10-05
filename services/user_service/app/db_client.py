@@ -127,7 +127,7 @@ class HotelManagementDBClient:
             raw_user_type = (
                 user.user_type.value if isinstance(user.user_type, Enum) else str(user.user_type)
             )
-            normalized_user_type = raw_user_type.strip().lower()
+            normalized_user_type = raw_user_type.strip().upper()
             try:
                 enum_user_type = ModelUserType(normalized_user_type)
             except ValueError as exc:

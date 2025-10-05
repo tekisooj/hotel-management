@@ -3,8 +3,8 @@ from uuid import UUID
 from enum import Enum
 
 class UserType(str, Enum):
-    STAFF = "staff"
-    GUEST = "guest"
+    STAFF = "STAFF"
+    GUEST = "GUEST"
 
 class UserCreate(BaseModel):
     name: str = Field(description="Name of a user")

@@ -8,8 +8,8 @@ from sqlalchemy import Enum as SqlEnum
 Base = declarative_base()
 
 class UserType(str, Enum):
-    STAFF = "staff"
-    GUEST = "guest"
+    STAFF = "STAFF"
+    GUEST = "GUEST"
 
 class User(Base):
     __tablename__ = "users"

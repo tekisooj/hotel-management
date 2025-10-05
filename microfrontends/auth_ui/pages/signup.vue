@@ -8,8 +8,8 @@
       <input v-model="form.password" type="password" placeholder="Password" required />
 
       <select v-model="form.user_type">
-        <option value="guest">Guest</option>
-        <option value="staff">Host</option>
+        <option value="GUEST">Guest</option>
+        <option value="STAFF">Host</option>
       </select>
 
       <button type="submit">Register</button>
@@ -28,7 +28,7 @@ const form = ref({
   last_name: "",
   email: "",
   password: "",
-  user_type: "guest" as UserType,
+  user_type: "GUEST" as UserType,
 });
 
 const error = ref("");
