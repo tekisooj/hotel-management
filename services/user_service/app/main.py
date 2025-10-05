@@ -45,7 +45,7 @@ def create_app() -> FastAPI:
 
     # --- CORS ---
     allowed_origins = [
-        "https://d3h3g1mttxpuc6.cloudfront.net",  # INT Auth UI
+        "https://d157dmqdv1g4x6.cloudfront.net",  # INT Auth UI
         "https://d2ecdgwxri75mv.cloudfront.net",  # PROD Auth UI
         "https://demfm8bnd6dtk.cloudfront.net",   # Guest INT
         "https://dsfjwq83frzww.cloudfront.net",   # Guest PROD
