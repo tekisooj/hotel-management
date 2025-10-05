@@ -145,7 +145,7 @@ class HotelManagementDBClient:
         try:
             overlapping = session.query(BookingDB).filter(
                 BookingDB.room_uuid == room_uuid,
-                BookingDB.status != "canceled",
+                BookingDB.status != BookingStatus.CANCELLED.value,
                 BookingDB.check_in < check_out,
                 BookingDB.check_out > check_in,
             ).first()
@@ -161,7 +161,7 @@ class HotelManagementDBClient:
         try:
             overlapping = session.query(BookingDB.room_uuid).filter(
                 BookingDB.room_uuid.in_(room_uuids),
-                BookingDB.status != "canceled",
+                BookingDB.status != BookingStatus.CANCELLED.value,
                 BookingDB.check_in < check_out,
                 BookingDB.check_out > check_in,
             ).all()
