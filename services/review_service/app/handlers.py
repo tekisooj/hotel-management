@@ -1,6 +1,5 @@
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request, Response
-from schemas import Property
 from db_client import ReviewDBClient
 from schemas import Review
 
