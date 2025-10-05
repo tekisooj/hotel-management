@@ -17,5 +17,6 @@ BookingServiceStack(
         region="us-east-1",
     ), 
     env_name=env_name, 
-    pr_number=pr_number)
+    pr_number=pr_number
+)
 app.synth()

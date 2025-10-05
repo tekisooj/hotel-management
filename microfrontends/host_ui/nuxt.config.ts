@@ -36,7 +36,9 @@ export default defineNuxtConfig({
       awsRegion: process.env.AWS_REGION || '',
       awsPlaceIndex: process.env.VITE_AWS_PLACE_INDEX || '',
       awsLocationApiKey: process.env.VITE_AWS_LOCATION_API_KEY || '',
-      devUserId: process.env.DEV_USER_ID || ''
+      devUserId: process.env.DEV_USER_ID || '',
+      authUiUrl: process.env.AUTH_UI_URL || '',
+      hostUiUrl: process.env.HOST_UI_URL || '',
     },
   },
 })

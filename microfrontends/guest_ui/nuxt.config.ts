@@ -1,3 +1,5 @@
+import { defineNuxtConfig } from "nuxt/config";
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   ssr: false, // build as SPA (good for S3/CloudFront)
@@ -39,6 +41,12 @@ export default defineNuxtConfig({
       awsPlaceIndex: process.env.VITE_AWS_PLACE_INDEX || '',
       // Optional dev convenience header for BFF when no JWT
       devUserId: process.env.DEV_USER_ID || '',
+      authUiUrl: process.env.AUTH_UI_URL || '',
+      guestUiUrl: process.env.GUEST_UI_URL || '',
+      cognitoAppClientId: process.env.AUTH_UI_URL || '',
+      cognitoHostedUiDomain: process.env.COGNITO_API_DOMAIN || '',
+      awsRegion: process.env.AWS_REGION || '',
+      cognitoUserPoolId: process.env.COGNITO_USER_POOL_ID || ''
     },
   },
 })

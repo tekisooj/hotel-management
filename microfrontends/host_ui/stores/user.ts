@@ -37,11 +37,21 @@ export const useUserStore = defineStore('user', {
     setToken(token: string | null) {
       this.token = token
       this.uuid = token ? getUserUuidFromToken(token) : null
+      if (typeof window !== 'undefined') {
+        if (token) {
+          window.localStorage.setItem('id_token', token)
+        } else {
+          window.localStorage.removeItem('id_token')
+        }
+      }
     },
     clear() {
       this.token = null
       this.uuid = null
       this.profile = null
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('id_token')
+      }
     },
     async fetchProfile() {
       const config = useRuntimeConfig()
@@ -54,4 +64,5 @@ export const useUserStore = defineStore('user', {
     },
   },
 })
+
 

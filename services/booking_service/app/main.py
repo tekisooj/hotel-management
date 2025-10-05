@@ -1,5 +1,6 @@
 import logging
 import os
+import socket
 import sys
 from fastapi import FastAPI
 from routes import router
@@ -24,7 +25,7 @@ def create_app() -> FastAPI:
         description=app_metadata.app_description
     )
     app.state.app_metadata = app_metadata
-    app.state.user_table_client = HotelManagementDBClient(app_config.hotel_management_database_secret_name, app_config.region)
+    app.state.hotel_management_db_client = HotelManagementDBClient(hotel_management_database_secret_name=app_config.hotel_management_database_secret_name, region=app_config.region, proxy_endpoint=app_config.db_proxy_endpoint)
 
     app.include_router(router)
 

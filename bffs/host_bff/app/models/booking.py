@@ -23,7 +23,7 @@ class Booking(BaseModel):
     status: BookingStatus = Field(description="Status of the booking")
     created_at: datetime = Field(description="Created at")
     updated_at: datetime = Field(description="Updated at")
-
+   
 class BookingUpdateRequest(BaseModel):
     booking_uuid: UUID = Field(description="Booking uuid")
     check_in: datetime | None = Field(default=None)

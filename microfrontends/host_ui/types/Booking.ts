@@ -10,4 +10,6 @@ export interface Booking {
     status: BookingStatus;
     createdAt: Date;
     updatedAt: Date;
+    guestName?: string;
+    guestEmail?: string;
 }

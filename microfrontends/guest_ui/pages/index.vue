@@ -103,14 +103,11 @@ async function submit() {
         resultsRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       })
     }
-  } catch (e) {
+  } catch {
     propertyDetails.value = []
   }
 }
 
-function scrollToResults() {
-  resultsRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
 </script>
 
 <style scoped>
@@ -411,3 +408,4 @@ function scrollToResults() {
   }
 }
 </style>
+
