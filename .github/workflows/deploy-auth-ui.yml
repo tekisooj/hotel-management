@@ -57,13 +57,12 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::${{ env.CDK_DEFAULT_ACCOUNT }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
-      - name: Deploy Auth UI (PR)
+      - name: Deploy Auth UI (INT)
         working-directory: microfrontends/auth_ui/infra
         run: |
-          cdk deploy "AuthUiStack-pr-${{ github.event.pull_request.number }}" \
+          cdk deploy "AuthUiStack-int" \
             --app "python3 app.py" \
-            --context env=pr \
-            --context pr_number=${{ github.event.pull_request.number }} \
+            --context env=int \
             --require-approval never
 
   build-and-deploy-int:
