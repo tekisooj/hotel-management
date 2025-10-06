@@ -10,8 +10,7 @@ import httpx
 from models.review import Review
 from models.booking import Booking, BookingStatus
 from models.user import UserResponse, UserUpdate
-from models.property import Property, PropertyDetail, Room
-from models.property import Availability
+from models.property import Availability, Property, PropertyDetail, Room
 from models.asset import AssetUploadRequest, AssetUploadResponse
 import os
 import boto3
