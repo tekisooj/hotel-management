@@ -58,6 +58,7 @@ class JWTVerifier:
                 key,
                 audience=self.audience,
                 algorithms=[alg] if alg else ["RS256"],
+                options={"verify_at_hash": False},
             )
         except Exception as e:
             raise HTTPException(status_code=401, detail=f"Invalid token: {e}")

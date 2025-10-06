@@ -105,8 +105,13 @@ export function useHostBff() {
   const user = useUserStore()
 
   function authHeaders() {
-    if (user.token) {
-      return { Authorization: `Bearer ${user.token}` }
+    let token = user.token
+    if (!token && typeof window !== 'undefined') {
+      token = window.localStorage.getItem('id_token')
+      if (token) user.setToken(token)
+    }
+    if (token) {
+      return { Authorization: `Bearer ${token}` }
     }
     const devUserId = (config.public as any).devUserId as string | undefined
     return devUserId ? { 'X-User-Id': devUserId } : {}
