@@ -9,7 +9,9 @@ export default defineNuxtRouteMiddleware((to) => {
   if (!user.token) {
     const authUrl = new URL(config.public.authUiUrl || '/')
     authUrl.searchParams.set('app', 'guest')
-    authUrl.searchParams.set('redirect', window.location.href)
+    const { pathname, search, hash } = window.location
+    const redirectTarget = `${pathname}${search}${hash}` || '/'
+    authUrl.searchParams.set('redirect', redirectTarget)
     return navigateTo(authUrl.toString(), { external: true })
   }
 })

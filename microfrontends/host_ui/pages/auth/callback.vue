@@ -20,7 +20,7 @@ onMounted(async () => {
     user.clear()
     const authUrl = new URL(config.public.authUiUrl || '/')
     authUrl.searchParams.set('app', 'host')
-    authUrl.searchParams.set('redirect', window.location.origin)
+    authUrl.searchParams.set('redirect', '/')
     window.location.href = authUrl.toString()
     return
   }
