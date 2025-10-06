@@ -31,7 +31,12 @@ onMounted(async () => {
   const destination = typeof redirectParam === 'string' && redirectParam.length
     ? redirectParam
     : '/'
-  router.replace(destination)
+
+  if (/^https?:\/\//i.test(destination)) {
+    window.location.replace(destination)
+  } else {
+    router.replace(destination)
+  }
 })
 </script>
 
