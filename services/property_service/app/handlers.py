@@ -60,7 +60,10 @@ async def get_property(
     property_table_client: PropertyTableClient = Depends(get_property_table_client),
     asset_storage: S3AssetStorage | None = Depends(get_asset_storage),
 ) -> Property:
-    property_obj = property_table_client.get_property(property_uuid)
+    try:
+        property_obj = property_table_client.get_property(property_uuid)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Property not found") from exc
     return add_image_url(property_obj, asset_storage) # type: ignore
 
 

@@ -120,6 +120,11 @@ class PropertyServiceStack(Stack):
         resource_property_id = resource_property.add_resource("{property_uuid}")
         resource_property_id.add_method("GET", integration)
 
+        resource_user = api.root.add_resource("user")
+        resource_user_id = resource_user.add_resource("{user_uuid}")
+        resource_user_properties = resource_user_id.add_resource("properties")
+        resource_user_properties.add_method("GET", integration)
+
         resource_room = api.root.add_resource("room")
         resource_room.add_method("POST", integration)
 
