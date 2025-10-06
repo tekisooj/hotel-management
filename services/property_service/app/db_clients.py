@@ -68,7 +68,7 @@ class PropertyTableClient:
             TableName=self.property_table_name,
             IndexName="user_uuid_index",
             KeyConditionExpression="user_uuid = :user_uuid",
-            ExpressionAttributeValues={":user_uuid": {"S": user_uuid}},
+            ExpressionAttributeValues={":user_uuid": {"S": str(user_uuid)}},
         )
 
         items = response.get("Items", [])
