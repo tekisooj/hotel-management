@@ -66,7 +66,7 @@ class PropertyTableClient:
     def get_user_properties(self, user_uuid: UUID) -> list[Property]:
         response = self.property_db_client.query(
             TableName=self.property_table_name,
-            IndexName="user_uuid_index",
+            IndexName="user_index",
             KeyConditionExpression="user_uuid = :user_uuid",
             ExpressionAttributeValues={":user_uuid": {"S": str(user_uuid)}},
         )
