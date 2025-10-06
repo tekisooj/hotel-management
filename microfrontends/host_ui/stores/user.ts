@@ -1,11 +1,30 @@
-import { defineStore, storeToRefs } from 'pinia'
+import { defineStore } from 'pinia'
 import { jwtDecode } from 'jwt-decode'
+
+type DecodedToken = {
+  [key: string]: unknown
+  exp?: number
+  'custom:user_uuid'?: string
+  sub?: string
+}
+
+export function isTokenExpired(token?: string | null): boolean {
+  if (!token) return true
+  try {
+    const payload = jwtDecode<DecodedToken>(token)
+    if (payload.exp == null) return false
+    const expiresAt = payload.exp * 1000
+    return Date.now() >= expiresAt
+  } catch {
+    return true
+  }
+}
 
 export function getUserUuidFromToken(token: string): string | null {
   try {
-    if (!token) return null
-    const payload: any = jwtDecode(token)
-    return (payload['custom:user_uuid'] as string) || (payload['sub'] as string) || null
+    if (!token || isTokenExpired(token)) return null
+    const payload = jwtDecode<DecodedToken>(token)
+    return payload['custom:user_uuid'] || payload.sub || null
   } catch {
     return null
   }
@@ -35,6 +54,10 @@ export const useUserStore = defineStore('user', {
   },
   actions: {
     setToken(token: string | null) {
+      if (token && isTokenExpired(token)) {
+        this.clear()
+        return
+      }
       this.token = token
       this.uuid = token ? getUserUuidFromToken(token) : null
       if (typeof window !== 'undefined') {
@@ -55,7 +78,10 @@ export const useUserStore = defineStore('user', {
     },
     async fetchProfile() {
       const config = useRuntimeConfig()
-      if (!this.token) return
+      if (!this.token || isTokenExpired(this.token)) {
+        this.clear()
+        return
+      }
       const me = await $fetch<UserProfile>(`${config.public.apiBase}/me`, {
         headers: { Authorization: `Bearer ${this.token}` },
       })
