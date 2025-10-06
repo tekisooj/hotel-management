@@ -176,7 +176,7 @@ async def get_user_properties(
     headers = _forward_auth_headers(request)
 
     response = await property_service_client.get(
-        f"properties/{str(current_user_uuid)}",
+        f"property/{str(current_user_uuid)}",
         headers=headers or None,
     )
     if response.status_code != 200:
