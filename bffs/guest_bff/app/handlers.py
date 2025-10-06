@@ -419,6 +419,7 @@ async def get_user_reviews(
 
 
 async def get_filtered_rooms(
+    request: Request,
     check_in_date: datetime | None = None,
     check_out_date: datetime | None = None,
     amenities: list[Amenity] | None = None,
@@ -431,7 +432,6 @@ async def get_filtered_rooms(
     longitude: float | None = None,
     radius_km: float | None = None,
     rating_above: float | None = None,
-    request: Request,
     review_service_client: AsyncClient = Depends(get_review_service_client),
     booking_service_client: AsyncClient = Depends(get_booking_service_client),
     property_service_client: AsyncClient = Depends(get_property_service_client),
