@@ -344,17 +344,22 @@ async def get_bookings(
         raise HTTPException(status_code=rooms_response.status_code, detail=rooms_response.text)
     rooms_response = rooms_response.json()
     rooms = [Room(**room) for room in rooms_response]
-    params = {
+    base_params = {
         "check_in": check_in.isoformat(),
         "check_out": check_out.isoformat(),
     }
-    for room in rooms:
-        params["room_uuid"] = str(room.uuid)
-        bookings_response = await booking_service_client.get(
-            "bookings",
-            params=params,
-            headers=headers or None,
-        )
+
+    semaphore = asyncio.Semaphore(5)
+
+    async def fetch_availability(room: Room) -> Availability:
+        params = {**base_params, "room_uuid": str(room.uuid)}
+        async with semaphore:
+            bookings_response = await booking_service_client.get(
+                "bookings",
+                params=params,
+                headers=headers or None,
+                timeout=20.0,
+            )
         if bookings_response.status_code != 200:
             raise HTTPException(status_code=bookings_response.status_code, detail=bookings_response.text)
         bookings_payload = bookings_response.json()
@@ -364,7 +369,10 @@ async def get_bookings(
         availability.bookings = room_bookings
         for booking in room_bookings:
             unique_user_ids.add(str(booking.user_uuid))
-        availabilities.append(availability)
+        return availability
+
+    if rooms:
+        availabilities.extend(await asyncio.gather(*(fetch_availability(room) for room in rooms)))
 
     user_details: dict[str, dict[str, Any]] = {}
 
@@ -445,4 +453,3 @@ async def get_property_reviews(
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     reviews_response = resp.json() or []
     return [Review(**review) for review in reviews_response]
-
