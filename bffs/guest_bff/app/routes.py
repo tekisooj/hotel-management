@@ -75,7 +75,7 @@ router.add_api_route(
 router.add_api_route(
     path="/rooms",
     methods=["GET"],
-    response_model=PropertyDetail,
+    response_model=list[PropertyDetail],
     endpoint=get_filtered_rooms,
     description="Get filtered rooms"
 )

@@ -56,7 +56,7 @@ router.add_api_route(
 )
 
 router.add_api_route(
-    path="/property/{user_uuid}",
+    path="/user/{user_uuid}/properties",
     methods=["GET"],
     response_model=list[Property],
     endpoint=get_user_properties,

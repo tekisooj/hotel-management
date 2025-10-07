@@ -10,8 +10,7 @@ import httpx
 from models.review import Review
 from models.booking import Booking, BookingStatus
 from models.user import UserResponse, UserUpdate
-from models.property import Property, PropertyDetail, Room
-from models.property import Availability
+from models.property import Availability, Property, PropertyDetail, Room
 from models.asset import AssetUploadRequest, AssetUploadResponse
 import os
 import boto3
@@ -66,6 +65,7 @@ class JWTVerifier:
                 key,
                 audience=self.audience,
                 algorithms=[alg] if alg else ["RS256"],
+                options={"verify_at_hash": False},
             )
         except Exception as e:
             raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
@@ -100,6 +100,20 @@ def get_place_index(request: Request) -> str | None:
     # Prefer value set on app state; fall back to env var
     place_index = getattr(request.app.state, "place_index", None)
     return place_index or os.environ.get("PLACE_INDEX_NAME")
+
+
+def _forward_auth_headers(request: Request) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    auth = request.headers.get("Authorization")
+    if auth:
+        headers["Authorization"] = auth
+    else:
+        env = getattr(getattr(request.app.state, "app_metadata", None), "host_bff_env", None)
+        if env != "prod":
+            xuid = request.headers.get("X-User-Id")
+            if xuid:
+                headers["X-User-Id"] = xuid
+    return headers
 
 
 def _extract_image_key(image: Any) -> str | None:
@@ -154,11 +168,16 @@ async def search_places(
 
 
 async def get_user_properties(
+    request: Request,
     current_user_uuid: UUID = Depends(get_current_user_uuid),
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> list[PropertyDetail]:
-    
-    response = await property_service_client.get(f"/properties/{str(current_user_uuid)}")
+    headers = _forward_auth_headers(request)
+
+    response = await property_service_client.get(
+        f"user/{str(current_user_uuid)}/properties",
+        headers=headers or None,
+    )
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
 
@@ -166,7 +185,10 @@ async def get_user_properties(
     property_details = [PropertyDetail(**prop) for prop in response_body]
 
     for property_detail in property_details:
-        rooms_response = await property_service_client.get(f"/rooms/{str(property_detail.uuid)}")
+        rooms_response = await property_service_client.get(
+            f"rooms/{str(property_detail.uuid)}",
+            headers=headers or None,
+        )
         if rooms_response.status_code != 200:
             raise HTTPException(status_code=rooms_response.status_code, detail=rooms_response.text)
 
@@ -177,12 +199,18 @@ async def get_user_properties(
 
 async def add_property(
     property: PropertyDetail,
+    request: Request,
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
+    headers = _forward_auth_headers(request)
     prop = Property(**property.model_dump())
     prop_payload = prop.model_dump(mode="json", exclude_none=True)
     _normalize_images_field(prop_payload)
-    response = await property_service_client.post("/property", json=prop_payload)
+    response = await property_service_client.post(
+        "property",
+        json=prop_payload,
+        headers=headers or None,
+    )
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     prop_uuid = response.json()
@@ -192,7 +220,11 @@ async def add_property(
         room_payload = room.model_dump(mode="json", exclude_none=True)
         _normalize_images_field(room_payload)
         room_payload["property_uuid"] = prop_uuid
-        response = await property_service_client.post("/room", json=room_payload)
+        response = await property_service_client.post(
+            "room",
+            json=room_payload,
+            headers=headers or None,
+        )
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=response.text)
 
@@ -200,11 +232,17 @@ async def add_property(
 
 async def add_room(
     room: Room,
+    request: Request,
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
+    headers = _forward_auth_headers(request)
     room_payload = room.model_dump(mode="json", exclude_none=True)
     _normalize_images_field(room_payload)
-    response = await property_service_client.post("/room", json=room_payload)
+    response = await property_service_client.post(
+        "room",
+        json=room_payload,
+        headers=headers or None,
+    )
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     room_uuid = response.json()
@@ -212,12 +250,15 @@ async def add_room(
 
 async def create_asset_upload_url(
     payload: AssetUploadRequest,
+    request: Request,
     property_service_client: AsyncClient = Depends(get_property_service_client),
 ) -> AssetUploadResponse:
+    headers = _forward_auth_headers(request)
     try:
         response = await property_service_client.post(
-            "/assets/upload-url",
+            "assets/upload-url",
             json=payload.model_dump(mode="json", exclude_none=True),
+            headers=headers or None,
         )
     except HTTPError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -227,9 +268,14 @@ async def create_asset_upload_url(
 
 async def delete_room(
     room_uuid: UUID,
+    request: Request,
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
-    response = await property_service_client.delete(f"/room/{str(room_uuid)}")
+    headers = _forward_auth_headers(request)
+    response = await property_service_client.delete(
+        f"room/{str(room_uuid)}",
+        headers=headers or None,
+    )
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     return room_uuid
@@ -237,9 +283,14 @@ async def delete_room(
 
 async def delete_property(
     property_uuid: UUID,
+    request: Request,
     property_service_client: AsyncClient = Depends(get_property_service_client)
 ) -> UUID:
-    response = await property_service_client.delete(f"/property/{str(property_uuid)}")
+    headers = _forward_auth_headers(request)
+    response = await property_service_client.delete(
+        f"property/{str(property_uuid)}",
+        headers=headers or None,
+    )
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     return property_uuid
@@ -248,9 +299,15 @@ async def delete_property(
 async def change_booking_status(
     booking_uuid: UUID,
     booking_status: BookingStatus,
+    request: Request,
     booking_service_client: AsyncClient = Depends(get_booking_service_client),
 ) -> Booking:
-    response = await booking_service_client.patch("/booking", json={"booking_uuid":str(booking_uuid), "status": booking_status.value})
+    headers = _forward_auth_headers(request)
+    response = await booking_service_client.patch(
+        "booking",
+        json={"booking_uuid": str(booking_uuid), "status": booking_status.value},
+        headers=headers or None,
+    )
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     response = response.json()
@@ -260,11 +317,16 @@ async def get_bookings(
     property_uuid: UUID,
     check_in: datetime,
     check_out: datetime,
+    request: Request,
     property_service_client: AsyncClient = Depends(get_property_service_client),
     booking_service_client: AsyncClient = Depends(get_booking_service_client),
     user_service_client: AsyncClient = Depends(get_user_service_client),
 ) -> list[Availability]:
-    property_response = await property_service_client.get(f"/property/{str(property_uuid)}")
+    headers = _forward_auth_headers(request)
+    property_response = await property_service_client.get(
+        f"property/{str(property_uuid)}",
+        headers=headers or None,
+    )
     if property_response.status_code != 200:
         raise HTTPException(status_code=property_response.status_code, detail=property_response.text)
 
@@ -274,7 +336,10 @@ async def get_bookings(
     availabilities: list[Availability] = []
     unique_user_ids: set[str] = set()
 
-    rooms_response = await property_service_client.get(f"/rooms/{str(property_obj.uuid)}")
+    rooms_response = await property_service_client.get(
+        f"rooms/{str(property_obj.uuid)}",
+        headers=headers or None,
+    )
     if rooms_response.status_code != 200:
         raise HTTPException(status_code=rooms_response.status_code, detail=rooms_response.text)
     rooms_response = rooms_response.json()
@@ -285,7 +350,11 @@ async def get_bookings(
     }
     for room in rooms:
         params["room_uuid"] = str(room.uuid)
-        bookings_response = await booking_service_client.get("/bookings", params=params)
+        bookings_response = await booking_service_client.get(
+            "bookings",
+            params=params,
+            headers=headers or None,
+        )
         if bookings_response.status_code != 200:
             raise HTTPException(status_code=bookings_response.status_code, detail=bookings_response.text)
         bookings_payload = bookings_response.json()
@@ -304,7 +373,10 @@ async def get_bookings(
             if user_uuid in user_details:
                 return
             try:
-                response = await user_service_client.get(f"/user/{user_uuid}")
+                response = await user_service_client.get(
+                    f"user/{user_uuid}",
+                    headers=headers or None,
+                )
             except HTTPError:
                 return
             if response.status_code == 200:
@@ -331,8 +403,8 @@ async def get_current_user(
     request: Request,
     user_service_client: AsyncClient = Depends(get_user_service_client),
 ) -> UserResponse:
-    auth = request.headers.get("Authorization", "")
-    resp = await user_service_client.get("/me", headers={"Authorization": auth}, timeout=10.0)
+    headers = _forward_auth_headers(request)
+    resp = await user_service_client.get("me", headers=headers or None, timeout=10.0)
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     return UserResponse(**resp.json())
@@ -344,12 +416,12 @@ async def update_current_user(
     current_user_uuid: UUID = Depends(get_current_user_uuid),
     user_service_client: AsyncClient = Depends(get_user_service_client),
 ) -> UserResponse | None:
-    auth = request.headers.get("Authorization", "")
+    headers = _forward_auth_headers(request)
     payload = update.model_dump(exclude_none=True)
     resp = await user_service_client.patch(
-        f"/user/{str(current_user_uuid)}",
+        f"user/{str(current_user_uuid)}",
         json=payload,
-        headers={"Authorization": auth},
+        headers=headers or None,
         timeout=10.0,
     )
     if resp.status_code >= 400:
@@ -360,9 +432,15 @@ async def update_current_user(
 
 async def get_property_reviews(
     property_uuid: UUID,
+    request: Request,
     review_service_client: AsyncClient = Depends(get_review_service_client),
 ) -> list[Review]:
-    resp = await review_service_client.get(f"/reviews/{str(property_uuid)}", timeout=10.0)
+    headers = _forward_auth_headers(request)
+    resp = await review_service_client.get(
+        f"reviews/{str(property_uuid)}",
+        timeout=10.0,
+        headers=headers or None,
+    )
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     reviews_response = resp.json() or []

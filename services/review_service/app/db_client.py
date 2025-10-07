@@ -1,9 +1,7 @@
 from datetime import datetime
-import json
 from uuid import UUID, uuid4
 
 import boto3
-from fastapi import HTTPException
 
 from schemas import Review
 from utils import from_dynamodb_item, to_dynamodb_item

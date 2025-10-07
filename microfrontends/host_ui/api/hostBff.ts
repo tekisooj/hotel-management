@@ -2,7 +2,7 @@ import { NuxtAxiosInstance } from '@nuxtjs/axios'
 
 import { PropertyDetail } from '@/types/PropertyDetail'
 import { useRuntimeConfig } from 'nuxt/app'
-import { useUserStore } from '@/stores/user'
+import { useUserStore, isTokenExpired } from '@/stores/user'
 import { Booking } from 'types/Booking'
 import { BookingStatus } from 'types/BookingStatus'
 import { Review } from 'types/Review'
@@ -105,8 +105,22 @@ export function useHostBff() {
   const user = useUserStore()
 
   function authHeaders() {
-    if (user.token) {
-      return { Authorization: `Bearer ${user.token}` }
+    let token = user.token
+    if (!token && typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('id_token')
+      if (stored && !isTokenExpired(stored)) {
+        user.setToken(stored)
+        token = stored
+      } else if (stored) {
+        window.localStorage.removeItem('id_token')
+      }
+    }
+    if (token && isTokenExpired(token)) {
+      user.clear()
+      token = null
+    }
+    if (token) {
+      return { Authorization: `Bearer ${token}` }
     }
     const devUserId = (config.public as any).devUserId as string | undefined
     return devUserId ? { 'X-User-Id': devUserId } : {}

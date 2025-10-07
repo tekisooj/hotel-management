@@ -27,10 +27,10 @@ host_bff_prod_configuration = AppConfiguration(
 )
 
 host_bff_int_configuration = AppConfiguration(
-    user_service_url="https://g8bpnxtiii.execute-api.us-east-1.amazonaws.com/prod",
+    user_service_url="https://g8bpnxtiii.execute-api.us-east-1.amazonaws.com/prod/",
     booking_service_url="https://sn2evwp3ub.execute-api.us-east-1.amazonaws.com/prod/",
-    property_service_url="https://92znf03thc.execute-api.us-east-1.amazonaws.com/prod",
-    review_service_url="https://vdt7h3agnj.execute-api.us-east-1.amazonaws.com/prod",    
+    property_service_url="https://92znf03thc.execute-api.us-east-1.amazonaws.com/prod/",
+    review_service_url="https://pu6e8qc16b.execute-api.us-east-1.amazonaws.com/prod/",    
     audience=os.environ.get("AUDIENCE", None),
     jwks_url=os.environ.get("JWKS_URL", None),
     place_index=os.environ.get("PLACE_INDEX_NAME", None)

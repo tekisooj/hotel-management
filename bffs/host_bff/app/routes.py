@@ -18,7 +18,7 @@ from handlers import (
 )
 from models.asset import AssetUploadResponse
 from models.booking import Booking
-from models.property import Property, PropertyDetail, Room
+from models.property import Availability, Property, PropertyDetail, Room
 from models.review import Review
 from models.user import UserResponse
 
@@ -76,7 +76,7 @@ router.add_api_route(
 router.add_api_route(
     path="/bookings",
     methods=["GET"],
-    response_model=list[Booking],
+    response_model=list[Availability],
     endpoint=get_bookings,
     description="Get bookings",
 )

@@ -20,7 +20,7 @@ onMounted(async () => {
     user.clear()
     const authUrl = new URL(config.public.authUiUrl || '/')
     authUrl.searchParams.set('app', 'guest')
-    authUrl.searchParams.set('redirect', window.location.origin)
+    authUrl.searchParams.set('redirect', '/')
     window.location.href = authUrl.toString()
     return
   }
@@ -31,7 +31,12 @@ onMounted(async () => {
   const destination = typeof redirectParam === 'string' && redirectParam.length
     ? redirectParam
     : '/'
-  router.replace(destination)
+
+  if (/^https?:\/\//i.test(destination)) {
+    window.location.replace(destination)
+  } else {
+    router.replace(destination)
+  }
 })
 </script>
 

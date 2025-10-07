@@ -13,7 +13,7 @@ export function useAuthSession() {
       const nextPath = `${basePath}/logout`
       authUrl.pathname = nextPath.startsWith('/') ? nextPath : `/${nextPath}`
       authUrl.searchParams.set('app', 'guest')
-      authUrl.searchParams.set('redirect', window.location.origin)
+      authUrl.searchParams.set('redirect', '/')
       window.location.href = authUrl.toString()
     }
   }

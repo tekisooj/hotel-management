@@ -1,6 +1,4 @@
 import logging
-import os
-import sys
 from fastapi import FastAPI
 from routes import router
 from db_client import ReviewDBClient
