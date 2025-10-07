@@ -2,6 +2,16 @@ import { defineStore } from 'pinia'
 import type { PropertyDetail } from '@/types/PropertyDetail'
 import type { Room } from '@/types/Room'
 
+type SearchSnapshot = {
+  country: string
+  city: string
+  state?: string
+  checkIn?: string
+  checkOut?: string
+  capacity?: number
+  maxPrice?: number
+}
+
 function pick<T>(obj: any, key: string, fallback?: T): T | undefined {
   if (obj && typeof obj === 'object') {
     if (key in obj) return obj[key]
@@ -61,6 +71,7 @@ export const useSearchStore = defineStore('guest-search', {
   state: () => ({
     propertiesById: {} as Record<string, PropertyDetail>,
     roomsById: {} as Record<string, Room>,
+    lastSearch: null as SearchSnapshot | null,
   }),
   actions: {
     ingestSearch(results: any[]) {
@@ -74,11 +85,22 @@ export const useSearchStore = defineStore('guest-search', {
     },
     setProperty(raw: any) {
       const p = normalizeProperty(raw)
-      if (p?.uuid) this.propertiesById[p.uuid] = p
+      if (p?.uuid) {
+        this.propertiesById[p.uuid] = p
+        for (const r of p.rooms || []) {
+          if (r.uuid) this.roomsById[r.uuid] = r
+        }
+      }
     },
     setRoom(raw: any) {
       const r = normalizeRoom(raw)
       if (r?.uuid) this.roomsById[r.uuid] = r
+    },
+    setLastSearch(snapshot: SearchSnapshot) {
+      this.lastSearch = { ...snapshot }
+    },
+    clearLastSearch() {
+      this.lastSearch = null
     },
   },
   getters: {
@@ -86,4 +108,3 @@ export const useSearchStore = defineStore('guest-search', {
     getRoom: (state) => (uuid: string) => state.roomsById[uuid],
   },
 })
-

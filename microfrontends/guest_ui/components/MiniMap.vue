@@ -3,21 +3,26 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
+
 const props = defineProps<{ latitude?: number; longitude?: number; zoom?: number }>()
 const container = ref<HTMLDivElement | null>(null)
 
 onMounted(() => {
   if (!container.value || props.latitude == null || props.longitude == null) return
-  // @ts-ignore maplibregl is loaded via CDN in app head
-  const map = new maplibregl.Map({
+  if (typeof window === 'undefined') return
+  const maplibre = (window as any).maplibregl
+  if (!maplibre?.Map) return
+
+  const map = new maplibre.Map({
     container: container.value,
-    style: `https://demotiles.maplibre.org/style.json`,
+    style: 'https://demotiles.maplibre.org/style.json',
     center: [props.longitude, props.latitude],
     zoom: props.zoom ?? 12,
     interactive: false,
   })
-  // @ts-ignore
-  new maplibregl.Marker().setLngLat([props.longitude, props.latitude]).addTo(map)
+
+  new maplibre.Marker().setLngLat([props.longitude, props.latitude]).addTo(map)
 })
 </script>
 
@@ -29,4 +34,3 @@ onMounted(() => {
   overflow: hidden;
 }
 </style>
-

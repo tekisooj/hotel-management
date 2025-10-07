@@ -19,8 +19,8 @@
       </div>
       <slot name="extra"></slot>
     </div>
-    <span class="badge bg-primary rounded-pill align-self-start" v-if="hotel.average_rating != null">
-      {{ Number(hotel.averageRating).toFixed(1) }} &#9733;
+    <span class="badge bg-primary rounded-pill align-self-start" v-if="averageRating != null">
+      {{ averageRating.toFixed(1) }} &#9733;
     </span>
     <MiniMap
       v-if="hotel.latitude != null && hotel.longitude != null"
@@ -31,8 +31,17 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import MiniMap from '@/components/MiniMap.vue'
-import { PropertyDetail } from '@/types/PropertyDetail'
+import type { PropertyDetail } from '@/types/PropertyDetail'
 
-defineProps<{ hotel: PropertyDetail }>()
+const props = defineProps<{ hotel: PropertyDetail }>()
+
+const averageRating = computed(() => {
+  const raw = (props.hotel as any).averageRating ?? (props.hotel as any).average_rating
+  if (raw == null) return null
+  const numeric = typeof raw === 'number' ? raw : Number(raw)
+  return Number.isFinite(numeric) ? numeric : null
+})
 </script>
+

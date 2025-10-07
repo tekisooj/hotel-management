@@ -94,6 +94,15 @@ async function submit() {
       capacity: capacity.value || undefined,
       max_price: maxPrice.value || undefined,
     })
+    store.setLastSearch({
+      country: country.value,
+      city: city.value,
+      state: state.value || undefined,
+      checkIn: checkIn.value || undefined,
+      checkOut: checkOut.value || undefined,
+      capacity: capacity.value || undefined,
+      maxPrice: maxPrice.value || undefined,
+    })
     propertyDetails.value = Array.isArray(res) ? res : []
     if (Array.isArray(propertyDetails.value)) {
       store.ingestSearch(propertyDetails.value)
@@ -408,4 +417,5 @@ async function submit() {
   }
 }
 </style>
+
 

@@ -91,7 +91,7 @@ router.add_api_route(
 router.add_api_route(
     path="/property/{property_uuid}",
     methods=["GET"],
-    response_model=Property,
+    response_model=PropertyDetail,
     endpoint=fetch_property,
     description="Get property details"
 )

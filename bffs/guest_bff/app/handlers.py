@@ -137,7 +137,7 @@ async def fetch_property(
     property_uuid: UUID,
     request: Request,
     property_service_client: AsyncClient = Depends(get_property_service_client),
-) -> Property:
+) -> PropertyDetail:
     headers = _forward_auth_headers(request)
     resp = await property_service_client.get(
         f"property/{str(property_uuid)}",
@@ -146,8 +146,18 @@ async def fetch_property(
     )
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    data = resp.json()
-    return Property(**data)
+    data = resp.json() or {}
+
+    rooms_resp = await property_service_client.get(
+        "rooms",
+        params={"property_uuid": str(property_uuid)},
+        timeout=10.0,
+        headers=headers or None,
+    )
+    rooms_payload = rooms_resp.json() if rooms_resp.status_code == 200 else []
+    data["rooms"] = rooms_payload
+
+    return PropertyDetail(**data)
 
 async def fetch_room(
     room_uuid: UUID,
