@@ -1,6 +1,7 @@
 from datetime import datetime, date
 import asyncio
 from decimal import Decimal, ROUND_HALF_UP
+from typing import Any
 from uuid import UUID, uuid4
 from fastapi import Depends, HTTPException, Request
 from httpx import AsyncClient, HTTPError
@@ -10,7 +11,7 @@ from jose import jwt
 import httpx
 
 from models.review import Review
-from models.booking import Booking
+from models.booking import Booking, BookingStatus
 from models.user import UserResponse, UserUpdate
 from models.property import Amenity, Property, PropertyDetail, Room
 from models.payment import (
