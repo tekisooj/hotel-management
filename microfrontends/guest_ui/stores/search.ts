@@ -3,13 +3,16 @@ import type { PropertyDetail } from '@/types/PropertyDetail'
 import type { Room } from '@/types/Room'
 
 type SearchSnapshot = {
-  country: string
-  city: string
+  country?: string
+  city?: string
   state?: string
   checkIn?: string
   checkOut?: string
   capacity?: number
   maxPrice?: number
+  latitude?: number
+  longitude?: number
+  radiusKm?: number
 }
 
 function pick<T>(obj: any, key: string, fallback?: T): T | undefined {

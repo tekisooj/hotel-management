@@ -1,8 +1,4 @@
-from aws_cdk import (
-    Duration,
-    RemovalPolicy,
-    Stack,
-)
+from aws_cdk import Duration, RemovalPolicy, Stack
 from aws_cdk.aws_apigateway import EndpointType, LambdaIntegration, RestApi
 from aws_cdk.aws_dynamodb import Attribute, AttributeType, BillingMode, Table, TableEncryption
 from aws_cdk.aws_iam import ManagedPolicy, Role, ServicePrincipal
@@ -20,7 +16,7 @@ class PropertyServiceStack(Stack):
         lambda_role = Role(
             self,
             f"PropertyServiceLambdaRole-{env_name}{suffix}",
-            assumed_by=ServicePrincipal("lambda.amazonaws.com"),  # type: ignore
+            assumed_by=ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
             ],
@@ -86,7 +82,7 @@ class PropertyServiceStack(Stack):
             runtime=Runtime.PYTHON_3_11,
             handler="main.handler",
             code=Code.from_asset("services/property_service/app"),
-            role=lambda_role,  # type: ignore
+            role=lambda_role,
             timeout=Duration.seconds(30),
             memory_size=512,
             environment={
@@ -108,7 +104,7 @@ class PropertyServiceStack(Stack):
             description="API Gateway exposing property service Lambda",
             endpoint_types=[EndpointType.REGIONAL],
         )
-        integration = LambdaIntegration(lambda_function, proxy=True)  # typing: ignore
+        integration = LambdaIntegration(lambda_function, proxy=True)
 
         resource_assets = api.root.add_resource("assets")
         resource_assets_upload = resource_assets.add_resource("upload-url")
@@ -119,6 +115,8 @@ class PropertyServiceStack(Stack):
 
         resource_property_id = resource_property.add_resource("{property_uuid}")
         resource_property_id.add_method("GET", integration)
+        resource_property_id.add_method("PUT", integration)
+        resource_property_id.add_method("DELETE", integration)
 
         resource_user = api.root.add_resource("user")
         resource_user_id = resource_user.add_resource("{user_uuid}")
@@ -127,9 +125,11 @@ class PropertyServiceStack(Stack):
 
         resource_room = api.root.add_resource("room")
         resource_room.add_method("POST", integration)
+        resource_room.add_method("PUT", integration)
 
         resource_room_id = resource_room.add_resource("{room_uuid}")
         resource_room_id.add_method("GET", integration)
+        resource_room_id.add_method("DELETE", integration)
 
         resource_rooms = api.root.add_resource("rooms")
         resource_rooms.add_method("GET", integration)

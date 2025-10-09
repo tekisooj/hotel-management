@@ -57,9 +57,12 @@ function buildAuthHeaders(userStore: ReturnType<typeof useUserStore>, devUserId?
 }
 
 type SearchRoomsParams = {
-  country: string
-  city: string
+  country?: string
+  city?: string
   state?: string
+  latitude?: number
+  longitude?: number
+  radius_km?: number
   check_in_date: string
   check_out_date: string
   capacity?: number
@@ -109,13 +112,24 @@ export function useGuestBff() {
 
   async function searchRooms(params: SearchRoomsParams): Promise<PropertyDetail[]> {
     const query: Record<string, string | number> = {
-      country: params.country,
-      city: params.city,
       check_in_date: params.check_in_date,
       check_out_date: params.check_out_date,
     }
+    if (params.country) {
+      query.country = params.country
+    }
+    if (params.city) {
+      query.city = params.city
+    }
     if (params.state) {
       query.state = params.state
+    }
+    if (typeof params.latitude === 'number' && typeof params.longitude === 'number') {
+      query.latitude = params.latitude
+      query.longitude = params.longitude
+      if (typeof params.radius_km === 'number' && params.radius_km > 0) {
+        query.radius_km = params.radius_km
+      }
     }
     if (typeof params.capacity === 'number' && params.capacity > 0) {
       query.capacity = params.capacity
@@ -129,7 +143,6 @@ export function useGuestBff() {
       headers: authHeaders(),
     })
   }
-
   async function addReview(body: { property_uuid: string; rating: number; comment?: string }) {
     const { property_uuid, ...rest } = body
     return await $fetch(`${baseURL}/review/${property_uuid}`, {
@@ -233,4 +246,3 @@ export function useGuestBff() {
     capturePayment,
   }
 }
-
