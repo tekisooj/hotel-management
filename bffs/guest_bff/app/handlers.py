@@ -407,7 +407,7 @@ async def create_payment_order(
     token, base_url = await _paypal_access_token(request)
     logger.info(f"Token {token} bas_url {base_url}")
     order_body = {
-        "intent": "CAPTURE",
+        "intent": "capture",
         "purchase_units": [
             {
                 "reference_id": str(payload.room_uuid),
