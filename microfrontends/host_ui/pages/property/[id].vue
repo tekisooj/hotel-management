@@ -172,13 +172,13 @@
             {{ room.capacity }} guests  ${{ Number(room.price_per_night ?? room.pricePerNight ?? 0).toFixed(2) }} per night
           </p>
           <p v-if="room.description">{{ room.description }}</p>
-          <div class="host-room-images" v-if="room.images?.length">
-            <img
-              v-for="(image, idx) in room.images"
-              :key="image.key || idx"
-              :src="image.url"
-              :alt="`${room.name} image ${idx + 1}`"
-            />
+          <div class="host-room-images" v-if="roomGalleryImages(room).length">
+            <template v-for="(image, idx) in roomGalleryImages(room)" :key="image.key || idx">
+              <img
+                :src="image.url"
+                :alt="`${room.name} image ${idx + 1}`"
+              />
+            </template>
           </div>
           <div class="host-room-actions">
             <button type="button" class="host-link" @click="startRoomEdit(room)">Edit room</button>
@@ -358,7 +358,14 @@ function normalizeImageList(images: unknown): NormalizedImage[] {
     .filter((image): image is NormalizedImage => image !== null)
 }
 
-const images = computed(() => normalizeImageList(property.value?.images).filter((image) => !!image.url))
+function galleryImages(images: unknown): NormalizedImage[] {
+  return normalizeImageList(images).filter((image) => !!image.url)
+}
+
+function roomGalleryImages(room: any): NormalizedImage[] {
+  return galleryImages(room?.images)
+}
+const images = computed(() => galleryImages(property.value?.images))
 const roomCount = computed(() => rooms.value.length)
 const locationLabel = computed(() => {
   if (!property.value) return ''
@@ -398,9 +405,7 @@ async function loadPropertyDetail() {
           .filter((room: any) => !!room)
           .map((room: any) => ({ ...room, images: normalizeImageList(room?.images) }))
       : []
-    property.value = detail
-      ? { ...detail, images: normalizeImageList(detail?.images), rooms: normalizedRooms }
-      : null
+    property.value = detail || null
     rooms.value = normalizedRooms
     if (isEditingProperty.value) {
       hydrateEditProperty()

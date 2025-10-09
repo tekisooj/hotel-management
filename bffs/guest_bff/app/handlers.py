@@ -704,8 +704,7 @@ async def get_filtered_rooms(
         room_filter_params["amenities"] = [a.name for a in amenities]
 
     if not properties:
-        raise ValueError("Location must be provided.")
-
+        return []
     for property in properties:
         params = {"property_uuid": str(property.uuid)}
         params.update(room_filter_params)
@@ -784,3 +783,4 @@ async def get_filtered_rooms(
         available_room_entries = list(filter(lambda x: x.average_rating and x.average_rating>=rating_above, available_room_entries))
 
     return available_room_entries
+
