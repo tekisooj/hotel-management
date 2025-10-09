@@ -275,6 +275,7 @@ import { useHostBff } from '@/api/hostBff'
 import type { PropertyDetail } from '@/types/PropertyDetail'
 import type { Room } from '@/types/Room'
 import type { Amenity } from '@/types/Amenity'
+import { RoomType } from '@/types/RoomType'
 
 const route = useRoute()
 const router = useRouter()

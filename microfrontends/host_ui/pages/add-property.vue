@@ -140,7 +140,7 @@ const { addProperty, createAssetUploadUrl } = useHostBff();
 const config = useRuntimeConfig()
 const user = useUserStore()
 
-const roomTypes: RoomType[] = ['single', 'double', 'suite', 'family', 'deluxe', 'studio'];
+const roomTypes = Object.values(RoomType)
 
 const pendingUploads = ref(0)
 const uploadError = ref<string | null>(null)
