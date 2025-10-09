@@ -130,7 +130,11 @@ const propertyAddress = computed(() => {
   )
 })
 
-const paypalClientId = computed(() => config.public.paypalClientId as string)
+const paypalClientIdFromConfig = computed(() => (config.public.paypalClientId as string || '').trim())
+const activePaypalClientId = ref<string | null>(paypalClientIdFromConfig.value || null)
+let paypalSdkClientId: string | null = null
+let paypalSdkLoading: Promise<void> | null = null
+let initializeOrderPromise: Promise<void> | null = null
 
 onMounted(async () => {
   if (!roomUuid.value || !checkIn.value || !checkOut.value) {
@@ -140,8 +144,9 @@ onMounted(async () => {
   }
   try {
     await hydrateRoom()
-    await ensurePayPalSdk()
-    renderPayPalButtons()
+    await initializePaymentOrder(false)
+    orderId.value = null
+    await renderPayPalButtons()
   } catch (err: any) {
     error.value = parseError(err, 'Unable to prepare the payment page.')
   } finally {
@@ -181,46 +186,98 @@ async function hydrateRoom() {
   }
 }
 
-async function ensurePayPalSdk() {
+async function initializePaymentOrder(force = false) {
+  if (!force && orderId.value) {
+    return
+  }
+  if (initializeOrderPromise) {
+    await initializeOrderPromise
+    return
+  }
+  initializeOrderPromise = (async () => {
+    const response = await createPaymentOrder({
+      room_uuid: roomUuid.value,
+      check_in: checkIn.value,
+      check_out: checkOut.value,
+      guests: guests.value,
+    })
+    orderId.value = response.order_id
+    orderAmount.value = response.amount
+
+    if (response.paypal_client_id) {
+      activePaypalClientId.value = response.paypal_client_id
+    } else if (!activePaypalClientId.value) {
+      activePaypalClientId.value = paypalClientIdFromConfig.value || null
+    }
+
+    const clientId = activePaypalClientId.value || paypalClientIdFromConfig.value || null
+    if (!clientId) {
+      throw new Error('PayPal client ID is not configured.')
+    }
+    await ensurePayPalSdk(clientId)
+  })()
+
+  try {
+    await initializeOrderPromise
+  } finally {
+    initializeOrderPromise = null
+  }
+}
+
+async function ensurePayPalSdk(clientId: string) {
   if (typeof window === 'undefined') return
-  if (!paypalClientId.value) {
+  if (!clientId) {
     throw new Error('PayPal client ID is not configured.')
   }
-  if ((window as any).paypal) {
+
+  if (paypalSdkClientId === clientId && (window as any).paypal?.Buttons) {
     return
   }
-  if (document.getElementById('paypal-sdk')) {
-    await waitForPayPal()
-    return
+
+  if (paypalSdkLoading) {
+    try {
+      await paypalSdkLoading
+      if (paypalSdkClientId === clientId && (window as any).paypal?.Buttons) {
+        return
+      }
+    } catch {
+      // fall through to reload
+    }
   }
-  await new Promise<void>((resolve, reject) => {
+
+  const existingScript = document.getElementById('paypal-sdk') as HTMLScriptElement | null
+  if (existingScript) {
+    const existingId =
+      existingScript.getAttribute('data-client-id') ||
+      (existingScript.src ? new URL(existingScript.src, window.location.origin).searchParams.get('client-id') : '')
+    if (existingId === clientId && (window as any).paypal?.Buttons) {
+      paypalSdkClientId = clientId
+      return
+    }
+    existingScript.remove()
+  }
+
+  delete (window as any).paypal
+  paypalSdkClientId = clientId
+
+  paypalSdkLoading = new Promise<void>((resolve, reject) => {
     const script = document.createElement('script')
     script.id = 'paypal-sdk'
-    script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId.value}&currency=USD&intent=CAPTURE`
+    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=CAPTURE&components=buttons`
+    script.setAttribute('data-client-id', clientId)
     script.onload = () => resolve()
     script.onerror = () => reject(new Error('Unable to load PayPal SDK.'))
     document.head.appendChild(script)
   })
+
+  try {
+    await paypalSdkLoading
+  } finally {
+    paypalSdkLoading = null
+  }
 }
 
-function waitForPayPal(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let attempts = 0
-    const maxAttempts = 20
-    const timer = window.setInterval(() => {
-      attempts += 1
-      if ((window as any).paypal) {
-        window.clearInterval(timer)
-        resolve()
-      } else if (attempts >= maxAttempts) {
-        window.clearInterval(timer)
-        reject(new Error('PayPal SDK did not load in time.'))
-      }
-    }, 200)
-  })
-}
-
-function renderPayPalButtons() {
+async function renderPayPalButtons() {
   if (paypalButtonsRendered.value || typeof window === 'undefined') return
   const paypal = (window as any).paypal
   if (!paypal?.Buttons) {
@@ -237,15 +294,16 @@ function renderPayPalButtons() {
       paymentError.value = null
       paymentSuccess.value = false
       bookingUuid.value = null
-      const response = await createPaymentOrder({
-        room_uuid: roomUuid.value,
-        check_in: checkIn.value,
-        check_out: checkOut.value,
-        guests: guests.value,
-      })
-      orderId.value = response.order_id
-      orderAmount.value = response.amount
-      return response.order_id
+      try {
+        await initializePaymentOrder(true)
+        if (!orderId.value) {
+          throw new Error('Unable to create PayPal order.')
+        }
+        return orderId.value
+      } catch (err) {
+        paymentError.value = parseError(err, 'Unable to create the PayPal order.')
+        throw err
+      }
     },
     onApprove: async (data: any) => {
       paymentError.value = null
@@ -260,30 +318,37 @@ function renderPayPalButtons() {
         bookingUuid.value = String(result.booking_uuid)
         orderAmount.value = result.amount
         paymentSuccess.value = true
+        orderId.value = null
       } catch (err: any) {
-        paymentError.value = parseError(err, 'We could not finalize your booking. No charges were applied.')
+        paymentError.value = parseError(err, 'Something went wrong while processing the payment.')
       }
     },
     onCancel: () => {
       paymentError.value = 'Payment was cancelled. You can try again when ready.'
+      orderId.value = null
     },
     onError: (err: any) => {
       paymentError.value = parseError(err, 'Something went wrong while processing the payment.')
+      orderId.value = null
     },
   }).render('#paypal-button-container')
 }
 
-function formatDate(input: string): string {
-  if (!input) return '--'
-  const date = new Date(input)
-  if (Number.isNaN(date.getTime())) return input
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(date)
+function formatPrice(value: number) {
+  return value.toFixed(2)
 }
 
-function formatPrice(value: number | string): string {
-  const num = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(num)) return '--'
-  return num.toFixed(2)
+function formatDate(value: string) {
+  if (!value) return '—'
+  try {
+    return new Date(value).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  } catch (err) {
+    return value
+  }
 }
 
 function pick(source: any, camel: string, snake: string) {
@@ -306,8 +371,16 @@ function goHome() {
 }
 
 function returnToRoom() {
-  if (roomUuid.value) {
-    router.push({ path: `/room/${roomUuid.value}`, query: { checkIn: checkIn.value, checkOut: checkOut.value, guests: String(guests.value) } })
+  const targetUuid = room.value?.uuid || roomUuid.value
+  if (targetUuid) {
+    router.push({
+      path: `/room/${targetUuid}`,
+      query: {
+        checkIn: checkIn.value,
+        checkOut: checkOut.value,
+        guests: String(guests.value),
+      },
+    })
   } else {
     goHome()
   }
@@ -450,4 +523,7 @@ function returnToRoom() {
   }
 }
 </style>
+
+
+
 

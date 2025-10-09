@@ -19,7 +19,9 @@ interface HostBff {
   getProperties(): Promise<any>
   getProperty(propertyUuid: string): Promise<PropertyDetail>
   addProperty(property: PropertyDetail): Promise<any>
+  updateProperty(propertyUuid: string, property: PropertyDetail): Promise<PropertyDetail>
   addRoom(room: Room): Promise<any>
+  updateRoom(roomUuid: string, room: Room): Promise<Room>
   deleteRoom(roomUuid: string): Promise<any>
   deleteProperty(propertyUuid: string): Promise<any>
   getBookings(propertyUuid: string, checkInDate: Date, checkOutDate: Date): Promise<RoomAvailability[]>
@@ -72,6 +74,26 @@ function mapAvailability(raw: any): RoomAvailability {
 
 function mapAvailabilityList(list: any[]): RoomAvailability[] {
   return Array.isArray(list) ? list.map(mapAvailability) : []
+}
+
+function mapPropertyDetailToPayload(body: PropertyDetail, ownerId?: string | null) {
+  return {
+    uuid: body.uuid || undefined,
+    user_uuid: ownerId || body.userUuid || undefined,
+    name: body.name,
+    description: body.description,
+    country: body.country,
+    state: body.state,
+    city: body.city,
+    county: body.county,
+    address: body.address,
+    full_address: body.fullAddress,
+    latitude: body.latitude,
+    longitude: body.longitude,
+    stars: body.stars,
+    place_id: (body as any).placeId,
+    images: normalizeImages(body.images),
+  }
 }
 
 export default (axios: NuxtAxiosInstance): HostBff => ({
@@ -154,20 +176,7 @@ export function useHostBff() {
   async function addProperty(body: PropertyDetail): Promise<string> {
     const devUserId = (config.public as any).devUserId as string | undefined
     const payload: any = {
-      user_uuid: body.userUuid || devUserId,
-      name: body.name,
-      description: body.description,
-      country: body.country,
-      state: body.state,
-      city: body.city,
-      county: body.county,
-      address: body.address,
-      full_address: body.fullAddress,
-      latitude: body.latitude,
-      longitude: body.longitude,
-      stars: body.stars,
-      place_id: (body as any).placeId,
-      images: normalizeImages(body.images),
+      ...mapPropertyDetailToPayload(body, devUserId ?? null),
       rooms: body.rooms?.map((room) => ({
         uuid: room.uuid,
         property_uuid: room.propertyUuid,
@@ -190,6 +199,16 @@ export function useHostBff() {
     return typeof res === 'string' ? res : res.uuid
   }
 
+  async function updateProperty(propertyUuid: string, body: PropertyDetail): Promise<PropertyDetail> {
+    const payload = mapPropertyDetailToPayload(body, null)
+    payload.uuid = propertyUuid
+    return await $fetch<PropertyDetail>(`${baseURL}/property/${propertyUuid}`, {
+      method: 'PATCH',
+      body: payload,
+      headers: authHeaders(),
+    })
+  }
+
   async function addRoom(body: Room): Promise<string> {
     const payload: any = {
       uuid: body.uuid || undefined,
@@ -210,6 +229,27 @@ export function useHostBff() {
       headers: authHeaders(),
     })
     return typeof res === 'string' ? res : res.uuid
+  }
+
+  async function updateRoom(roomUuid: string, body: Room): Promise<Room> {
+    const payload: any = {
+      uuid: roomUuid,
+      property_uuid: body.propertyUuid,
+      name: body.name,
+      description: body.description,
+      capacity: body.capacity,
+      room_type: body.roomType,
+      price_per_night: body.pricePerNight,
+      min_price_per_night: body.minPricePerNight,
+      max_price_per_night: body.maxPricePerNight,
+      amenities: body.amenities,
+      images: normalizeImages(body.images),
+    }
+    return await $fetch<Room>(`${baseURL}/room/${roomUuid}`, {
+      method: 'PUT',
+      body: payload,
+      headers: authHeaders(),
+    })
   }
 
   async function deleteRoom(room_uuid: string): Promise<string> {
@@ -274,7 +314,9 @@ export function useHostBff() {
     getProperties,
     getProperty,
     addProperty,
+    updateProperty,
     addRoom,
+    updateRoom,
     deleteRoom,
     deleteProperty,
     getBookings,
@@ -284,5 +326,4 @@ export function useHostBff() {
     searchPlaces,
   }
 }
-
 

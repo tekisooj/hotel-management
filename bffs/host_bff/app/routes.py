@@ -4,7 +4,9 @@ from fastapi import APIRouter
 
 from handlers import (
     add_property,
+    update_property,
     add_room,
+    update_room,
     change_booking_status,
     create_asset_upload_url,
     delete_property,
@@ -59,11 +61,27 @@ router.add_api_route(
 )
 
 router.add_api_route(
+    path="/property/{property_uuid}",
+    methods=["PATCH"],
+    response_model=PropertyDetail,
+    endpoint=update_property,
+    description="Update property details",
+)
+
+router.add_api_route(
     path="/room",
     methods=["POST"],
     response_model=UUID,
     endpoint=add_room,
     description="Add a new room",
+)
+
+router.add_api_route(
+    path="/room/{room_uuid}",
+    methods=["PUT"],
+    response_model=Room,
+    endpoint=update_room,
+    description="Update user room",
 )
 
 router.add_api_route(
