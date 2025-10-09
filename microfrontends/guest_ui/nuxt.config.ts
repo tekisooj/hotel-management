@@ -1,5 +1,12 @@
 import { defineNuxtConfig } from "nuxt/config";
 
+const guestApiStage = process.env.GUEST_API_STAGE || 'prod'
+const guestApiDomain = process.env.GUEST_API_DOMAIN ? (process.env.GUEST_API_DOMAIN as string).replace(/\/$/, '') : ''
+const guestApiFallback = guestApiDomain
+  ? (guestApiDomain.endsWith(`/${guestApiStage}`) ? guestApiDomain : `${guestApiDomain}/${guestApiStage}`)
+  : ''
+const resolvedGuestApiBase = (process.env.GUEST_API_BASE || guestApiFallback || '').replace(/\/$/, '')
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   ssr: false, // build as SPA (good for S3/CloudFront)
@@ -34,10 +41,8 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      // Use explicit base if provided; else derive from domain with '/prod'
-      apiBase: process.env.GUEST_API_BASE || (
-        process.env.GUEST_API_DOMAIN ? `${(process.env.GUEST_API_DOMAIN as string).replace(/\/$/, '')}/prod` : ''
-      ),
+      // Use explicit base if provided; else derive from domain and avoid duplicating the stage
+      apiBase: resolvedGuestApiBase,
       awsPlaceIndex: process.env.VITE_AWS_PLACE_INDEX || '',
       // Optional dev convenience header for BFF when no JWT
       devUserId: process.env.DEV_USER_ID || '',
