@@ -125,6 +125,8 @@ class PropertyTableClient:
             "FilterExpression": " AND ".join(filter_expr_parts),
             "ExpressionAttributeValues": eav,
         }
+        if state:
+            params.setdefault("ExpressionAttributeNames", {})["#state"] = "state"
 
         results: list[Property] = []
         while True:
@@ -335,3 +337,4 @@ class RoomTableClient:
         response = self.room_db_client.query(**params)
         items = response.get("Items", [])
         return [Room(**from_dynamodb_item(it)) for it in items]
+
