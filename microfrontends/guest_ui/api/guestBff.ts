@@ -13,6 +13,8 @@ interface GuestBff {
   getUserBookings(): Promise<any>
   cancelUserBooking(bookingUuid: string): Promise<any>
   getFilteredRooms(params: Record<string, unknown>): Promise<any>
+  createPaymentOrder(payload: PaymentOrderRequest): Promise<PaymentOrderResponse>
+  capturePayment(payload: CapturePaymentRequest): Promise<CapturePaymentResponse>
 }
 
 declare module '@nuxt/types' {
@@ -29,6 +31,8 @@ export default (axios: NuxtAxiosInstance): GuestBff => ({
   getUserBookings: async () => axios.$get('my/bookings'),
   cancelUserBooking: async (bookingUuid: string) => axios.$delete(`my/booking/${bookingUuid}`),
   getFilteredRooms: async (params: Record<string, unknown>) => axios.$get('rooms', { params }),
+  createPaymentOrder: async (payload: PaymentOrderRequest) => axios.$post('booking/payment/order', payload),
+  capturePayment: async (payload: CapturePaymentRequest) => axios.$post('booking/payment/capture', payload),
 })
 
 function buildAuthHeaders(userStore: ReturnType<typeof useUserStore>, devUserId?: string) {
@@ -60,6 +64,37 @@ type SearchRoomsParams = {
   check_out_date: string
   capacity?: number
   max_price?: number
+}
+
+type PaymentOrderRequest = {
+  room_uuid: string
+  check_in: string
+  check_out: string
+  guests: number
+}
+
+interface PaymentAmount {
+  currency_code: string
+  value: string
+}
+
+type PaymentOrderResponse = {
+  order_id: string
+  amount: PaymentAmount
+  nights: number
+  nightly_rate: string
+  room_name: string
+  paypal_client_id?: string | null
+}
+
+type CapturePaymentRequest = PaymentOrderRequest & {
+  order_id: string
+}
+
+type CapturePaymentResponse = {
+  booking_uuid: string
+  payment_status: string
+  amount: PaymentAmount
 }
 
 export function useGuestBff() {
@@ -166,6 +201,22 @@ export function useGuestBff() {
     })
   }
 
+  async function createPaymentOrder(payload: PaymentOrderRequest): Promise<PaymentOrderResponse> {
+    return await $fetch<PaymentOrderResponse>(`${baseURL}/booking/payment/order`, {
+      method: 'POST',
+      body: payload,
+      headers: authHeaders(),
+    })
+  }
+
+  async function capturePayment(payload: CapturePaymentRequest): Promise<CapturePaymentResponse> {
+    return await $fetch<CapturePaymentResponse>(`${baseURL}/booking/payment/capture`, {
+      method: 'POST',
+      body: payload,
+      headers: authHeaders(),
+    })
+  }
+
   return {
     searchRooms,
     addReview,
@@ -178,5 +229,8 @@ export function useGuestBff() {
     getRoom,
     getProperty,
     searchPlaces,
+    createPaymentOrder,
+    capturePayment,
   }
 }
+

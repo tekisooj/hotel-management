@@ -46,7 +46,8 @@ export default defineNuxtConfig({
       cognitoAppClientId: process.env.AUTH_UI_URL || '',
       cognitoHostedUiDomain: process.env.COGNITO_API_DOMAIN || '',
       awsRegion: process.env.AWS_REGION || '',
-      cognitoUserPoolId: process.env.COGNITO_USER_POOL_ID || ''
+      cognitoUserPoolId: process.env.COGNITO_USER_POOL_ID || '',
+      paypalClientId: process.env.PAYPAL_CLIENT_ID || ''
     },
   },
 })

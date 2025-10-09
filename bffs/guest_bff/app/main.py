@@ -36,6 +36,9 @@ def create_app() -> FastAPI:
     app.state.jwt_verifier = JWTVerifier(jwks_url=app_config.jwks_url, audience=app_config.audience, env=app_metadata.guest_bff_env)
     app.state.event_bus = EventBusClient(app_config.event_bus_name)
     app.state.place_index = app_config.place_index
+    app.state.paypal_client_id = app_config.paypal_client_id
+    app.state.paypal_client_secret = app_config.paypal_client_secret
+    app.state.paypal_base_url = app_config.paypal_base_url or "https://api-m.sandbox.paypal.com"
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

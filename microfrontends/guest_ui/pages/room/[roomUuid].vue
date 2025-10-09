@@ -60,18 +60,11 @@
             <label>Guests</label>
             <input v-model.number="guests" type="number" min="1" />
           </div>
-          <button class="reserve" :disabled="!canReserve || isSubmitting">
-            <span v-if="isSubmitting">Booking...</span>
-            <span v-else>Reserve</span>
-          </button>
+          <button class="reserve" :disabled="!canReserve">Proceed to payment</button>
         </form>
         <div class="booking-summary" v-if="canReserve">
           <span>{{ nights }} night<span v-if="nights !== 1">s</span> total: ${{ formatPrice(totalPrice) }}</span>
         </div>
-        <p v-if="submissionError" class="booking-message error">{{ submissionError }}</p>
-        <p v-if="bookingConfirmation" class="booking-message success">
-          Booking confirmed! Reference {{ bookingConfirmation }}.
-        </p>
 
         <h3 class="section-title">Address</h3>
         <p class="address" v-if="property">
@@ -93,7 +86,7 @@ import { useSearchStore } from '@/stores/search'
 
 const route = useRoute()
 const router = useRouter()
-const { getRoom, getProperty, addBooking } = useGuestBff()
+const { getRoom, getProperty } = useGuestBff()
 const store = useSearchStore()
 
 const loading = ref(true)
@@ -102,9 +95,6 @@ const property = ref<PropertyDetail | null>(null)
 const checkIn = ref('')
 const checkOut = ref('')
 const guests = ref(2)
-const isSubmitting = ref(false)
-const submissionError = ref<string | null>(null)
-const bookingConfirmation = ref<string | null>(null)
 
 const propertyRating = computed(() => {
   if (!property.value) return null
@@ -181,10 +171,6 @@ function applyDefaults() {
   }
 }
 
-function toIso(date: string) {
-  return new Date(`${date}T00:00:00`).toISOString()
-}
-
 async function load() {
   loading.value = true
   const roomUuid = route.params.roomUuid as string | undefined
@@ -229,39 +215,22 @@ async function load() {
   }
 }
 
-async function reserve() {
+function reserve() {
   if (!canReserve.value || !room.value) return
-  isSubmitting.value = true
-  submissionError.value = null
-  bookingConfirmation.value = null
-  try {
-    const nowIso = new Date().toISOString()
-    const bookingUuid =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`
-    const payload = {
-      uuid: bookingUuid,
-      room_uuid: room.value.uuid,
-      check_in: toIso(checkIn.value),
-      check_out: toIso(checkOut.value),
-      total_price: Number(totalPrice.value.toFixed(2)),
-      status: 'pending',
-      created_at: nowIso,
-      updated_at: nowIso,
-    }
-    const confirmation = await addBooking(payload)
-    bookingConfirmation.value = confirmation
-  } catch (err: any) {
-    const message =
-      err?.response?.data?.detail ||
-      err?.data?.detail ||
-      err?.message ||
-      'Unable to complete the booking right now.'
-    submissionError.value = String(message)
-  } finally {
-    isSubmitting.value = false
+  const query: Record<string, string> = {
+    room: room.value.uuid,
+    checkIn: checkIn.value,
+    checkOut: checkOut.value,
   }
+  if (guests.value > 0) {
+    query.guests = String(guests.value)
+  }
+  const propertyQuery = route.query.property as string | undefined
+  const propertyUuid = propertyQuery || pick(room.value, 'propertyUuid', 'property_uuid')
+  if (propertyUuid) {
+    query.property = String(propertyUuid)
+  }
+  router.push({ path: '/payment', query })
 }
 
 function goBack() {
@@ -415,18 +384,6 @@ onMounted(load)
 .booking-summary {
   font-weight: 600;
   color: #2f261a;
-}
-
-.booking-message {
-  margin-top: 12px;
-}
-
-.booking-message.error {
-  color: #b03a2e;
-}
-
-.booking-message.success {
-  color: #2e7d32;
 }
 
 .address {
