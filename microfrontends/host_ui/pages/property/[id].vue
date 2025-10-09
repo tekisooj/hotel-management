@@ -176,7 +176,6 @@
             <img
               v-for="(image, idx) in room.images"
               :key="image.key || idx"
-              v-if="image.url"
               :src="image.url"
               :alt="`${room.name} image ${idx + 1}`"
             />
