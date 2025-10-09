@@ -375,6 +375,14 @@ async def add_review(
         pass
     return review_uuid
 
+def _paypal_headers(token: str) -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Prefer": "return=representation",
+        "PayPal-Request-Id": str(uuid4()),  # idempotency
+    }
 
 
 async def create_payment_order(
@@ -430,7 +438,7 @@ async def create_payment_order(
             response = await client.post(
                 f"{base_url}/v2/checkout/orders",
                 json=order_body,
-                headers={"Authorization": f"Bearer {token}"},
+                headers=_paypal_headers(token),
             )
             logger.info(f"RESPONSE {response.status_code}")
             response.raise_for_status()
@@ -483,7 +491,7 @@ async def capture_payment_order(
         try:
             response = await client.post(
                 f"{base_url}/v2/checkout/orders/{payload.order_id}/capture",
-                headers={"Authorization": f"Bearer {token}"},
+                headers=_paypal_headers(token),
             )
             response.raise_for_status()
         except HTTPError as exc:
