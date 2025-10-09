@@ -6,6 +6,7 @@
 import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useRuntimeConfig } from 'nuxt/app'
 
 const route = useRoute()
 const router = useRouter()

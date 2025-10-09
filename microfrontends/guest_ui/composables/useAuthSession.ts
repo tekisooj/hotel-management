@@ -1,4 +1,5 @@
 import { useUserStore } from '@/stores/user'
+import { useRuntimeConfig } from 'nuxt/app'
 
 export function useAuthSession() {
   const user = useUserStore()
