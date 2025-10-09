@@ -264,7 +264,7 @@ async function submit() {
 }
 
 .search_input {
-  width: 100%;
+  width: 80%;
   padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid rgba(125, 102, 71, 0.25);

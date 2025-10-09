@@ -21,6 +21,9 @@ from models.payment import (
     CreatePaymentOrderResponse,
     Money,
 )
+import logging
+
+logger = logging.getLogger()
 
 
 class JWTVerifier:
@@ -129,6 +132,7 @@ def _get_paypal_settings(request: Request) -> tuple[str, str, str]:
 
 async def _paypal_access_token(request: Request) -> tuple[str, str]:
     client_id, secret, base_url = _get_paypal_settings(request)
+    logger.info(f"PAYPAL SETTINGS {client_id} {secret} {base_url}")
     async with AsyncClient(timeout=PAYPAL_HTTP_TIMEOUT) as client:
         try:
             resp = await client.post(
@@ -136,6 +140,7 @@ async def _paypal_access_token(request: Request) -> tuple[str, str]:
                 data={"grant_type": "client_credentials"},
                 auth=(client_id, secret),
             )
+            logger.info(f"PAYPAL oauth response {resp.status_code}")
             resp.raise_for_status()
         except HTTPError as exc:
             raise HTTPException(status_code=502, detail=f"PayPal auth failed: {exc}") from exc
@@ -316,6 +321,9 @@ async def create_payment_order(
         timeout=10.0,
         headers=headers or None,
     )
+
+    logger.info(f"Room response status code {room_response.status_code}")
+
     if room_response.status_code != 200:
         raise HTTPException(status_code=room_response.status_code, detail=room_response.text)
     room_payload = room_response.json()
@@ -325,8 +333,11 @@ async def create_payment_order(
         payload.check_in,
         payload.check_out,
     )
+    
+    logger.info(f"{total} {nightly} {nights} {currency}")
 
     token, base_url = await _paypal_access_token(request)
+    logger.info(f"Token {token} bas_url {base_url}")
     order_body = {
         "intent": "CAPTURE",
         "purchase_units": [
@@ -353,6 +364,7 @@ async def create_payment_order(
                 json=order_body,
                 headers={"Authorization": f"Bearer {token}"},
             )
+            logger.info(f"RESPONSE {response.status_code}")
             response.raise_for_status()
         except HTTPError as exc:
             raise HTTPException(status_code=502, detail=f"Failed to create PayPal order: {exc}") from exc
