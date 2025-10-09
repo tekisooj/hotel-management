@@ -1,19 +1,16 @@
 <template>
-  <div class="w-full max-w-md mx-auto mt-8">
+  <div class="host-location-search">
     <input
       v-model="query"
       @input="searchPlaces"
       type="text"
-      placeholder="Search for a location..."
-      class="w-full border border-gray-300 rounded px-4 py-2"
+      placeholder="Search for a location"
     />
-
-    <ul v-if="results.length" class="border rounded-b shadow bg-white mt-1">
+    <ul v-if="results.length" class="host-location-search__results">
       <li
         v-for="(result, index) in results"
         :key="index"
         @click="selectPlace(result)"
-        class="px-4 py-2 cursor-pointer hover:bg-gray-100"
       >
         {{ result.label || result.Label }}
       </li>
@@ -23,7 +20,6 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRuntimeConfig } from '#imports'
 import { useHostBff } from '@/api/hostBff'
 
 const emit = defineEmits<{
@@ -33,7 +29,6 @@ const emit = defineEmits<{
 const query = ref('')
 const results = ref<any[]>([])
 
-const config = useRuntimeConfig()
 const { searchPlaces: searchPlacesApi } = useHostBff()
 
 const searchPlaces = async () => {
@@ -68,3 +63,40 @@ const selectPlace = (place: any) => {
   results.value = []
 }
 </script>
+
+<style scoped>
+.host-location-search {
+  position: relative;
+}
+
+.host-location-search input {
+  width: 100%;
+}
+
+.host-location-search__results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+  background: #fffdfa;
+  border-radius: 16px;
+  box-shadow: 0 18px 32px rgba(31, 20, 10, 0.16);
+  border: 1px solid rgba(47, 38, 26, 0.08);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.host-location-search__results li {
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #4a3a27;
+}
+
+.host-location-search__results li:hover {
+  background: rgba(255, 236, 215, 0.55);
+}
+</style>

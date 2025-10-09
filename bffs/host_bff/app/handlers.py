@@ -197,6 +197,46 @@ async def get_user_properties(
 
     return property_details
 
+
+async def get_property_detail(
+    property_uuid: UUID,
+    request: Request,
+    current_user_uuid: UUID = Depends(get_current_user_uuid),
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+) -> PropertyDetail:
+    headers = _forward_auth_headers(request)
+
+    response = await property_service_client.get(
+        f"property/{str(property_uuid)}",
+        headers=headers or None,
+    )
+    if response.status_code == 404:
+        raise HTTPException(status_code=404, detail="Property not found")
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    detail_payload = response.json() or {}
+    detail = PropertyDetail(**detail_payload)
+
+    if detail.user_uuid != current_user_uuid:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    rooms_response = await property_service_client.get(
+        f"rooms/{str(property_uuid)}",
+        headers=headers or None,
+    )
+    if rooms_response.status_code == 404:
+        detail.rooms = []
+        return detail
+    if rooms_response.status_code != 200:
+        raise HTTPException(status_code=rooms_response.status_code, detail=rooms_response.text)
+
+    rooms_payload = rooms_response.json() or []
+    detail.rooms = [Room(**room) for room in rooms_payload]
+
+    return detail
+
+
 async def add_property(
     property: PropertyDetail,
     request: Request,
@@ -230,6 +270,58 @@ async def add_property(
 
     return prop_uuid
 
+async def update_property(
+    property_uuid: UUID,
+    property: PropertyDetail,
+    request: Request,
+    current_user_uuid: UUID = Depends(get_current_user_uuid),
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+) -> PropertyDetail:
+    headers = _forward_auth_headers(request)
+
+    existing_response = await property_service_client.get(
+        f"property/{str(property_uuid)}",
+        headers=headers or None,
+    )
+    if existing_response.status_code == 404:
+        raise HTTPException(status_code=404, detail="Property not found")
+    if existing_response.status_code != 200:
+        raise HTTPException(status_code=existing_response.status_code, detail=existing_response.text)
+
+    existing_payload = existing_response.json() or {}
+    existing = PropertyDetail(**existing_payload)
+    if existing.user_uuid != current_user_uuid:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    property.uuid = property_uuid
+    property.user_uuid = current_user_uuid
+
+    prop = Property(**property.model_dump())
+    prop_payload = prop.model_dump(mode="json", exclude_none=True)
+    _normalize_images_field(prop_payload)
+
+    response = await property_service_client.put(
+        f"property/{str(property_uuid)}",
+        json=prop_payload,
+        headers=headers or None,
+    )
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    detail_payload = response.json() or {}
+    detail = PropertyDetail(**detail_payload)
+
+    rooms_response = await property_service_client.get(
+        f"rooms/{str(property_uuid)}",
+        headers=headers or None,
+    )
+    if rooms_response.status_code == 200:
+        rooms_payload = rooms_response.json() or []
+        detail.rooms = [Room(**room) for room in rooms_payload]
+
+    return detail
+
+
 async def add_room(
     room: Room,
     request: Request,
@@ -247,6 +339,35 @@ async def add_room(
         raise HTTPException(status_code=response.status_code, detail=response.text)
     room_uuid = response.json()
     return room_uuid
+
+async def update_room(
+    room_uuid: UUID,
+    room: Room,
+    request: Request,
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+) -> Room:
+    headers = _forward_auth_headers(request)
+    room_payload = room.model_dump(mode="json", exclude_none=True)
+    room_payload["uuid"] = str(room_uuid)
+    _normalize_images_field(room_payload)
+
+    response = await property_service_client.put(
+        "room",
+        json=room_payload,
+        headers=headers or None,
+    )
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    fetch_response = await property_service_client.get(
+        f"room/{str(room_uuid)}",
+        headers=headers or None,
+    )
+    if fetch_response.status_code != 200:
+        raise HTTPException(status_code=fetch_response.status_code, detail=fetch_response.text)
+
+    return Room(**fetch_response.json())
+
 
 async def create_asset_upload_url(
     payload: AssetUploadRequest,
@@ -344,17 +465,22 @@ async def get_bookings(
         raise HTTPException(status_code=rooms_response.status_code, detail=rooms_response.text)
     rooms_response = rooms_response.json()
     rooms = [Room(**room) for room in rooms_response]
-    params = {
+    base_params = {
         "check_in": check_in.isoformat(),
         "check_out": check_out.isoformat(),
     }
-    for room in rooms:
-        params["room_uuid"] = str(room.uuid)
-        bookings_response = await booking_service_client.get(
-            "bookings",
-            params=params,
-            headers=headers or None,
-        )
+
+    semaphore = asyncio.Semaphore(5)
+
+    async def fetch_availability(room: Room) -> Availability:
+        params = {**base_params, "room_uuid": str(room.uuid)}
+        async with semaphore:
+            bookings_response = await booking_service_client.get(
+                "bookings",
+                params=params,
+                headers=headers or None,
+                timeout=20.0,
+            )
         if bookings_response.status_code != 200:
             raise HTTPException(status_code=bookings_response.status_code, detail=bookings_response.text)
         bookings_payload = bookings_response.json()
@@ -364,7 +490,10 @@ async def get_bookings(
         availability.bookings = room_bookings
         for booking in room_bookings:
             unique_user_ids.add(str(booking.user_uuid))
-        availabilities.append(availability)
+        return availability
+
+    if rooms:
+        availabilities.extend(await asyncio.gather(*(fetch_availability(room) for room in rooms)))
 
     user_details: dict[str, dict[str, Any]] = {}
 
@@ -445,4 +574,3 @@ async def get_property_reviews(
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     reviews_response = resp.json() or []
     return [Review(**review) for review in reviews_response]
-

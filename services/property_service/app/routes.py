@@ -3,6 +3,7 @@ from fastapi import APIRouter
 
 from handlers import (
     add_property,
+    update_property,
     delete_property,
     delete_room,
     get_filtered_rooms,
@@ -45,6 +46,14 @@ router.add_api_route(
     response_model=UUID,
     endpoint=delete_property,
     description="Delete property"
+)
+
+router.add_api_route(
+    path="/property/{property_uuid}",
+    methods=["PUT"],
+    response_model=Property,
+    endpoint=update_property,
+    description="Update property"
 )
 
 router.add_api_route(

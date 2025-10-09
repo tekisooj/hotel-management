@@ -1,6 +1,8 @@
-﻿from datetime import datetime
+from datetime import datetime, date
 import asyncio
-from uuid import UUID
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Any
+from uuid import UUID, uuid4
 from fastapi import Depends, HTTPException, Request
 from httpx import AsyncClient, HTTPError
 import os
@@ -9,9 +11,19 @@ from jose import jwt
 import httpx
 
 from models.review import Review
-from models.booking import Booking
+from models.booking import Booking, BookingStatus
 from models.user import UserResponse, UserUpdate
 from models.property import Amenity, Property, PropertyDetail, Room
+from models.payment import (
+    CapturePaymentRequest,
+    CapturePaymentResponse,
+    CreatePaymentOrderRequest,
+    CreatePaymentOrderResponse,
+    Money,
+)
+import logging
+
+logger = logging.getLogger()
 
 
 class JWTVerifier:
@@ -107,6 +119,59 @@ def _forward_auth_headers(request: Request) -> dict[str, str]:
             headers["X-User-Id"] = xuid
     return headers
 
+PAYPAL_DEFAULT_BASE_URL = "https://api-m.sandbox.paypal.com"
+PAYPAL_HTTP_TIMEOUT = 20.0
+
+def _get_paypal_settings(request: Request) -> tuple[str, str, str]:
+    client_id = getattr(request.app.state, "paypal_client_id", None)
+    secret = getattr(request.app.state, "paypal_client_secret", None)
+    base_url = getattr(request.app.state, "paypal_base_url", PAYPAL_DEFAULT_BASE_URL) or PAYPAL_DEFAULT_BASE_URL
+    if not client_id or not secret:
+        raise HTTPException(status_code=500, detail="PayPal integration is not configured")
+    return client_id, secret, base_url.rstrip('/')
+
+async def _paypal_access_token(request: Request) -> tuple[str, str]:
+    client_id, secret, base_url = _get_paypal_settings(request)
+    logger.info(f"PAYPAL SETTINGS {client_id} {secret} {base_url}")
+    async with AsyncClient(timeout=PAYPAL_HTTP_TIMEOUT) as client:
+        try:
+            resp = await client.post(
+                f"{base_url}/v1/oauth2/token",
+                data={"grant_type": "client_credentials"},
+                auth=(client_id, secret),
+            )
+            logger.info(f"PAYPAL oauth response {resp.status_code}")
+            resp.raise_for_status()
+        except HTTPError as exc:
+            raise HTTPException(status_code=502, detail=f"PayPal auth failed: {exc}") from exc
+    token = resp.json().get("access_token")
+    if not token:
+        raise HTTPException(status_code=502, detail="Missing access token from PayPal response")
+    return token, base_url
+
+def _format_decimal(value: Decimal) -> str:
+    return f"{value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}"
+
+def _compute_booking_amount(room_payload: dict[str, Any], check_in: date, check_out: date) -> tuple[Decimal, Decimal, int, str]:
+    price_raw = (
+        room_payload.get('price_per_night')
+        or room_payload.get('pricePerNight')
+        or room_payload.get('price_perNight')
+    )
+    if price_raw is None:
+        raise HTTPException(status_code=502, detail="Room pricing information unavailable")
+    price = Decimal(str(price_raw))
+    nights = (check_out - check_in).days
+    if nights <= 0:
+        raise HTTPException(status_code=400, detail="Check-out date must be after check-in date")
+    total = (price * nights).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    nightly = price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    currency = room_payload.get('currency_code') or 'USD'
+    return total, nightly, nights, currency
+
+def _date_to_iso(value: date) -> str:
+    return datetime.combine(value, datetime.min.time()).isoformat()
+
 async def search_places(text: str,  index_name: str = Depends(get_place_index)) -> list[dict]:
 
     if not index_name:
@@ -137,7 +202,7 @@ async def fetch_property(
     property_uuid: UUID,
     request: Request,
     property_service_client: AsyncClient = Depends(get_property_service_client),
-) -> Property:
+) -> PropertyDetail:
     headers = _forward_auth_headers(request)
     resp = await property_service_client.get(
         f"property/{str(property_uuid)}",
@@ -146,8 +211,18 @@ async def fetch_property(
     )
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    data = resp.json()
-    return Property(**data)
+    data = resp.json() or {}
+
+    rooms_resp = await property_service_client.get(
+        "rooms",
+        params={"property_uuid": str(property_uuid)},
+        timeout=10.0,
+        headers=headers or None,
+    )
+    rooms_payload = rooms_resp.json() if rooms_resp.status_code == 200 else []
+    data["rooms"] = rooms_payload
+
+    return PropertyDetail(**data)
 
 async def fetch_room(
     room_uuid: UUID,
@@ -233,6 +308,167 @@ async def add_review(
     return review_uuid
 
 
+
+async def create_payment_order(
+    payload: CreatePaymentOrderRequest,
+    request: Request,
+    current_user_uuid: UUID = Depends(get_current_user_uuid),
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+) -> CreatePaymentOrderResponse:
+    headers = _forward_auth_headers(request)
+    room_response = await property_service_client.get(
+        f"room/{str(payload.room_uuid)}",
+        timeout=10.0,
+        headers=headers or None,
+    )
+
+    logger.info(f"Room response status code {room_response.status_code}")
+
+    if room_response.status_code != 200:
+        raise HTTPException(status_code=room_response.status_code, detail=room_response.text)
+    room_payload = room_response.json()
+
+    total, nightly, nights, currency = _compute_booking_amount(
+        room_payload,
+        payload.check_in,
+        payload.check_out,
+    )
+    
+    logger.info(f"{total} {nightly} {nights} {currency}")
+
+    token, base_url = await _paypal_access_token(request)
+    logger.info(f"Token {token} bas_url {base_url}")
+    order_body = {
+        "intent": "CAPTURE",
+        "purchase_units": [
+            {
+                "reference_id": str(payload.room_uuid),
+                "custom_id": str(current_user_uuid),
+                "description": (f"Room booking - {room_payload.get('name', 'Room')}"[:127]),
+                "amount": {
+                    "currency_code": currency,
+                    "value": _format_decimal(total),
+                },
+            }
+        ],
+        "application_context": {
+            "shipping_preference": "NO_SHIPPING",
+            "user_action": "PAY_NOW",
+        },
+    }
+
+    async with AsyncClient(timeout=PAYPAL_HTTP_TIMEOUT) as client:
+        try:
+            response = await client.post(
+                f"{base_url}/v2/checkout/orders",
+                json=order_body,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            logger.info(f"RESPONSE {response.status_code}")
+            response.raise_for_status()
+        except HTTPError as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to create PayPal order: {exc}") from exc
+
+    order_payload = response.json()
+    order_id = order_payload.get("id")
+    if not order_id:
+        raise HTTPException(status_code=502, detail="Invalid response from PayPal order creation")
+
+    return CreatePaymentOrderResponse(
+        order_id=order_id,
+        amount=Money(currency_code=currency, value=_format_decimal(total)),
+        nights=nights,
+        nightly_rate=_format_decimal(nightly),
+        room_name=room_payload.get("name", ""),
+        paypal_client_id=getattr(request.app.state, "paypal_client_id", None),
+    )
+
+
+async def capture_payment_order(
+    payload: CapturePaymentRequest,
+    request: Request,
+    current_user_uuid: UUID = Depends(get_current_user_uuid),
+    booking_service_client: AsyncClient = Depends(get_booking_service_client),
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+    user_service_client: AsyncClient = Depends(get_user_service_client),
+    event_bus=Depends(get_event_bus),
+) -> CapturePaymentResponse:
+    headers = _forward_auth_headers(request)
+    room_response = await property_service_client.get(
+        f"room/{str(payload.room_uuid)}",
+        timeout=10.0,
+        headers=headers or None,
+    )
+    if room_response.status_code != 200:
+        raise HTTPException(status_code=room_response.status_code, detail=room_response.text)
+    room_payload = room_response.json()
+
+    total, _, _, currency = _compute_booking_amount(
+        room_payload,
+        payload.check_in,
+        payload.check_out,
+    )
+
+    token, base_url = await _paypal_access_token(request)
+
+    async with AsyncClient(timeout=PAYPAL_HTTP_TIMEOUT) as client:
+        try:
+            response = await client.post(
+                f"{base_url}/v2/checkout/orders/{payload.order_id}/capture",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            response.raise_for_status()
+        except HTTPError as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to capture PayPal order: {exc}") from exc
+
+    capture_payload = response.json()
+    status = capture_payload.get("status")
+    purchase_units = capture_payload.get("purchase_units") or []
+    payments = purchase_units[0].get("payments") if purchase_units else {}
+    captures = payments.get("captures") or []
+    capture_amount = None
+    if captures:
+        capture_amount = captures[0].get("amount")
+        status = captures[0].get("status", status)
+
+    if status not in {"COMPLETED", "APPROVED"}:
+        raise HTTPException(status_code=502, detail=f"Unexpected PayPal capture status: {status}")
+
+    paid_value = capture_amount.get("value") if capture_amount else None
+    paid_currency = capture_amount.get("currency_code") if capture_amount else currency
+    if paid_value is None:
+        raise HTTPException(status_code=502, detail="PayPal capture did not return an amount")
+
+    paid_total = Decimal(str(paid_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    if paid_total != total:
+        raise HTTPException(status_code=400, detail="Captured amount does not match expected total")
+
+    booking_payload = {
+        "uuid": str(uuid4()),
+        "room_uuid": str(payload.room_uuid),
+        "check_in": _date_to_iso(payload.check_in),
+        "check_out": _date_to_iso(payload.check_out),
+        "total_price": float(total),
+        "status": BookingStatus.PENDING.value,
+        "created_at": datetime.utcnow().isoformat() + 'Z',
+        "updated_at": datetime.utcnow().isoformat() + 'Z',
+    }
+
+    booking_uuid = await add_booking(
+        request,
+        booking_payload,
+        current_user_uuid,
+        booking_service_client,
+        event_bus,
+        property_service_client,
+        user_service_client,
+    )
+
+    return CapturePaymentResponse(
+        booking_uuid=booking_uuid,
+        payment_status="COMPLETED",
+        amount=Money(currency_code=paid_currency or currency, value=_format_decimal(total)),
+    )
 async def add_booking(
     request: Request,
     booking: dict,
@@ -480,8 +716,7 @@ async def get_filtered_rooms(
         room_filter_params["amenities"] = [a.name for a in amenities]
 
     if not properties:
-        raise ValueError("Location must be provided.")
-
+        return []
     for property in properties:
         params = {"property_uuid": str(property.uuid)}
         params.update(room_filter_params)
@@ -560,6 +795,4 @@ async def get_filtered_rooms(
         available_room_entries = list(filter(lambda x: x.average_rating and x.average_rating>=rating_above, available_room_entries))
 
     return available_room_entries
-
-
 

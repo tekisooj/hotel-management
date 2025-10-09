@@ -68,33 +68,66 @@ const checkIn = ref('')
 const checkOut = ref('')
 const capacity = ref(0)
 const maxPrice = ref<number | undefined>(undefined)
+const latitude = ref<number | null>(null)
+const longitude = ref<number | null>(null)
+const DEFAULT_SEARCH_RADIUS_KM = 50
 
 const propertyDetails = ref<any[]>([])
 const resultsRef = ref<HTMLElement | null>(null)
 
-const canSearch = computed(() => !!country.value && !!city.value && !!checkIn.value && !!checkOut.value)
+const hasCity = computed(() => city.value.trim().length > 0)
+const hasCoordinates = computed(() => latitude.value !== null && longitude.value !== null)
+
+const canSearch = computed(() => (hasCity.value || hasCoordinates.value) && !!checkIn.value && !!checkOut.value)
 
 
 const handleLocation = (location: any) => {
-  country.value = location.country;
-  state.value = location.state;
-  city.value = location.city;
+  country.value = location.country || ''
+  state.value = location.state || ''
+  city.value = location.city || ''
+  latitude.value = typeof location.latitude === 'number' ? location.latitude : null
+  longitude.value = typeof location.longitude === 'number' ? location.longitude : null
 };
 
 
 async function submit() {
   if (!canSearch.value) return
   try {
+    const capacityValue = Number(capacity.value)
+    const hasCapacity = Number.isFinite(capacityValue) && capacityValue > 0
+    const maxPriceValue = Number(maxPrice.value)
+    const hasMaxPrice = Number.isFinite(maxPriceValue) && maxPriceValue > 0
+
     const res = await searchRooms({
-      country: country.value,
-      city: city.value,
-      state: state.value || undefined,
+      ...(country.value ? { country: country.value } : {}),
+      ...(city.value ? { city: city.value } : {}),
+      ...(state.value ? { state: state.value } : {}),
+      ...(latitude.value !== null && longitude.value !== null
+        ? {
+            latitude: latitude.value,
+            longitude: longitude.value,
+            radius_km: DEFAULT_SEARCH_RADIUS_KM,
+          }
+        : {}),
       check_in_date: checkIn.value,
       check_out_date: checkOut.value,
-      capacity: capacity.value || undefined,
-      max_price: maxPrice.value || undefined,
+      ...(hasCapacity ? { capacity: capacityValue } : {}),
+      ...(hasMaxPrice ? { max_price: maxPriceValue } : {}),
+    })
+    store.setLastSearch({
+      country: country.value || undefined,
+      city: city.value || undefined,
+      state: state.value || undefined,
+      checkIn: checkIn.value || undefined,
+      checkOut: checkOut.value || undefined,
+      capacity: hasCapacity ? capacityValue : undefined,
+      maxPrice: hasMaxPrice ? maxPriceValue : undefined,
+      latitude: latitude.value ?? undefined,
+      longitude: longitude.value ?? undefined,
+      radiusKm: latitude.value !== null && longitude.value !== null ? DEFAULT_SEARCH_RADIUS_KM : undefined,
     })
     propertyDetails.value = Array.isArray(res) ? res : []
+
     if (Array.isArray(propertyDetails.value)) {
       store.ingestSearch(propertyDetails.value)
     }
@@ -231,7 +264,7 @@ async function submit() {
 }
 
 .search_input {
-  width: 100%;
+  width: 80%;
   padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid rgba(125, 102, 71, 0.25);
@@ -408,4 +441,3 @@ async function submit() {
   }
 }
 </style>
-

@@ -1,1 +1,8 @@
-export type RoomType = 'single' | 'double' | 'suite' | 'family' | 'deluxe' | 'studio';
+export enum RoomType {
+  Single = 'single',
+  Double = 'double',
+  Suite = 'suite',
+  Family = 'family',
+  Deluxe = 'deluxe',
+  Studio = 'studio',
+}

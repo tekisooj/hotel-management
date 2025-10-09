@@ -1,8 +1,8 @@
 <template>
   <div class="login-page">
     <div class="card">
-      <h1 class="title">Sign in to Hotel Management</h1>
-      <p class="subtitle">Choose the application you want to access.</p>
+      <h1 class="title">Sign in</h1>
+      <p class="subtitle">Are you a guest or host?</p>
 
       <div class="selector">
         <label class="form-label" for="app">Application</label>
@@ -12,7 +12,7 @@
         </select>
       </div>
 
-      <button class="btn btn-primary w-100" @click="login">Sign in with Cognito</button>
+      <button class="btn btn-primary w-100" @click="login">Sign in</button>
     </div>
   </div>
 </template>

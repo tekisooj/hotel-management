@@ -14,11 +14,14 @@ from handlers import (
     get_current_user,
     update_current_user,
     search_places,
+    create_payment_order,
+    capture_payment_order,
 )
 from models.booking import Booking
 from models.property import Property, PropertyDetail, Room
 from models.user import UserResponse
 from models.review import Review
+from models.payment import CreatePaymentOrderResponse, CapturePaymentResponse
 
 
 router = APIRouter()
@@ -57,6 +60,22 @@ router.add_api_route(
 )
 
 router.add_api_route(
+    path="/booking/payment/order",
+    methods=["POST"],
+    response_model=CreatePaymentOrderResponse,
+    endpoint=create_payment_order,
+    description="Create a PayPal order for booking"
+)
+
+router.add_api_route(
+    path="/booking/payment/capture",
+    methods=["POST"],
+    response_model=CapturePaymentResponse,
+    endpoint=capture_payment_order,
+    description="Capture PayPal payment and confirm booking"
+)
+
+router.add_api_route(
     path="/my/bookings",
     methods=["GET"],
     response_model=list[Booking],
@@ -91,7 +110,7 @@ router.add_api_route(
 router.add_api_route(
     path="/property/{property_uuid}",
     methods=["GET"],
-    response_model=Property,
+    response_model=PropertyDetail,
     endpoint=fetch_property,
     description="Get property details"
 )

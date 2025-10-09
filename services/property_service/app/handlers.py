@@ -55,6 +55,33 @@ async def add_property(
     return property_table_client.add_property(property)
 
 
+async def update_property(
+    property_uuid: UUID,
+    property: Property,
+    property_table_client: PropertyTableClient = Depends(get_property_table_client),
+    asset_storage: S3AssetStorage | None = Depends(get_asset_storage),
+) -> Property:
+    try:
+        existing = property_table_client.get_property(property_uuid)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Property not found") from exc
+
+    property.uuid = property_uuid
+    if property.user_uuid is None:
+        property.user_uuid = existing.user_uuid
+    if property.created_at is None and getattr(existing, "created_at", None) is not None:
+        property.created_at = existing.created_at
+    if property.images is None and getattr(existing, "images", None) is not None:
+        property.images = existing.images
+
+    set_property_full_address(property)
+    strip_image_urls(property.images)
+    property_table_client.add_property(property)
+
+    updated = property_table_client.get_property(property_uuid)
+    return add_image_url(updated, asset_storage)  # type: ignore
+
+
 async def get_property(
     property_uuid: UUID,
     property_table_client: PropertyTableClient = Depends(get_property_table_client),

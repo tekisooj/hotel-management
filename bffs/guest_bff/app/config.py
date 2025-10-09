@@ -16,6 +16,9 @@ class AppConfiguration(BaseSettings):
     audience: str | None = None
     jwks_url: str | None = None
     place_index: str | None = None
+    paypal_client_id: str | None = None
+    paypal_client_secret: str | None = None
+    paypal_base_url: str | None = None
 
 guest_bff_prod_configuration = AppConfiguration(
     user_service_url="https://9by6xj4b6h.execute-api.us-east-1.amazonaws.com/prod/",
@@ -25,8 +28,11 @@ guest_bff_prod_configuration = AppConfiguration(
     audience=os.environ.get("AUDIENCE", None),
     jwks_url=os.environ.get("JWKS_URL", None),
     event_bus_name=os.getenv("EVENT_BUS_NAME", None),
-    place_index=os.environ.get("PLACE_INDEX_NAME", None)
-    
+    place_index=os.environ.get("PLACE_INDEX_NAME", None),
+    paypal_client_id=os.environ.get("PAYPAL_CLIENT_ID"),
+    paypal_client_secret=os.environ.get("PAYPAL_CLIENT_SECRET"),
+    paypal_base_url=os.environ.get("PAYPAL_BASE_URL", "https://api-m.sandbox.paypal.com")
+
 )
 
 guest_bff_int_configuration = AppConfiguration(
@@ -37,7 +43,10 @@ guest_bff_int_configuration = AppConfiguration(
     audience=os.environ.get("AUDIENCE", None),
     jwks_url=os.environ.get("JWKS_URL", None),
     event_bus_name=os.getenv("EVENT_BUS_NAME", None),
-    place_index=os.environ.get("PLACE_INDEX_NAME", None)
+    place_index=os.environ.get("PLACE_INDEX_NAME", None),
+    paypal_client_id=os.environ.get("PAYPAL_CLIENT_ID"),
+    paypal_client_secret=os.environ.get("PAYPAL_CLIENT_SECRET"),
+    paypal_base_url=os.environ.get("PAYPAL_BASE_URL", "https://api-m.sandbox.paypal.com")
 
 )
 

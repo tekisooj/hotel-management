@@ -21,8 +21,8 @@
       >
         <div class="card">
           <img
-            v-if="room.images?.length && room.images[0].url"
-            :src="room.images[0].url"
+            v-if="room.images?.length && room.images[0]?.url"
+            :src="room.images?.[0]?.url"
             :alt="`${room.name} photo`"
             class="card-img-top object-fit-cover"
             style="height: 180px;"
@@ -64,3 +64,4 @@ import type { Room } from '@/types/Room'
 const props = defineProps<{ rooms: Room[]; id?: string }>()
 const carouselId = computed(() => props.id || `rooms-carousel-${Math.random().toString(36).slice(2, 8)}`)
 </script>
+
