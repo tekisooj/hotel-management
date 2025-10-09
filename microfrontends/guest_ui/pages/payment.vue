@@ -276,7 +276,7 @@ async function ensurePayPalSdk(clientId: string) {
   const qs = new URLSearchParams({
     'client-id': id,
     currency,
-    intent: 'CAPTURE',
+    intent: 'capture',
     components: 'buttons',
     ...(isProd ? {} : { debug: 'true' }),
   })
