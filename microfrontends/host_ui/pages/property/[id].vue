@@ -333,7 +333,33 @@ const editRoomForm = reactive({
 
 const roomTypes = Object.values(RoomType)
 
-const images = computed(() => property.value?.images ?? [])
+type NormalizedImage = { key: string; url?: string }
+
+function normalizeImageList(images: unknown): NormalizedImage[] {
+  if (!Array.isArray(images)) {
+    return []
+  }
+  return images
+    .map((raw) => {
+      if (!raw) {
+        return null
+      }
+      if (typeof raw === 'string') {
+        const key = raw.trim()
+        return key ? { key } : null
+      }
+      if (typeof raw === 'object') {
+        const value = raw as { key?: unknown; url?: unknown }
+        const key = typeof value.key === 'string' ? value.key.trim() : ''
+        const url = typeof value.url === 'string' && value.url.length ? value.url : undefined
+        return key ? { key, url } : null
+      }
+      return null
+    })
+    .filter((image): image is NormalizedImage => image !== null)
+}
+
+const images = computed(() => normalizeImageList(property.value?.images).filter((image) => !!image.url))
 const roomCount = computed(() => rooms.value.length)
 const locationLabel = computed(() => {
   if (!property.value) return ''
@@ -368,8 +394,15 @@ async function loadPropertyDetail() {
   try {
     loadError.value = null
     const detail = await getProperty(param)
+    const normalizedRooms = Array.isArray(detail?.rooms)
+      ? detail.rooms
+          .filter((room: any) => !!room)
+          .map((room: any) => ({ ...room, images: normalizeImageList(room?.images) }))
+      : []
     property.value = detail
-    rooms.value = Array.isArray(detail?.rooms) ? detail.rooms : []
+      ? { ...detail, images: normalizeImageList(detail?.images), rooms: normalizedRooms }
+      : null
+    rooms.value = normalizedRooms
     if (isEditingProperty.value) {
       hydrateEditProperty()
     }
@@ -401,9 +434,7 @@ function hydrateEditProperty() {
   editPropertyForm.latitude = property.value.latitude ?? ''
   editPropertyForm.longitude = property.value.longitude ?? ''
   editPropertyForm.placeId = property.value.place_id ?? (property.value as any).placeId ?? ''
-  editPropertyForm.images = Array.isArray(property.value.images)
-    ? property.value.images.map((image: any) => ({ key: image.key, url: image.url }))
-    : []
+  editPropertyForm.images = normalizeImageList(property.value?.images)
 }
 
 function beginEditProperty() {
@@ -509,9 +540,7 @@ function hydrateEditRoom(room: any) {
   editRoomForm.amenitiesInput = Array.isArray(room.amenities)
     ? room.amenities.map((amenity: Amenity) => amenity.name).filter(Boolean).join(', ')
     : ''
-  editRoomForm.images = Array.isArray(room.images)
-    ? room.images.map((image: any) => ({ key: image.key, url: image.url }))
-    : []
+  editRoomForm.images = normalizeImageList(room?.images)
 }
 
 function startRoomEdit(room: any) {

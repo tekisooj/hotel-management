@@ -127,6 +127,7 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { useRuntimeConfig } from 'nuxt/app'
 import { useUserStore } from '@/stores/user'
 import { RoomType } from '@/types/RoomType';
@@ -137,6 +138,7 @@ import { Image } from '@/types/Image';
 import { useHostBff } from '@/api/hostBff';
 
 const { addProperty, createAssetUploadUrl } = useHostBff();
+const router = useRouter();
 const config = useRuntimeConfig()
 const user = useUserStore()
 
@@ -308,8 +310,10 @@ async function add() {
 
   try {
     await addProperty(propDetail);
+    await router.push('/');
   } catch (error: any) {
     uploadError.value = error?.data?.message || error?.message || 'Unable to create property.'
   }
 }
 </script>
+

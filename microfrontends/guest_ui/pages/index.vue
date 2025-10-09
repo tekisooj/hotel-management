@@ -72,7 +72,9 @@ const maxPrice = ref<number | undefined>(undefined)
 const propertyDetails = ref<any[]>([])
 const resultsRef = ref<HTMLElement | null>(null)
 
-const canSearch = computed(() => !!country.value && !!city.value && !!checkIn.value && !!checkOut.value)
+const hasLocation = computed(() => Boolean(country.value || state.value || city.value))
+
+const canSearch = computed(() => hasLocation.value && !!checkIn.value && !!checkOut.value)
 
 
 const handleLocation = (location: any) => {
@@ -417,5 +419,4 @@ async function submit() {
   }
 }
 </style>
-
 
