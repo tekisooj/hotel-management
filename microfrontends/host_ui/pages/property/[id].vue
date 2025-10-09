@@ -169,7 +169,7 @@
         <li v-for="room in rooms" :key="room.uuid || room.name">
           <h3>{{ room.name }}</h3>
           <p class="host-property__room-meta">
-            {{ room.capacity }} guests � ${{ Number(room.price_per_night ?? room.pricePerNight ?? 0).toFixed(2) }} per night
+            {{ room.capacity }} guests  ${{ Number(room.price_per_night ?? room.pricePerNight ?? 0).toFixed(2) }} per night
           </p>
           <p v-if="room.description">{{ room.description }}</p>
           <div class="host-room-images" v-if="room.images?.length">

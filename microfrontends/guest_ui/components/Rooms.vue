@@ -60,7 +60,7 @@
         aria-label="Previous room"
         @click="prevRoom"
       >
-        ‹
+        <
       </button>
       <button
         v-if="roomsList.length > 1"
@@ -69,7 +69,7 @@
         aria-label="Next room"
         @click="nextRoom"
       >
-        ›
+        >
       </button>
     </div>
 

@@ -16,7 +16,7 @@
         <header class="payment-header">
           <div>
             <h1>Confirm your stay</h1>
-            <p class="subtitle">{{ room.name }} • {{ property?.name || room.propertyUuid }}</p>
+            <p class="subtitle">{{ room.name }}, {{ property?.name || room.propertyUuid }}</p>
           </div>
           <div class="payment-amount" v-if="displayAmount">
             <span class="label">Total</span>
@@ -339,7 +339,7 @@ function formatPrice(value: number) {
 }
 
 function formatDate(value: string) {
-  if (!value) return '—'
+  if (!value) return ''
   try {
     return new Date(value).toLocaleDateString(undefined, {
       year: 'numeric',

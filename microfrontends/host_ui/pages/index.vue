@@ -22,7 +22,7 @@
           <p class="host-empty">{{ loadError }}</p>
         </template>
         <template v-else-if="!properties.length">
-          <p class="host-empty">You don't have any properties yet. Click �Add new property� to get started.</p>
+          <p class="host-empty">You don't have any properties yet. Click Add new property to get started.</p>
         </template>
         <template v-else>
           <HotelList :hotels="properties" />
