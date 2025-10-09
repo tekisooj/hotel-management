@@ -76,6 +76,16 @@ function mapAvailabilityList(list: any[]): RoomAvailability[] {
   return Array.isArray(list) ? list.map(mapAvailability) : []
 }
 
+function normalizeImages(images?: Array<{ key?: string | null }>) {
+  if (!images) {
+    return undefined
+  }
+  const normalized = images
+    .map((image) => (image?.key ?? '').trim())
+    .filter((key): key is string => key.length > 0)
+    .map((key) => ({ key }))
+  return normalized.length ? normalized : undefined
+}
 function mapPropertyDetailToPayload(body: PropertyDetail, ownerId?: string | null) {
   return {
     uuid: body.uuid || undefined,
@@ -150,16 +160,6 @@ export function useHostBff() {
     return devUserId ? { 'X-User-Id': devUserId } : {}
   }
 
-  function normalizeImages(images?: Array<{ key?: string | null }>) {
-    if (!images) {
-      return undefined
-    }
-    const normalized = images
-      .map((image) => (image?.key ?? '').trim())
-      .filter((key): key is string => key.length > 0)
-      .map((key) => ({ key }))
-    return normalized.length ? normalized : undefined
-  }
 
   async function getProperties(): Promise<PropertyDetail[]> {
     return await $fetch<PropertyDetail[]>(`${baseURL}/properties`, {
