@@ -197,6 +197,46 @@ async def get_user_properties(
 
     return property_details
 
+
+async def get_property_detail(
+    property_uuid: UUID,
+    request: Request,
+    current_user_uuid: UUID = Depends(get_current_user_uuid),
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+) -> PropertyDetail:
+    headers = _forward_auth_headers(request)
+
+    response = await property_service_client.get(
+        f"property/{str(property_uuid)}",
+        headers=headers or None,
+    )
+    if response.status_code == 404:
+        raise HTTPException(status_code=404, detail="Property not found")
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    detail_payload = response.json() or {}
+    detail = PropertyDetail(**detail_payload)
+
+    if detail.user_uuid != current_user_uuid:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    rooms_response = await property_service_client.get(
+        f"rooms/{str(property_uuid)}",
+        headers=headers or None,
+    )
+    if rooms_response.status_code == 404:
+        detail.rooms = []
+        return detail
+    if rooms_response.status_code != 200:
+        raise HTTPException(status_code=rooms_response.status_code, detail=rooms_response.text)
+
+    rooms_payload = rooms_response.json() or []
+    detail.rooms = [Room(**room) for room in rooms_payload]
+
+    return detail
+
+
 async def add_property(
     property: PropertyDetail,
     request: Request,

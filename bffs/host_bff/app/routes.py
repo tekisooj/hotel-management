@@ -12,6 +12,7 @@ from handlers import (
     get_bookings,
     get_current_user,
     get_property_reviews,
+    get_property_detail,
     get_user_properties,
     search_places,
     update_current_user,
@@ -39,6 +40,14 @@ router.add_api_route(
     response_model=list[PropertyDetail],
     endpoint=get_user_properties,
     description="Get all properties of a user",
+)
+
+router.add_api_route(
+    path="/property/{property_uuid}",
+    methods=["GET"],
+    response_model=PropertyDetail,
+    endpoint=get_property_detail,
+    description="Get property details",
 )
 
 router.add_api_route(

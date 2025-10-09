@@ -17,6 +17,7 @@ interface AssetUploadResponse {
 
 interface HostBff {
   getProperties(): Promise<any>
+  getProperty(propertyUuid: string): Promise<PropertyDetail>
   addProperty(property: PropertyDetail): Promise<any>
   addRoom(room: Room): Promise<any>
   deleteRoom(roomUuid: string): Promise<any>
@@ -75,6 +76,7 @@ function mapAvailabilityList(list: any[]): RoomAvailability[] {
 
 export default (axios: NuxtAxiosInstance): HostBff => ({
   getProperties: async () => axios.$get('properties'),
+  getProperty: async (propertyUuid: string) => axios.$get(`property/${propertyUuid}`),
   addProperty: async (property: PropertyDetail) => axios.$post('property', property),
   addRoom: async (room: Room) => axios.$post('room', room),
   deleteRoom: async (roomUuid: string) => axios.$delete(`room/${roomUuid}`),
@@ -139,6 +141,12 @@ export function useHostBff() {
 
   async function getProperties(): Promise<PropertyDetail[]> {
     return await $fetch<PropertyDetail[]>(`${baseURL}/properties`, {
+      headers: authHeaders(),
+    })
+  }
+
+  async function getProperty(propertyUuid: string): Promise<PropertyDetail> {
+    return await $fetch<PropertyDetail>(`${baseURL}/property/${propertyUuid}`, {
       headers: authHeaders(),
     })
   }
@@ -264,6 +272,7 @@ export function useHostBff() {
 
   return {
     getProperties,
+    getProperty,
     addProperty,
     addRoom,
     deleteRoom,

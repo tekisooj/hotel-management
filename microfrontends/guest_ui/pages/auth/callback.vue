@@ -1,5 +1,5 @@
 <template>
-  <div class="callback">Signing you in…</div>
+  <div class="callback">Signing you in...</div>
 </template>
 
 <script setup lang="ts">
@@ -11,6 +11,23 @@ const route = useRoute()
 const router = useRouter()
 const user = useUserStore()
 const config = useRuntimeConfig()
+
+async function redirectToDestination(target: unknown) {
+  if (typeof window === 'undefined') return
+  const raw = typeof target === 'string' ? target.trim() : ''
+  const destination = raw || '/'
+  if (/^https?:\/\//i.test(destination)) {
+    window.location.replace(destination)
+    return
+  }
+  const normalized = destination.startsWith('/') ? destination : `/${destination}`
+  try {
+    await router.replace(normalized)
+  } catch {
+    const absolute = new URL(normalized, window.location.origin)
+    window.location.replace(absolute.toString())
+  }
+}
 
 onMounted(async () => {
   const tokenParam = route.query.id_token
@@ -28,15 +45,7 @@ onMounted(async () => {
   user.setToken(tokenParam)
   await user.fetchProfile().catch(() => user.clear())
 
-  const destination = typeof redirectParam === 'string' && redirectParam.length
-    ? redirectParam
-    : '/'
-
-  if (/^https?:\/\//i.test(destination)) {
-    window.location.replace(destination)
-  } else {
-    router.replace(destination)
-  }
+  await redirectToDestination(redirectParam)
 })
 </script>
 
