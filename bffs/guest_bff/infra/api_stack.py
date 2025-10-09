@@ -1,3 +1,4 @@
+import os
 from aws_cdk import (
     Stack,
     Duration,
@@ -32,7 +33,15 @@ class GuestBffStack(Stack):
 
         self.jwks_url = f"https://cognito-idp.us-east-1.amazonaws.com/{self.user_pool_id}/.well-known/jwks.json"
 
-
+        paypal_env = {
+            key: value
+            for key, value in {
+                "PAYPAL_CLIENT_ID": os.environ.get("PAYPAL_CLIENT_ID"),
+                "PAYPAL_CLIENT_SECRET": os.environ.get("PAYPAL_CLIENT_SECRET"),
+                "PAYPAL_BASE_URL": os.environ.get("PAYPAL_BASE_URL"),
+            }.items()
+            if value
+        }
 
         self.lambda_function = Function(
             self, f"GuestBffFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
@@ -48,6 +57,7 @@ class GuestBffStack(Stack):
                 "AUDIENCE": self.audience,
                 "JWKS_URL": self.jwks_url,
                 "PLACE_INDEX_NAME": "HotelManagementPlaceIndex",
+                **paypal_env,
             }
         )
 
