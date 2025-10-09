@@ -8,13 +8,6 @@ from aws_cdk.aws_lambda import Function, Runtime, Code
 from aws_cdk.aws_apigateway import LambdaRestApi, EndpointType, Cors, LambdaIntegration
 from aws_cdk.aws_events import EventBus
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy, PolicyStatement
-from aws_cdk.aws_ec2 import (
-    Vpc,
-    SubnetType,
-    SubnetConfiguration,
-    SecurityGroup,
-    SubnetSelection,
-)
 from constructs import Construct
 
 
@@ -30,26 +23,7 @@ class GuestBffStack(Stack):
             assumed_by=ServicePrincipal("lambda.amazonaws.com"),  # type: ignore
             managed_policies=[
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
-                ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaVPCAccessExecutionRole"),
             ],
-        )
-
-        vpc = Vpc(
-            self,
-            f"GuestBffVpc-{env_name}{suffix}",
-            max_azs=2,
-            nat_gateways=1,
-            subnet_configuration=[
-                SubnetConfiguration(name="public", subnet_type=SubnetType.PUBLIC),
-                SubnetConfiguration(name="private-egress", subnet_type=SubnetType.PRIVATE_WITH_EGRESS),
-            ],
-        )
-
-        lambda_sg = SecurityGroup(
-            self,
-            f"GuestBffLambdaSg-{env_name}{suffix}",
-            vpc=vpc,
-            allow_all_outbound=True,
         )
 
         if self.env_name == "prod":
@@ -88,9 +62,6 @@ class GuestBffStack(Stack):
                 "PLACE_INDEX_NAME": "HotelManagementPlaceIndex",
                 **paypal_env,
             },
-            vpc=vpc,
-            vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS),
-            security_groups=[lambda_sg],
         )
 
         self.gateway = LambdaRestApi(
@@ -116,10 +87,7 @@ class GuestBffStack(Stack):
         event_bus.grant_put_events_to(self.lambda_function)  # type: ignore
 
         self.lambda_function.add_to_role_policy(
-            PolicyStatement(
-                actions=["geo:SearchPlaceIndexForText"],
-                resources=["*"],
-            )
+            PolicyStatement(actions=["geo:SearchPlaceIndexForText"], resources=["*"])
         )
 
         integration = LambdaIntegration(self.lambda_function)
@@ -138,6 +106,12 @@ class GuestBffStack(Stack):
         booking = self.gateway.root.add_resource("booking")
         booking.add_method("POST", integration)
 
+        payment = booking.add_resource("payment")
+        payment_order = payment.add_resource("order")
+        payment_order.add_method("POST", integration)
+        payment_capture = payment.add_resource("capture")
+        payment_capture.add_method("POST", integration)
+
         my = self.gateway.root.add_resource("my")
         my_bookings = my.add_resource("bookings")
         my_bookings.add_method("GET", integration)
@@ -147,6 +121,14 @@ class GuestBffStack(Stack):
 
         rooms = self.gateway.root.add_resource("rooms")
         rooms.add_method("GET", integration)
+
+        room = self.gateway.root.add_resource("room")
+        room_id = room.add_resource("{room_uuid}")
+        room_id.add_method("GET", integration)
+
+        property_res = self.gateway.root.add_resource("property")
+        property_id = property_res.add_resource("{property_uuid}")
+        property_id.add_method("GET", integration)
 
         me = self.gateway.root.add_resource("me")
         me.add_method("GET", integration)
