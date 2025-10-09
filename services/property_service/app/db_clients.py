@@ -114,7 +114,7 @@ class PropertyTableClient:
             filter_expr_parts.append("country = :country")
             eav[":country"] = {"S": country}
         if state:
-            filter_expr_parts.append("state = :state")
+            filter_expr_parts.append("#state = :state")
             eav[":state"] = {"S": state}
         if city:
             filter_expr_parts.append("city = :city")
@@ -335,7 +335,3 @@ class RoomTableClient:
         response = self.room_db_client.query(**params)
         items = response.get("Items", [])
         return [Room(**from_dynamodb_item(it)) for it in items]
-        
-        
-
-
