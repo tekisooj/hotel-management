@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 from routes import router
-from config import AppMetadata, guest_bff_prod_configuration, guest_bff_int_configuration
+from config import AppMetadata, build_guest_bff_configuration
 from event_bus import EventBusClient
 from handlers import JWTVerifier
 from httpx import AsyncClient
@@ -19,7 +19,7 @@ logger.setLevel(logging.INFO)
 
 def create_app() -> FastAPI:
     app_metadata = AppMetadata()
-    app_config = guest_bff_prod_configuration if app_metadata.guest_bff_env == "prod" else guest_bff_int_configuration
+    app_config = build_guest_bff_configuration(app_metadata.guest_bff_env)
     app = FastAPI(
         title=app_metadata.app_title,
         description=app_metadata.app_description
@@ -53,3 +53,4 @@ def create_app() -> FastAPI:
 
 app = create_app()
 handler = Mangum(app, lifespan="off")
+
