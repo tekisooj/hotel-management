@@ -204,17 +204,22 @@ async function initializePaymentOrder(force = false) {
     orderId.value = response.order_id
     orderAmount.value = response.amount
 
-    if (response.paypal_client_id) {
-      activePaypalClientId.value = response.paypal_client_id
-    } else if (!activePaypalClientId.value) {
-      activePaypalClientId.value = paypalClientIdFromConfig.value || null
-    }
+    const responseClientId =
+      typeof response.paypal_client_id === 'string' ? response.paypal_client_id.trim() : ''
+    const fallbackClientId = paypalClientIdFromConfig.value || null
+    const nextClientId = responseClientId || fallbackClientId
 
-    const clientId = activePaypalClientId.value || paypalClientIdFromConfig.value || null
-    if (!clientId) {
+    if (!nextClientId) {
       throw new Error('PayPal client ID is not configured.')
     }
-    await ensurePayPalSdk(clientId)
+
+    const clientIdChanged = activePaypalClientId.value !== nextClientId
+    activePaypalClientId.value = nextClientId
+    if (clientIdChanged) {
+      paypalButtonsRendered.value = false
+    }
+
+    await ensurePayPalSdk(nextClientId)
   })()
 
   try {
@@ -255,9 +260,11 @@ async function ensurePayPalSdk(clientId: string) {
       return
     }
     existingScript.remove()
+    paypalButtonsRendered.value = false
   }
 
   delete (window as any).paypal
+  paypalButtonsRendered.value = false
   paypalSdkClientId = clientId
 
   paypalSdkLoading = new Promise<void>((resolve, reject) => {
@@ -277,61 +284,91 @@ async function ensurePayPalSdk(clientId: string) {
   }
 }
 
-async function renderPayPalButtons() {
-  if (paypalButtonsRendered.value || typeof window === 'undefined') return
+async function renderPayPalButtons(forceReload = false) {
+  if (typeof window === 'undefined') return
+
+  let clientId = activePaypalClientId.value || paypalClientIdFromConfig.value || null
+  if (!clientId) {
+    await initializePaymentOrder(true)
+    clientId = activePaypalClientId.value || paypalClientIdFromConfig.value || null
+  }
+
+  if (!clientId) {
+    throw new Error('PayPal client ID is not configured.')
+  }
+
+  await ensurePayPalSdk(clientId)
+
   const paypal = (window as any).paypal
   if (!paypal?.Buttons) {
     throw new Error('PayPal Buttons are not available.')
   }
-  paypalButtonsRendered.value = true
-  paypal.Buttons({
-    style: {
-      layout: 'vertical',
-      shape: 'rect',
-      label: 'pay',
-    },
-    createOrder: async () => {
-      paymentError.value = null
-      paymentSuccess.value = false
-      bookingUuid.value = null
-      try {
-        await initializePaymentOrder(true)
-        if (!orderId.value) {
-          throw new Error('Unable to create PayPal order.')
+
+  if (paypalButtonsRendered.value && !forceReload) {
+    return
+  }
+
+  const container = document.getElementById('paypal-button-container') as HTMLElement | null
+  if (!container) {
+    throw new Error('PayPal button container is not available.')
+  }
+
+  container.innerHTML = ''
+
+  try {
+    paypalButtonsRendered.value = true
+    await paypal.Buttons({
+      style: {
+        layout: 'vertical',
+        shape: 'rect',
+        label: 'pay',
+      },
+      createOrder: async () => {
+        paymentError.value = null
+        paymentSuccess.value = false
+        bookingUuid.value = null
+        try {
+          await initializePaymentOrder(true)
+          if (!orderId.value) {
+            throw new Error('Unable to create PayPal order.')
+          }
+          return orderId.value
+        } catch (err) {
+          paymentError.value = parseError(err, 'Unable to create the PayPal order.')
+          throw err
         }
-        return orderId.value
-      } catch (err) {
-        paymentError.value = parseError(err, 'Unable to create the PayPal order.')
-        throw err
-      }
-    },
-    onApprove: async (data: any) => {
-      paymentError.value = null
-      try {
-        const result = await capturePayment({
-          order_id: data.orderID,
-          room_uuid: roomUuid.value,
-          check_in: checkIn.value,
-          check_out: checkOut.value,
-          guests: guests.value,
-        })
-        bookingUuid.value = String(result.booking_uuid)
-        orderAmount.value = result.amount
-        paymentSuccess.value = true
+      },
+      onApprove: async (data: any) => {
+        paymentError.value = null
+        try {
+          const result = await capturePayment({
+            order_id: data.orderID,
+            room_uuid: roomUuid.value,
+            check_in: checkIn.value,
+            check_out: checkOut.value,
+            guests: guests.value,
+          })
+          bookingUuid.value = String(result.booking_uuid)
+          orderAmount.value = result.amount
+          paymentSuccess.value = true
+          orderId.value = null
+        } catch (err: any) {
+          paymentError.value = parseError(err, 'Something went wrong while processing the payment.')
+        }
+      },
+      onCancel: () => {
+        paymentError.value = 'Payment was cancelled. You can try again when ready.'
         orderId.value = null
-      } catch (err: any) {
+      },
+      onError: (err: any) => {
         paymentError.value = parseError(err, 'Something went wrong while processing the payment.')
-      }
-    },
-    onCancel: () => {
-      paymentError.value = 'Payment was cancelled. You can try again when ready.'
-      orderId.value = null
-    },
-    onError: (err: any) => {
-      paymentError.value = parseError(err, 'Something went wrong while processing the payment.')
-      orderId.value = null
-    },
-  }).render('#paypal-button-container')
+        orderId.value = null
+      },
+    }).render(container)
+  } catch (err) {
+    paypalButtonsRendered.value = false
+    throw err
+  }
 }
 
 function formatPrice(value: number) {
@@ -523,7 +560,4 @@ function returnToRoom() {
   }
 }
 </style>
-
-
-
 
