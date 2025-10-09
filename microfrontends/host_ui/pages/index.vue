@@ -2,10 +2,8 @@
   <div class="host-page">
     <section class="host-hero">
       <p class="host-hero__eyebrow">Host dashboard</p>
-      <h1 class="host-hero__title">Manage your portfolio</h1>
-      <p class="host-hero__subtitle">
-        Review your listings, keep availability up to date, and jump quickly to bookings or new property setup.
-      </p>
+      <h1 class="host-hero__title">Manage your properties</h1>
+
       <div class="host-hero__actions">
         <button class="host-btn host-btn--primary" @click="addNewProperty">Add new property</button>
         <button class="host-btn host-btn--ghost" @click="viewBookings">View bookings</button>
@@ -15,19 +13,16 @@
     <section class="host-section">
       <header class="host-section__header">
         <h2 class="host-section__title">Your properties</h2>
-        <p class="host-section__subtitle">
-          Select a property to edit rooms, adjust rates, or check upcoming reservations.
-        </p>
       </header>
       <div class="host-card host-card--list">
         <template v-if="loading">
-          <p class="host-empty">Loading your portfolio…</p>
+          <p class="host-empty">Loading your properties</p>
         </template>
         <template v-else-if="loadError">
           <p class="host-empty">{{ loadError }}</p>
         </template>
         <template v-else-if="!properties.length">
-          <p class="host-empty">You don't have any properties yet. Click “Add new property” to get started.</p>
+          <p class="host-empty">You don't have any properties yet. Click ï¿½Add new propertyï¿½ to get started.</p>
         </template>
         <template v-else>
           <HotelList :hotels="properties" />

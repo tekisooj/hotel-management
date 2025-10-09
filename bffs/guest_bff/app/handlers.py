@@ -311,7 +311,7 @@ async def create_payment_order(
 ) -> CreatePaymentOrderResponse:
     headers = _forward_auth_headers(request)
     room_response = await property_service_client.get(
-        f\"room/{str(payload.room_uuid)}\",
+        f"room/{str(payload.room_uuid)}",
         timeout=10.0,
         headers=headers or None,
     )
@@ -382,7 +382,7 @@ async def capture_payment_order(
 ) -> CapturePaymentResponse:
     headers = _forward_auth_headers(request)
     room_response = await property_service_client.get(
-        f\"room/{str(payload.room_uuid)}\",
+        f"room/{str(payload.room_uuid)}",
         timeout=10.0,
         headers=headers or None,
     )
