@@ -1,111 +1,129 @@
 <template>
-  <div class="container mt-4">
-    <form id="property-form" class="row g-2 align-items-end">
-      <div class="col-md-3">
-        <label class="form-label">Name</label>
-        <input v-model="property.hotelName" type="text" class="form-control" placeholder="Name" />
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Description</label>
-        <input v-model="property.description" type="text" class="form-control" placeholder="Description" />
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Stars</label>
-        <input v-model="property.stars" type="number" class="form-control" placeholder="Stars" />
-      </div>
+  <div class="host-page host-page--form">
+    <header class="host-form-header">
+      <p class="host-hero__eyebrow">New listing</p>
+      <h1>List a new property</h1>
+      <p>Add essential details, images, and rooms to make your property bookable in minutes.</p>
+    </header>
 
-      <div class="col-md-3">
-        <label class="form-label">Property Photos</label>
-        <input type="file" class="form-control" multiple accept="image/*" @change="handlePropertyFiles" />
-        <ul v-if="property.images.length" class="mt-2 list-unstyled">
-          <li
-            v-for="(image, idx) in property.images"
-            :key="`${image.key}-${idx}`"
-            class="d-flex align-items-center justify-content-between gap-2"
-          >
-            <span class="small text-truncate">{{ image.key }}</span>
-            <button type="button" class="btn btn-link btn-sm text-danger" @click="removePropertyImage(idx)">
-              Remove
-            </button>
-          </li>
-        </ul>
-      </div>
-
-      <location-search @selected="handleLocation" />
-    </form>
-
-    <div v-if="uploadError" class="alert alert-danger mt-3">{{ uploadError }}</div>
-    <p v-if="pendingUploads > 0" class="text-muted mt-2">Uploading images&hellip; please wait.</p>
-
-    <div
-      v-for="(room, index) in rooms"
-      :key="index"
-      class="mb-4 p-3 border rounded bg-light"
-    >
-      <div class="row">
-        <div class="col-md-6 mb-3">
-          <label class="form-label">Name</label>
-          <input type="text" class="form-control" v-model="room.name" required />
+    <div class="host-card host-card--form">
+      <form id="property-form" class="host-form-grid" @submit.prevent>
+        <div class="host-form-field">
+          <label class="host-label" for="property-name">Name</label>
+          <input id="property-name" v-model="property.hotelName" type="text" placeholder="Sunset Villas" />
         </div>
-        <div class="col-md-3 mb-3">
-          <label class="form-label">Description</label>
-          <input type="text" class="form-control" v-model="room.description" required />
+        <div class="host-form-field">
+          <label class="host-label" for="property-description">Description</label>
+          <input id="property-description" v-model="property.description" type="text" placeholder="Short description" />
         </div>
-        <div class="col-md-3 mb-3">
-          <label class="form-label">Max Guests</label>
-          <input type="number" class="form-control" v-model="room.capacity" required />
+        <div class="host-form-field">
+          <label class="host-label" for="property-stars">Stars</label>
+          <input id="property-stars" v-model="property.stars" type="number" min="0" max="5" step="0.5" placeholder="4.5" />
         </div>
-
-        <div class="col-md-3 mb-3">
-          <label class="form-label">Room Type</label>
-          <select class="form-select" v-model="room.roomType" required>
-            <option disabled value="">Select a room type</option>
-            <option v-for="type in roomTypes" :key="type" :value="type">
-              {{ type.charAt(0).toUpperCase() + type.slice(1) }}
-            </option>
-          </select>
-        </div>
-
-        <div class="col-md-3 mb-3">
-          <label class="form-label">Price Per Night</label>
-          <input type="number" class="form-control" v-model="room.pricePerNight" required />
-        </div>
-        <div class="col-md-3 mb-3">
-          <label class="form-label">Min Price Per Night</label>
-          <input type="number" class="form-control" v-model="room.minPricePerNight" required />
-        </div>
-        <div class="col-md-3 mb-3">
-          <label class="form-label">Max Price Per Night</label>
-          <input type="number" class="form-control" v-model="room.maxPricePerNight" required />
-        </div>
-        <div class="col-md-3 mb-3">
-          <label class="form-label">Amenities (comma separated)</label>
-          <input type="text" class="form-control" v-model="room.amenitiesInput" />
-        </div>
-        <div class="col-md-6 mb-3">
-          <label class="form-label">Room Photos</label>
-          <input type="file" class="form-control" multiple accept="image/*" @change="(event) => handleRoomFiles(index, event)" />
-          <ul v-if="room.images?.length" class="mt-2 list-unstyled">
+        <div class="host-form-field host-form-field--full">
+          <label class="host-label" for="property-images">Property photos</label>
+          <input id="property-images" type="file" multiple accept="image/*" @change="handlePropertyFiles" />
+          <ul v-if="property.images.length" class="host-uploader-list">
             <li
-              v-for="(image, imgIdx) in room.images"
-              :key="`${image.key}-${imgIdx}`"
-              class="d-flex align-items-center justify-content-between gap-2"
+              v-for="(image, idx) in property.images"
+              :key="`${image.key}-${idx}`"
+              class="host-uploader-item"
             >
-              <span class="small text-truncate">{{ image.key }}</span>
-              <button type="button" class="btn btn-link btn-sm text-danger" @click="removeRoomImage(index, imgIdx)">
+              <span class="text-truncate">{{ image.key }}</span>
+              <button type="button" class="host-link host-link--danger" @click="removePropertyImage(idx)">
                 Remove
               </button>
             </li>
           </ul>
         </div>
+        <div class="host-form-field host-form-field--full">
+          <label class="host-label">Location</label>
+          <location-search @selected="handleLocation" />
+        </div>
+      </form>
+
+      <div v-if="uploadError" class="host-alert">{{ uploadError }}</div>
+      <p v-if="pendingUploads > 0" class="host-subtext">Uploading images… please wait.</p>
+
+      <section class="host-section">
+        <header class="host-section__header">
+          <h2 class="host-subsection-title">Rooms</h2>
+          <p class="host-subtext">Add one room entry for each layout or rate plan you offer.</p>
+        </header>
+
+        <div
+          v-for="(room, index) in rooms"
+          :key="index"
+          class="host-room-card"
+        >
+          <div class="host-form-grid">
+            <div class="host-form-field">
+              <label class="host-label">Name</label>
+              <input type="text" v-model="room.name" placeholder="Deluxe King" />
+            </div>
+            <div class="host-form-field">
+              <label class="host-label">Description</label>
+              <input type="text" v-model="room.description" placeholder="Spacious room with city view" />
+            </div>
+            <div class="host-form-field">
+              <label class="host-label">Max guests</label>
+              <input type="number" v-model="room.capacity" min="1" />
+            </div>
+            <div class="host-form-field">
+              <label class="host-label">Room type</label>
+              <select v-model="room.roomType">
+                <option disabled value="">Select a room type</option>
+                <option v-for="type in roomTypes" :key="type" :value="type">
+                  {{ type.charAt(0).toUpperCase() + type.slice(1) }}
+                </option>
+              </select>
+            </div>
+            <div class="host-form-field">
+              <label class="host-label">Price / night</label>
+              <input type="number" v-model="room.pricePerNight" min="0" step="0.01" />
+            </div>
+            <div class="host-form-field">
+              <label class="host-label">Minimum price</label>
+              <input type="number" v-model="room.minPricePerNight" min="0" step="0.01" />
+            </div>
+            <div class="host-form-field">
+              <label class="host-label">Maximum price</label>
+              <input type="number" v-model="room.maxPricePerNight" min="0" step="0.01" />
+            </div>
+            <div class="host-form-field host-form-field--full">
+              <label class="host-label">Amenities (comma separated)</label>
+              <input type="text" v-model="room.amenitiesInput" placeholder="Wi-Fi, Parking, Pool" />
+            </div>
+            <div class="host-form-field host-form-field--full">
+              <label class="host-label">Room photos</label>
+              <input type="file" multiple accept="image/*" @change="(event) => handleRoomFiles(index, event)" />
+              <ul v-if="room.images?.length" class="host-uploader-list">
+                <li
+                  v-for="(image, imgIdx) in room.images"
+                  :key="`${image.key}-${imgIdx}`"
+                  class="host-uploader-item"
+                >
+                  <span class="text-truncate">{{ image.key }}</span>
+                  <button type="button" class="host-link host-link--danger" @click="removeRoomImage(index, imgIdx)">
+                    Remove
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="host-form-actions">
+        <button type="button" class="host-btn host-btn--ghost" @click="addRoom">+ Add room</button>
+        <button type="button" class="host-btn host-btn--primary" :disabled="pendingUploads > 0" @click="add">
+          Publish property
+        </button>
       </div>
     </div>
-
-    <button class="btn btn-primary col-md-3 mb-4" @click="addRoom">+ Add Room</button>
-    <hr />
-    <button class="btn btn-success col-md-3 mb-4" :disabled="pendingUploads > 0" @click="add">Add Property</button>
   </div>
 </template>
+
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue';

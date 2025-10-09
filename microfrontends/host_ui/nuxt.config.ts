@@ -1,5 +1,7 @@
+import { defineNuxtConfig } from 'nuxt/config'
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  css: ['~/assets/styles/host-theme.css'],
   ssr: false, // build as SPA (good for S3/CloudFront)
   devtools: { enabled: false },
   modules: [
@@ -42,3 +44,5 @@ export default defineNuxtConfig({
     },
   },
 })
+
+

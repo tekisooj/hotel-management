@@ -1,79 +1,82 @@
 <template>
-  <div class="bookings-page">
-    <div class="container py-4">
-      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-        <div>
-          <h1 class="page-title">Bookings for <span class="highlight">{{ selectedProperty?.name || 'N/A' }}</span></h1>
-          <p v-if="selectedProperty?.address" class="property-address">{{ selectedProperty.address }}</p>
+  <div class="host-page host-page--bookings">
+    <section class="host-section">
+      <header class="host-section__header">
+        <p class="host-hero__eyebrow">Calendar</p>
+        <h1 class="host-section__title">Booking overview</h1>
+        <p class="host-section__subtitle">
+          Track upcoming stays and availability for each of your properties across the next two months.
+        </p>
+      </header>
+      <div class="host-card host-card--bookings">
+        <div class="host-bookings-header">
+          <div>
+            <h2 class="host-subsection-title">
+              Bookings for <span class="highlight">{{ selectedProperty?.name || 'Select a property' }}</span>
+            </h2>
+            <p v-if="selectedProperty?.address" class="host-subtext">{{ selectedProperty.address }}</p>
+          </div>
+          <div class="host-property-picker">
+            <label class="host-label" for="property-select">Property</label>
+            <select
+              id="property-select"
+              v-model="selectedPropertyUuid"
+              :disabled="propertiesLoading || !properties.length"
+            >
+              <option value="" disabled>Select a property</option>
+              <option v-for="property in properties" :key="property.uuid" :value="property.uuid">
+                {{ property.name }}
+              </option>
+            </select>
+          </div>
         </div>
-        <div class="property-picker">
-          <label class="form-label text-muted mb-1">Property</label>
-          <select
-            class="form-select"
-            v-model="selectedPropertyUuid"
-            :disabled="propertiesLoading || !properties.length"
+
+        <div class="host-bookings-toolbar">
+          <div class="host-month-nav">
+            <button class="host-btn host-btn--ghost" type="button" @click="goToPreviousMonth" :disabled="loadingBookings">
+              ‹
+            </button>
+            <span class="host-month-label">{{ monthRangeLabel }}</span>
+            <button class="host-btn host-btn--ghost" type="button" @click="goToNextMonth" :disabled="loadingBookings">
+              ›
+            </button>
+          </div>
+          <div class="host-legend">
+            <span class="host-legend-box"></span>
+            <small>Booked</small>
+          </div>
+        </div>
+
+        <p v-if="bookingsError" class="host-alert">{{ bookingsError }}</p>
+
+        <div v-if="loadingBookings" class="host-empty">Loading bookings…</div>
+
+        <div v-else-if="!roomAvailabilities.length" class="host-empty-card">
+          <h2>No bookings yet</h2>
+          <p>Select another month or property to see upcoming reservations.</p>
+        </div>
+
+        <div v-else class="host-calendar-grid">
+          <div
+            v-for="availability in roomAvailabilities"
+            :key="availability.uuid"
+            class="host-calendar-card"
           >
-            <option value="" disabled>Select a property</option>
-            <option v-for="property in properties" :key="property.uuid" :value="property.uuid">
-              {{ property.name }}
-            </option>
-          </select>
-        </div>
-      </div>
-
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-        <div class="d-flex align-items-center gap-2">
-          <button class="btn btn-outline-secondary btn-sm" @click="goToPreviousMonth" :disabled="loadingBookings">
-            &lt;
-          </button>
-          <span class="month-range">{{ monthRangeLabel }}</span>
-          <button class="btn btn-outline-secondary btn-sm" @click="goToNextMonth" :disabled="loadingBookings">
-            &gt;
-          </button>
-        </div>
-        <div class="legend d-flex align-items-center gap-2">
-          <span class="legend-box"></span>
-          <small class="text-muted">Booked</small>
-        </div>
-      </div>
-
-      <div v-if="bookingsError" class="alert alert-warning">{{ bookingsError }}</div>
-
-      <div v-if="loadingBookings" class="text-center py-5">
-        <div class="spinner-border text-secondary" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-      </div>
-
-      <div v-else-if="!roomAvailabilities.length" class="empty-state">
-        <h2>No bookings yet</h2>
-        <p>Select another month or property to see upcoming reservations.</p>
-      </div>
-
-      <div v-else class="d-flex flex-column gap-4">
-        <div
-          v-for="availability in roomAvailabilities"
-          :key="availability.uuid"
-          class="card room-card shadow-sm"
-        >
-          <div class="card-body">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div class="host-calendar-card__header">
               <div>
-                <h3 class="room-title">{{ availability.name }}</h3>
-                <div class="text-muted small">
-                  Max. {{ availability.capacity }} {{ availability.capacity === 1 ? 'Guest' : 'Guests' }} |
-                  ${{ availability.price_per_night }}/night
-                </div>
+                <h3 class="host-calendar-card__title">{{ availability.name }}</h3>
+                <p class="host-calendar-card__meta">
+                  Max. {{ availability.capacity }} {{ availability.capacity === 1 ? 'guest' : 'guests' }} · ${{ availability.price_per_night }}/night
+                </p>
               </div>
-              <div v-if="availability.property?.name" class="text-muted small text-end">
+              <span v-if="availability.property?.name" class="host-calendar-card__property">
                 {{ availability.property.name }}
-              </div>
+              </span>
             </div>
-            <div class="row g-3">
+            <div class="host-calendar-grid">
               <div
                 v-for="month in visibleMonths"
                 :key="`${availability.uuid}-${month.year}-${month.month}`"
-                class="col-12 col-md-6"
               >
                 <BookingCalendar
                   :month="month.month"
@@ -85,7 +88,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </section>
   </div>
 </template>
 
@@ -108,7 +111,6 @@ const bookingsError = ref<string | null>(null)
 
 const currentMonth = ref(startOfMonth(new Date()))
 
-const propertiesReady = computed(() => properties.value.length > 0)
 const selectedProperty = computed(() =>
   properties.value.find((item) => item.uuid === selectedPropertyUuid.value)
 )
@@ -129,67 +131,47 @@ const visibleMonths = computed(() => {
   ]
 })
 
-const monthRangeLabel = computed(() => {
-  const [first, second] = visibleMonths.value
-  return `${formatMonth(first)} - ${formatMonth(second)}`
-})
-
 const calendarBookings = computed<Record<string, CalendarBooking[]>>(() => {
   const record: Record<string, CalendarBooking[]> = {}
-  roomAvailabilities.value.forEach((availability) => {
-    record[availability.uuid] = (availability.bookings || []).map((booking) => ({
-      uuid: booking.uuid,
-      checkIn: new Date(booking.check_in),
-      checkOut: new Date(booking.check_out),
-      label: buildGuestLabel(booking),
-      status: booking.status,
-      guestName: booking.guest_name ?? undefined,
-      guestEmail: booking.guest_email ?? undefined,
-    }))
-  })
+  for (const availability of roomAvailabilities.value) {
+    record[availability.uuid] = buildCalendarBookings(availability.bookings || [])
+  }
   return record
 })
 
+const monthRangeLabel = computed(() => {
+  const labels = visibleMonths.value.map(formatMonth)
+  return labels.join(' · ')
+})
+
 onMounted(async () => {
-  try {
-    const fetched = await getProperties()
-    properties.value = Array.isArray(fetched) ? fetched : []
-    if (properties.value.length) {
-      selectedPropertyUuid.value = properties.value[0].uuid || ''
-    }
-  } catch (error) {
-    bookingsError.value = 'Unable to load properties right now.'
-    properties.value = []
-  } finally {
-    propertiesLoading.value = false
+  await fetchProperties()
+})
+
+watch(selectedPropertyUuid, () => {
+  if (selectedPropertyUuid.value) {
+    fetchBookings()
   }
 })
 
-watch(
-  () => selectedPropertyUuid.value,
-  async (value, oldValue) => {
-    if (!propertiesReady.value) {
-      return
-    }
-    if (!value) {
-      roomAvailabilities.value = []
-      return
-    }
-    if (value !== oldValue) {
-      await fetchBookings()
-    }
+watch(rangeStart, () => {
+  if (selectedPropertyUuid.value) {
+    fetchBookings()
   }
-)
+})
 
-watch(
-  () => `${rangeStart.value.getTime()}-${rangeEnd.value.getTime()}`,
-  async () => {
-    if (!selectedPropertyUuid.value) {
-      return
+async function fetchProperties() {
+  propertiesLoading.value = true
+  try {
+    const response = await getProperties()
+    properties.value = Array.isArray(response) ? response : []
+    if (properties.value.length && !selectedPropertyUuid.value) {
+      selectedPropertyUuid.value = properties.value[0].uuid || ''
     }
-    await fetchBookings()
+  } finally {
+    propertiesLoading.value = false
   }
-)
+}
 
 async function fetchBookings() {
   if (!selectedPropertyUuid.value) {
@@ -201,7 +183,7 @@ async function fetchBookings() {
   try {
     const availabilities = await getBookings(selectedPropertyUuid.value, rangeStart.value, rangeEnd.value)
     roomAvailabilities.value = Array.isArray(availabilities) ? availabilities : []
-  } catch (error) {
+  } catch {
     bookingsError.value = 'Unable to load bookings for this property.'
     roomAvailabilities.value = []
   } finally {
@@ -221,6 +203,16 @@ function goToNextMonth() {
   currentMonth.value = next
 }
 
+function buildCalendarBookings(bookings: AvailabilityBooking[]): CalendarBooking[] {
+  return bookings.map((booking) => ({
+    uuid: booking.uuid,
+    start: booking.check_in,
+    end: booking.check_out,
+    label: buildGuestLabel(booking),
+    status: booking.status,
+  }))
+}
+
 function formatMonth(month: { month: number; year: number }) {
   return new Date(month.year, month.month - 1, 1).toLocaleDateString(undefined, {
     month: 'long',
@@ -231,7 +223,7 @@ function formatMonth(month: { month: number; year: number }) {
 function buildGuestLabel(booking: AvailabilityBooking): string {
   const fullName = (booking.guest_name || '').trim()
   if (fullName) {
-    return fullName.split(/\s+/)[0]
+    return fullName.split(/\\s+/)[0]
   }
   const email = (booking.guest_email || '').trim()
   if (email) {
@@ -261,63 +253,4 @@ function startOfMonth(date: Date) {
 }
 </script>
 
-<style scoped>
-.bookings-page {
-  min-height: 100vh;
-  background: linear-gradient(180deg, #f7f1e8 0%, #fdfbf7 100%);
-}
-
-.page-title {
-  font-size: 1.75rem;
-  margin-bottom: 0.25rem;
-}
-
-.highlight {
-  color: #805b2c;
-}
-
-.property-address {
-  margin: 0;
-  color: #8c8273;
-}
-
-.property-picker {
-  min-width: 220px;
-}
-
-.month-range {
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.legend-box {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  background: #d7e9cf;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.empty-state {
-  background: #fff;
-  border-radius: 16px;
-  padding: 48px 32px;
-  text-align: center;
-  border: 1px dashed rgba(0, 0, 0, 0.1);
-}
-
-.empty-state h2 {
-  margin-bottom: 8px;
-  font-size: 1.4rem;
-}
-
-.room-card {
-  border: none;
-  border-radius: 18px;
-}
-
-.room-title {
-  margin-bottom: 4px;
-}
-</style>
 

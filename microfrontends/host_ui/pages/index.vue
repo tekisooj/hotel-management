@@ -1,73 +1,71 @@
 <template>
-  <div class="page">
-    <div class="d-flex gap-2 mb-3 flex-wrap">
-      <button class="btn btn-outline-secondary" @click="viewBookings">View bookings</button>
-      <button class="btn btn-primary" @click="addNewProperty">Add new Property</button>
-    </div>
+  <div class="host-page">
+    <section class="host-hero">
+      <p class="host-hero__eyebrow">Host dashboard</p>
+      <h1 class="host-hero__title">Manage your portfolio</h1>
+      <p class="host-hero__subtitle">
+        Review your listings, keep availability up to date, and jump quickly to bookings or new property setup.
+      </p>
+      <div class="host-hero__actions">
+        <button class="host-btn host-btn--primary" @click="addNewProperty">Add new property</button>
+        <button class="host-btn host-btn--ghost" @click="viewBookings">View bookings</button>
+      </div>
+    </section>
 
-    <div class="hotels">
-      <HotelList :hotels="propertyDetails" />
-    </div>
+    <section class="host-section">
+      <header class="host-section__header">
+        <h2 class="host-section__title">Your properties</h2>
+        <p class="host-section__subtitle">
+          Select a property to edit rooms, adjust rates, or check upcoming reservations.
+        </p>
+      </header>
+      <div class="host-card host-card--list">
+        <template v-if="loading">
+          <p class="host-empty">Loading your portfolio…</p>
+        </template>
+        <template v-else-if="loadError">
+          <p class="host-empty">{{ loadError }}</p>
+        </template>
+        <template v-else-if="!properties.length">
+          <p class="host-empty">You don't have any properties yet. Click “Add new property” to get started.</p>
+        </template>
+        <template v-else>
+          <HotelList :hotels="properties" />
+        </template>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useHostBff } from '@/api/hostBff'
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import HotelList from '@/components/HotelList.vue'
-import { onMounted } from 'vue'
-import { ref, computed } from 'vue'
+import { useHostBff } from '@/api/hostBff'
+import type { PropertyDetail } from '@/types/PropertyDetail'
 
-const { getProperties } = useHostBff()
 const router = useRouter()
-const country = ref('')
-const city = ref('')
-const state = ref('')
-const checkIn = ref('')
-const checkOut = ref('')
-const capacity = ref(0)
-const maxPrice = ref(undefined)
-
-const propertyDetails = ref<any[]>([])
+const { getProperties } = useHostBff()
+const properties = ref<PropertyDetail[]>([])
+const loading = ref(true)
+const loadError = ref<string | null>(null)
 
 onMounted(async () => {
   try {
-    const res = await getProperties()
-    propertyDetails.value = Array.isArray(res) ? res : []
-  } catch (e) {
-    propertyDetails.value = []
+    const response = await getProperties()
+    properties.value = Array.isArray(response) ? response : []
+  } catch (error: any) {
+    loadError.value = error?.message || 'Unable to load your properties right now.'
+  } finally {
+    loading.value = false
   }
 })
 
-async function addNewProperty() {
-  await router.push({ path: '/add-property' })
+function addNewProperty() {
+  router.push({ path: '/add-property' })
 }
 
-async function viewBookings() {
-  await router.push({ path: '/bookings' })
-}
-
-async function submit() {
-  if (!canSearch.value) return
-  try {
-    const res = await searchRooms({
-      country: country.value,
-      city: city.value,
-      state: state.value || undefined,
-      check_in_date: checkIn.value,
-      check_out_date: checkOut.value,
-      capacity: capacity.value || undefined,
-      max_price: maxPrice.value || undefined,
-    })
-    propertyDetails.value = Array.isArray(res) ? res : []
-  } catch (e) {
-    // optional: surface error
-    propertyDetails.value = []
-  }
+function viewBookings() {
+  router.push({ path: '/bookings' })
 }
 </script>
-
-<style scoped>
-.page { padding: 24px; }
-.actions { margin-top: 16px; }
-button { padding: 8px 12px; }
-</style>
