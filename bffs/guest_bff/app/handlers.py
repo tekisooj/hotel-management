@@ -174,10 +174,15 @@ PAYPAL_DEFAULT_BASE_URL = "https://api-m.sandbox.paypal.com"
 PAYPAL_HTTP_TIMEOUT = 20.0
 
 def _get_paypal_settings(request: Request) -> tuple[str, str, str]:
-    client_id = getattr(request.app.state, "paypal_client_id", None)
-    secret = getattr(request.app.state, "paypal_client_secret", None)
-    base_url = getattr(request.app.state, "paypal_base_url", PAYPAL_DEFAULT_BASE_URL) or PAYPAL_DEFAULT_BASE_URL
+    client_id = getattr(request.app.state, "paypal_client_id", None) or os.environ.get("PAYPAL_CLIENT_ID")
+    secret = getattr(request.app.state, "paypal_client_secret", None) or os.environ.get("PAYPAL_CLIENT_SECRET")
+    base_url = (
+        getattr(request.app.state, "paypal_base_url", None)
+        or os.environ.get("PAYPAL_BASE_URL")
+        or PAYPAL_DEFAULT_BASE_URL
+    )
     if not client_id or not secret:
+        logger.error("PayPal integration missing credentials. client_id_present=%s secret_present=%s", bool(client_id), bool(secret))
         raise HTTPException(status_code=500, detail="PayPal integration is not configured")
     return client_id, secret, base_url.rstrip('/')
 

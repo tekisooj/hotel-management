@@ -77,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGuestBff } from '@/api/guestBff'
 import type { Room } from '@/types/Room'
@@ -95,6 +95,9 @@ const property = ref<PropertyDetail | null>(null)
 const checkIn = ref('')
 const checkOut = ref('')
 const guests = ref(2)
+const lastPricingCheckIn = ref<string | null>(null)
+const initialLoadComplete = ref(false)
+let pricingRequestToken = 0
 
 const propertyRating = computed(() => {
   if (!property.value) return null
@@ -179,15 +182,32 @@ async function load() {
     loading.value = false
     return
   }
+
+  applyDefaults()
+  const normalizedCheckIn = (checkIn.value || '').trim()
+
   try {
     const storedRoom = store.getRoom(roomUuid)
-    let resolvedRoom = storedRoom
-    if (!resolvedRoom) {
-      resolvedRoom = await getRoom(roomUuid)
+    let resolvedRoom: Room | null = storedRoom || null
+    let fetchedRoom: Room | null = null
+    try {
+      const data = await getRoom(
+        roomUuid,
+        normalizedCheckIn ? { checkInDate: normalizedCheckIn } : undefined,
+      )
+      if (data) {
+        fetchedRoom = data as Room
+        resolvedRoom = fetchedRoom
+      }
+    } catch (err) {
+      console.error('Failed to fetch room', err)
     }
+
     if (resolvedRoom) {
       store.setRoom(resolvedRoom)
       room.value = store.getRoom(roomUuid) || resolvedRoom
+    } else {
+      room.value = storedRoom || null
     }
 
     const propUuid =
@@ -196,9 +216,17 @@ async function load() {
 
     if (propUuid) {
       const storedProperty = store.getProperty(propUuid)
-      let resolvedProperty = storedProperty
-      if (!resolvedProperty) {
-        resolvedProperty = await getProperty(propUuid)
+      let resolvedProperty: PropertyDetail | null = storedProperty || null
+      try {
+        const data = await getProperty(
+          propUuid,
+          normalizedCheckIn ? { checkInDate: normalizedCheckIn } : undefined,
+        )
+        if (data) {
+          resolvedProperty = data as PropertyDetail
+        }
+      } catch (err) {
+        console.error('Failed to fetch property', err)
       }
       if (resolvedProperty) {
         store.setProperty(resolvedProperty)
@@ -206,12 +234,44 @@ async function load() {
       }
     }
 
-    applyDefaults()
+    if (fetchedRoom) {
+      lastPricingCheckIn.value = normalizedCheckIn || null
+    } else if (!normalizedCheckIn) {
+      lastPricingCheckIn.value = null
+    }
   } catch (err) {
     console.error('Failed to load room', err)
     room.value = room.value || null
   } finally {
     loading.value = false
+    initialLoadComplete.value = true
+  }
+}
+
+async function refreshRoomPricing(force = false) {
+  if (!room.value?.uuid) return
+  const normalized = (checkIn.value || '').trim()
+  const target = normalized ? normalized : null
+
+  if (!force && target === lastPricingCheckIn.value) {
+    return
+  }
+
+  pricingRequestToken += 1
+  const currentToken = pricingRequestToken
+  try {
+    const updatedRoom = await getRoom(
+      room.value.uuid,
+      normalized ? { checkInDate: normalized } : undefined,
+    )
+    if (pricingRequestToken !== currentToken || !updatedRoom) {
+      return
+    }
+    store.setRoom(updatedRoom)
+    room.value = store.getRoom(room.value.uuid) || updatedRoom
+    lastPricingCheckIn.value = target
+  } catch (err) {
+    console.error('Failed to refresh room pricing', err)
   }
 }
 
@@ -240,6 +300,14 @@ function goBack() {
     router.push('/')
   }
 }
+
+watch(
+  () => checkIn.value,
+  () => {
+    if (!initialLoadComplete.value) return
+    refreshRoomPricing()
+  },
+)
 
 onMounted(load)
 </script>

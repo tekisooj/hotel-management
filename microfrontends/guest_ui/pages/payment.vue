@@ -156,12 +156,14 @@ onMounted(async () => {
 
 async function hydrateRoom() {
   let currentRoom = store.getRoom(roomUuid.value)
-  if (!currentRoom) {
-    const fetchedRoom = await getRoom(roomUuid.value)
+  try {
+    const fetchedRoom = await getRoom(roomUuid.value, { checkInDate: checkIn.value })
     if (fetchedRoom) {
       store.setRoom(fetchedRoom)
-      currentRoom = store.getRoom(roomUuid.value)
+      currentRoom = store.getRoom(roomUuid.value) || fetchedRoom
     }
+  } catch (err) {
+    console.error('Failed to refresh room details', err)
   }
   if (!currentRoom) {
     throw new Error('Room not available for booking.')
@@ -175,12 +177,14 @@ async function hydrateRoom() {
 
   if (propertyUuid) {
     let existing = store.getProperty(propertyUuid)
-    if (!existing) {
-      const fetched = await getProperty(propertyUuid)
+    try {
+      const fetched = await getProperty(propertyUuid, { checkInDate: checkIn.value })
       if (fetched) {
         store.setProperty(fetched)
         existing = store.getProperty(propertyUuid) || fetched
       }
+    } catch (err) {
+      console.error('Failed to refresh property details', err)
     }
     property.value = existing || null
   }

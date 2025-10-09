@@ -5,6 +5,10 @@ import type { PropertyDetail } from '@/types/PropertyDetail'
 import type { Booking } from 'types/Booking'
 import type { Review } from 'types/Review'
 
+type RoomPricingOptions = {
+  checkInDate?: string | null
+}
+
 interface GuestBff {
   addReview(body: Review): Promise<any>
   getPropertyReviews(propertyUuid: string): Promise<any>
@@ -13,6 +17,8 @@ interface GuestBff {
   getUserBookings(): Promise<any>
   cancelUserBooking(bookingUuid: string): Promise<any>
   getFilteredRooms(params: Record<string, unknown>): Promise<any>
+  getRoom(roomUuid: string, options?: RoomPricingOptions): Promise<any>
+  getProperty(propertyUuid: string, options?: RoomPricingOptions): Promise<any>
   createPaymentOrder(payload: PaymentOrderRequest): Promise<PaymentOrderResponse>
   capturePayment(payload: CapturePaymentRequest): Promise<CapturePaymentResponse>
 }
@@ -31,6 +37,14 @@ export default (axios: NuxtAxiosInstance): GuestBff => ({
   getUserBookings: async () => axios.$get('my/bookings'),
   cancelUserBooking: async (bookingUuid: string) => axios.$delete(`my/booking/${bookingUuid}`),
   getFilteredRooms: async (params: Record<string, unknown>) => axios.$get('rooms', { params }),
+  getRoom: async (roomUuid: string, options?: RoomPricingOptions) =>
+    axios.$get(`room/${roomUuid}`, {
+      params: options?.checkInDate ? { check_in_date: options.checkInDate } : undefined,
+    }),
+  getProperty: async (propertyUuid: string, options?: RoomPricingOptions) =>
+    axios.$get(`property/${propertyUuid}`, {
+      params: options?.checkInDate ? { check_in_date: options.checkInDate } : undefined,
+    }),
   createPaymentOrder: async (payload: PaymentOrderRequest) => axios.$post('booking/payment/order', payload),
   capturePayment: async (payload: CapturePaymentRequest) => axios.$post('booking/payment/capture', payload),
 })
@@ -195,16 +209,26 @@ export function useGuestBff() {
     })
   }
 
-  async function getRoom(roomUuid: string) {
-    return await $fetch(`${baseURL}/room/${roomUuid}`, {
+  async function getRoom(roomUuid: string, options: RoomPricingOptions = {}) {
+    const requestOptions: { headers: Record<string, string>; params?: Record<string, string> } = {
       headers: authHeaders(),
-    })
+    }
+    const trimmedCheckIn = options.checkInDate?.trim()
+    if (trimmedCheckIn) {
+      requestOptions.params = { check_in_date: trimmedCheckIn }
+    }
+    return await $fetch(`${baseURL}/room/${roomUuid}`, requestOptions)
   }
 
-  async function getProperty(propertyUuid: string) {
-    return await $fetch(`${baseURL}/property/${propertyUuid}`, {
+  async function getProperty(propertyUuid: string, options: RoomPricingOptions = {}) {
+    const requestOptions: { headers: Record<string, string>; params?: Record<string, string> } = {
       headers: authHeaders(),
-    })
+    }
+    const trimmedCheckIn = options.checkInDate?.trim()
+    if (trimmedCheckIn) {
+      requestOptions.params = { check_in_date: trimmedCheckIn }
+    }
+    return await $fetch(`${baseURL}/property/${propertyUuid}`, requestOptions)
   }
 
   async function searchPlaces(text: string) {
