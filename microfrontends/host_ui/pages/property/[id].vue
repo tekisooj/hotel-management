@@ -169,7 +169,7 @@
         <li v-for="room in rooms" :key="room.uuid || room.name">
           <h3>{{ room.name }}</h3>
           <p class="host-property__room-meta">
-            {{ room.capacity }} guests • ${{ Number(room.price_per_night ?? room.pricePerNight ?? 0).toFixed(2) }} per night
+            {{ room.capacity }} guests ï¿½ ${{ Number(room.price_per_night ?? room.pricePerNight ?? 0).toFixed(2) }} per night
           </p>
           <p v-if="room.description">{{ room.description }}</p>
           <div class="host-room-images" v-if="room.images?.length">
@@ -275,7 +275,6 @@ import { useHostBff } from '@/api/hostBff'
 import type { PropertyDetail } from '@/types/PropertyDetail'
 import type { Room } from '@/types/Room'
 import type { Amenity } from '@/types/Amenity'
-import { RoomType } from '@/types/RoomType'
 
 const route = useRoute()
 const router = useRouter()
