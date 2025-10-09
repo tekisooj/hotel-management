@@ -1,7 +1,9 @@
 from datetime import datetime, date
+import calendar
 import asyncio
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
+from collections.abc import Mapping
 from uuid import UUID, uuid4
 from fastapi import Depends, HTTPException, Request
 from httpx import AsyncClient, HTTPError
@@ -119,14 +121,68 @@ def _forward_auth_headers(request: Request) -> dict[str, str]:
             headers["X-User-Id"] = xuid
     return headers
 
+def _extract_room_value(room_payload: Any, key: str) -> Any:
+    if isinstance(room_payload, Mapping):
+        return room_payload.get(key)
+    return getattr(room_payload, key, None)
+
+def _resolve_room_price(room_payload: Any, *keys: str) -> Decimal | None:
+    for key in keys:
+        value = _extract_room_value(room_payload, key)
+        if value is not None:
+            return Decimal(str(value))
+    return None
+
+def _normalize_date(value: date | datetime | None) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    return value
+
+def _add_months(source: date, months: int) -> date:
+    month_index = source.month - 1 + months
+    year = source.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(source.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+def _determine_nightly_price(room_payload: Any, check_in: date | None) -> Decimal:
+    base_price = _resolve_room_price(room_payload, 'price_per_night', 'pricePerNight', 'price_perNight')
+    if base_price is None:
+        raise HTTPException(status_code=502, detail="Room pricing information unavailable")
+
+    normalized_check_in = _normalize_date(check_in)
+    if not normalized_check_in:
+        return base_price
+
+    min_price = _resolve_room_price(room_payload, 'min_price_per_night', 'minPricePerNight', 'min_pricePerNight')
+    max_price = _resolve_room_price(room_payload, 'max_price_per_night', 'maxPricePerNight', 'max_pricePerNight')
+
+    today = date.today()
+    days_until_check_in = (normalized_check_in - today).days
+    six_months_out = _add_months(today, 6)
+
+    if normalized_check_in > six_months_out and min_price is not None:
+        return min_price
+    if days_until_check_in <= 10 and max_price is not None:
+        return max_price
+    return base_price
+
+def _quantize_currency(value: Decimal) -> Decimal:
+    return value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
 PAYPAL_DEFAULT_BASE_URL = "https://api-m.sandbox.paypal.com"
 PAYPAL_HTTP_TIMEOUT = 20.0
 
 def _get_paypal_settings(request: Request) -> tuple[str, str, str]:
-    client_id = getattr(request.app.state, "paypal_client_id", None)
-    secret = getattr(request.app.state, "paypal_client_secret", None)
-    base_url = getattr(request.app.state, "paypal_base_url", PAYPAL_DEFAULT_BASE_URL) or PAYPAL_DEFAULT_BASE_URL
+    client_id = getattr(request.app.state, "paypal_client_id", None) or os.environ.get("PAYPAL_CLIENT_ID")
+    secret = getattr(request.app.state, "paypal_client_secret", None) or os.environ.get("PAYPAL_CLIENT_SECRET")
+    base_url = (
+        getattr(request.app.state, "paypal_base_url", None)
+        or os.environ.get("PAYPAL_BASE_URL")
+        or PAYPAL_DEFAULT_BASE_URL
+    )
     if not client_id or not secret:
+        logger.error("PayPal integration missing credentials. client_id_present=%s secret_present=%s", bool(client_id), bool(secret))
         raise HTTPException(status_code=500, detail="PayPal integration is not configured")
     return client_id, secret, base_url.rstrip('/')
 
@@ -153,20 +209,14 @@ def _format_decimal(value: Decimal) -> str:
     return f"{value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}"
 
 def _compute_booking_amount(room_payload: dict[str, Any], check_in: date, check_out: date) -> tuple[Decimal, Decimal, int, str]:
-    price_raw = (
-        room_payload.get('price_per_night')
-        or room_payload.get('pricePerNight')
-        or room_payload.get('price_perNight')
-    )
-    if price_raw is None:
-        raise HTTPException(status_code=502, detail="Room pricing information unavailable")
-    price = Decimal(str(price_raw))
     nights = (check_out - check_in).days
     if nights <= 0:
-        raise HTTPException(status_code=400, detail="Check-out date must be after check-in date")
-    total = (price * nights).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    nightly = price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    currency = room_payload.get('currency_code') or 'USD'
+        raise HTTPException(status_code=400, detail='Check-out date must be after check-in date')
+
+    nightly_price = _determine_nightly_price(room_payload, check_in)
+    total = (nightly_price * nights).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    nightly = nightly_price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    currency = _extract_room_value(room_payload, 'currency_code') or 'USD'
     return total, nightly, nights, currency
 
 def _date_to_iso(value: date) -> str:
@@ -201,6 +251,7 @@ async def search_places(text: str,  index_name: str = Depends(get_place_index)) 
 async def fetch_property(
     property_uuid: UUID,
     request: Request,
+    check_in_date: date | None = None,
     property_service_client: AsyncClient = Depends(get_property_service_client),
 ) -> PropertyDetail:
     headers = _forward_auth_headers(request)
@@ -220,6 +271,16 @@ async def fetch_property(
         headers=headers or None,
     )
     rooms_payload = rooms_resp.json() if rooms_resp.status_code == 200 else []
+
+    normalized_check_in = _normalize_date(check_in_date)
+    if normalized_check_in:
+        adjusted_rooms: list[dict[str, Any]] = []
+        for room_data in rooms_payload:
+            nightly_decimal = _determine_nightly_price(room_data, normalized_check_in)
+            room_data['price_per_night'] = float(_quantize_currency(nightly_decimal))
+            adjusted_rooms.append(room_data)
+        rooms_payload = adjusted_rooms
+
     data["rooms"] = rooms_payload
 
     return PropertyDetail(**data)
@@ -227,6 +288,7 @@ async def fetch_property(
 async def fetch_room(
     room_uuid: UUID,
     request: Request,
+    check_in_date: date | None = None,
     property_service_client: AsyncClient = Depends(get_property_service_client),
 ) -> Room:
     headers = _forward_auth_headers(request)
@@ -238,6 +300,12 @@ async def fetch_room(
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     data = resp.json()
+
+    normalized_check_in = _normalize_date(check_in_date)
+    if normalized_check_in:
+        nightly_decimal = _determine_nightly_price(data, normalized_check_in)
+        data['price_per_night'] = float(_quantize_currency(nightly_decimal))
+
     return Room(**data)
 
 async def add_review(
@@ -656,8 +724,8 @@ async def get_user_reviews(
 
 async def get_filtered_rooms(
     request: Request,
-    check_in_date: datetime | None = None,
-    check_out_date: datetime | None = None,
+    check_in_date: date | None = None,
+    check_out_date: date | None = None,
     amenities: list[Amenity] | None = None,
     capacity: int | None = None,
     max_price: float | None = None,
@@ -791,8 +859,20 @@ async def get_filtered_rooms(
         
         prop_detail.average_rating = avg
 
+    normalized_check_in = _normalize_date(check_in_date)
+    if normalized_check_in:
+        for prop_detail in available_room_entries:
+            rooms = list(prop_detail.rooms or [])
+            if not rooms:
+                continue
+            adjusted_rooms: list[Room] = []
+            for room in rooms:
+                nightly_decimal = _determine_nightly_price(room, normalized_check_in)
+                room.price_per_night = float(_quantize_currency(nightly_decimal))
+                adjusted_rooms.append(room)
+            prop_detail.rooms = adjusted_rooms  # type: ignore[attr-defined]
+
     if rating_above:
         available_room_entries = list(filter(lambda x: x.average_rating and x.average_rating>=rating_above, available_room_entries))
 
     return available_room_entries
-

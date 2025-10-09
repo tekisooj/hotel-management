@@ -156,12 +156,14 @@ onMounted(async () => {
 
 async function hydrateRoom() {
   let currentRoom = store.getRoom(roomUuid.value)
-  if (!currentRoom) {
-    const fetchedRoom = await getRoom(roomUuid.value)
+  try {
+    const fetchedRoom = await getRoom(roomUuid.value, { checkInDate: checkIn.value })
     if (fetchedRoom) {
       store.setRoom(fetchedRoom)
-      currentRoom = store.getRoom(roomUuid.value)
+      currentRoom = store.getRoom(roomUuid.value) || fetchedRoom
     }
+  } catch (err) {
+    console.error('Failed to refresh room details', err)
   }
   if (!currentRoom) {
     throw new Error('Room not available for booking.')
@@ -175,21 +177,21 @@ async function hydrateRoom() {
 
   if (propertyUuid) {
     let existing = store.getProperty(propertyUuid)
-    if (!existing) {
-      const fetched = await getProperty(propertyUuid)
+    try {
+      const fetched = await getProperty(propertyUuid, { checkInDate: checkIn.value })
       if (fetched) {
         store.setProperty(fetched)
         existing = store.getProperty(propertyUuid) || fetched
       }
+    } catch (err) {
+      console.error('Failed to refresh property details', err)
     }
     property.value = existing || null
   }
 }
 
 async function initializePaymentOrder(force = false) {
-  if (!force && orderId.value) {
-    return
-  }
+  if (!force && orderId.value) return
   if (initializeOrderPromise) {
     await initializeOrderPromise
     return
@@ -209,8 +211,8 @@ async function initializePaymentOrder(force = false) {
     const fallbackClientId = paypalClientIdFromConfig.value || null
     const nextClientId = responseClientId || fallbackClientId
 
-    if (!nextClientId) {
-      throw new Error('PayPal client ID is not configured.')
+    if (!nextClientId || nextClientId === 'undefined') {
+      throw new Error('PayPal client ID is not configured or invalid.')
     }
 
     const clientIdChanged = activePaypalClientId.value !== nextClientId
@@ -231,20 +233,24 @@ async function initializePaymentOrder(force = false) {
 
 async function ensurePayPalSdk(clientId: string) {
   if (typeof window === 'undefined') return
-  if (!clientId) {
+
+  const id = (clientId || '').trim()
+  if (!id || id === 'undefined') {
     throw new Error('PayPal client ID is not configured.')
   }
 
-  if (paypalSdkClientId === clientId && (window as any).paypal?.Buttons) {
+  // Use the currency from the created order if known; else fall back to USD
+  const currency = (orderAmount.value?.currency_code || 'USD').trim().toUpperCase()
+  const isProd = process.env.NODE_ENV === 'production'
+
+  if (paypalSdkClientId === id && (window as any).paypal?.Buttons) {
     return
   }
 
   if (paypalSdkLoading) {
     try {
       await paypalSdkLoading
-      if (paypalSdkClientId === clientId && (window as any).paypal?.Buttons) {
-        return
-      }
+      if (paypalSdkClientId === id && (window as any).paypal?.Buttons) return
     } catch {
       // fall through to reload
     }
@@ -255,8 +261,8 @@ async function ensurePayPalSdk(clientId: string) {
     const existingId =
       existingScript.getAttribute('data-client-id') ||
       (existingScript.src ? new URL(existingScript.src, window.location.origin).searchParams.get('client-id') : '')
-    if (existingId === clientId && (window as any).paypal?.Buttons) {
-      paypalSdkClientId = clientId
+    if (existingId === id && (window as any).paypal?.Buttons) {
+      paypalSdkClientId = id
       return
     }
     existingScript.remove()
@@ -265,13 +271,21 @@ async function ensurePayPalSdk(clientId: string) {
 
   delete (window as any).paypal
   paypalButtonsRendered.value = false
-  paypalSdkClientId = clientId
+  paypalSdkClientId = id
+
+  const qs = new URLSearchParams({
+    'client-id': id,
+    currency,
+    intent: 'CAPTURE',
+    components: 'buttons',
+    ...(isProd ? {} : { debug: 'true' }),
+  })
 
   paypalSdkLoading = new Promise<void>((resolve, reject) => {
     const script = document.createElement('script')
     script.id = 'paypal-sdk'
-    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=CAPTURE&components=buttons`
-    script.setAttribute('data-client-id', clientId)
+    script.src = `https://www.paypal.com/sdk/js?${qs.toString()}`
+    script.setAttribute('data-client-id', id)
     script.onload = () => resolve()
     script.onerror = () => reject(new Error('Unable to load PayPal SDK.'))
     document.head.appendChild(script)
@@ -293,8 +307,8 @@ async function renderPayPalButtons(forceReload = false) {
     clientId = activePaypalClientId.value || paypalClientIdFromConfig.value || null
   }
 
-  if (!clientId) {
-    throw new Error('PayPal client ID is not configured.')
+  if (!clientId || clientId === 'undefined') {
+    throw new Error('PayPal client ID is not configured or invalid.')
   }
 
   await ensurePayPalSdk(clientId)
@@ -560,4 +574,3 @@ function returnToRoom() {
   }
 }
 </style>
-

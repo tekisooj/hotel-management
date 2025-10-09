@@ -67,6 +67,9 @@ jobs:
       GUEST_UI_URL: ${{ github.event.inputs.environment == 'prod' && vars.GUEST_UI_URL_PROD || vars.GUEST_UI_URL_INT }}
       HOST_UI_URL: ${{ github.event.inputs.environment == 'prod' && vars.HOST_UI_URL_PROD || vars.HOST_UI_URL_INT }}
       AUTH_UI_URL: ${{ github.event.inputs.environment == 'prod' && vars.AUTH_UI_URL_PROD || vars.AUTH_UI_URL_INT }}
+      PAYPAL_CLIENT_ID: ${{ vars.PAYPAL_CLIENT_ID }}
+      PAYPAL_BASE_URL: ${{ vars.PAYPAL_BASE_URL }}
+      PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
 
