@@ -4,14 +4,17 @@
       <div v-if="loading" class="payment-card placeholder">
         <p>Preparing your payment session...</p>
       </div>
+
       <div v-else-if="error" class="payment-card placeholder">
         <p>{{ error }}</p>
         <button class="btn btn-outline-primary" @click="returnToRoom">Back to room</button>
       </div>
+
       <div v-else-if="!room" class="payment-card placeholder">
         <p>Room details are unavailable. Please start the booking again.</p>
         <button class="btn btn-outline-primary" @click="goHome">Go home</button>
       </div>
+
       <div v-else class="payment-card card">
         <header class="payment-header">
           <div>
@@ -48,7 +51,7 @@
         </section>
 
         <section class="payment-actions">
-          <div id="paypal-button-container" class="paypal-container"></div>
+          <div id="paypal-button-container" ref="paypalEl" class="paypal-container"></div>
           <p v-if="paymentError" class="payment-message error">{{ paymentError }}</p>
           <p v-if="paymentSuccess" class="payment-message success">
             Payment completed! Booking reference {{ bookingUuid }}.
@@ -65,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRuntimeConfig } from 'nuxt/app'
 import { useGuestBff } from '@/api/guestBff'
@@ -89,6 +92,7 @@ const paymentError = ref<string | null>(null)
 const paymentSuccess = ref(false)
 const bookingUuid = ref<string | null>(null)
 const paypalButtonsRendered = ref(false)
+const paypalEl = ref<HTMLElement | null>(null)
 
 const roomUuid = computed(() => (route.query.room as string) || (route.query.roomUuid as string) || '')
 const checkIn = ref((route.query.checkIn as string) || (route.query.check_in as string) || '')
@@ -144,12 +148,15 @@ onMounted(async () => {
   }
   try {
     await hydrateRoom()
+
+    loading.value = false
+    await nextTick()
+
     await initializePaymentOrder(false)
     orderId.value = null
     await renderPayPalButtons()
   } catch (err: any) {
     error.value = parseError(err, 'Unable to prepare the payment page.')
-  } finally {
     loading.value = false
   }
 })
@@ -239,7 +246,6 @@ async function ensurePayPalSdk(clientId: string) {
     throw new Error('PayPal client ID is not configured.')
   }
 
-  // Use the currency from the created order if known; else fall back to USD
   const currency = (orderAmount.value?.currency_code || 'USD').trim().toUpperCase()
   const isProd = process.env.NODE_ENV === 'production'
 
@@ -318,13 +324,14 @@ async function renderPayPalButtons(forceReload = false) {
     throw new Error('PayPal Buttons are not available.')
   }
 
-  if (paypalButtonsRendered.value && !forceReload) {
-    return
-  }
-
-  const container = document.getElementById('paypal-button-container') as HTMLElement | null
+  await nextTick()
+  const container = paypalEl.value
   if (!container) {
     throw new Error('PayPal button container is not available.')
+  }
+
+  if (paypalButtonsRendered.value && !forceReload) {
+    return
   }
 
   container.innerHTML = ''
