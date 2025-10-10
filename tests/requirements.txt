@@ -1,0 +1,9 @@
+pytest
+pytest-asyncio
+httpx
+moto[boto3]
+boto3
+pydantic
+fastapi
+uvicorn
+anyio
