@@ -4,9 +4,7 @@ from httpx import Response, Request
 import pytest
 
 def _fake_async_client(monkeypatch, responses: list[Response]):
-    """
-    Patch httpx.AsyncClient to return queued responses.
-    """
+
     class FakeRespCtx:
         def __init__(self):
             self._idx = 0
@@ -24,7 +22,7 @@ def _fake_async_client(monkeypatch, responses: list[Response]):
             self._idx += 1
             return resp
 
-    import bffs.guest_bff.app.handlers as handlers  # adjust if handlers are elsewhere
+    import bffs.guest_bff.app.handlers as handlers
 
     class FakeAsyncClient:
         def __init__(self, *a, **kw): ...
@@ -35,13 +33,7 @@ def _fake_async_client(monkeypatch, responses: list[Response]):
 
 
 def test_create_payment_order_success(bff_client, monkeypatch):
-    """
-    Mocks:
-      - Property service room lookup
-      - PayPal token
-      - PayPal order creation
-    """
-    # patch the app.state.property_service_client GET for /room/{uuid}
+
     room_uuid = str(uuid4())
     room_payload = {"uuid": room_uuid, "name": "Nice Room", "price_per_night": 120, "currency_code": "USD"}
 
@@ -56,7 +48,6 @@ def test_create_payment_order_success(bff_client, monkeypatch):
     app_state = bff_client.app.state
     app_state.property_service_client = type("C", (), {"get": fake_get})
 
-    # queue httpx responses: OAuth token, create order
     oauth_json = {"access_token": "TOKEN"}
     order_json = {"id": "ORDER123", "status": "CREATED"}
 
@@ -88,7 +79,6 @@ def test_capture_payment_success(bff_client, monkeypatch):
     room_uuid = str(uuid4())
     room_payload = {"uuid": room_uuid, "name": "Room", "price_per_night": 100, "currency_code": "USD"}
 
-    # property service get room
     def fake_get_room(url, *a, **kw):
         class R:
             status_code = 200
@@ -96,7 +86,6 @@ def test_capture_payment_success(bff_client, monkeypatch):
             text = "OK"
         return R()
 
-    # booking service create booking
     def fake_post_booking(path, json=None, *a, **kw):
         class R:
             status_code = 200
@@ -108,7 +97,6 @@ def test_capture_payment_success(bff_client, monkeypatch):
     app_state.property_service_client = type("P", (), {"get": fake_get_room})
     app_state.booking_service_client = type("B", (), {"post": fake_post_booking})
 
-    # Fake OAuth + Capture OK
     oauth_json = {"access_token": "TOKEN"}
     capture_json = {
         "status": "COMPLETED",

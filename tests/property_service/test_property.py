@@ -27,9 +27,8 @@ def test_add_and_get_property(property_client):
 
 
 def test_properties_by_city(property_client):
-    # list endpoint exists in your routes
     r = property_client.get("/properties/city", params={"country": "US", "city": "Santa Monica"})
-    assert r.status_code in (200, 404, 200)  # allow empty list
+    assert r.status_code in (200, 404, 200)
     assert isinstance(r.json(), list)
 
 
@@ -41,7 +40,6 @@ def test_create_presigned_upload(property_client):
 
 
 def test_rooms_crud(property_client):
-    # create property first
     import uuid
     prop_id = str(uuid.uuid4())
     property_client.post("/property", json={"uuid": prop_id, "name": "X", "country": "RS", "city": "Beograd"})

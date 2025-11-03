@@ -1,5 +1,3 @@
-
-
 import boto3
 
 from schemas import SignUpRequest

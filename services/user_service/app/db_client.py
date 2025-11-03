@@ -37,10 +37,10 @@ class HotelManagementDBClient:
         self.ssl_cert_path = self._discover_cert_bundle()
 
         if not self.ssl_cert_path:
-            logger.error("❌ Missing RDS SSL cert bundle (e.g., global-bundle.pem)")
+            logger.error("Missing RDS SSL cert bundle")
             raise RuntimeError("RDS cert bundle not found. Set SSL_CERT_PATH or include it in your Lambda package.")
         else:
-            logger.info(f"✅ Using RDS trust store at: {self.ssl_cert_path}")
+            logger.info(f"Using RDS trust store")
 
     def _discover_cert_bundle(self) -> Optional[str]:
         candidates = [
@@ -65,9 +65,9 @@ class HotelManagementDBClient:
             with socket.create_connection((host, port), timeout=5) as sock:
                 with context.wrap_socket(sock, server_hostname=host) as ssock:
                     cert = ssock.getpeercert()
-                    logger.info(f"🔐 Verified RDS proxy cert for {host}, issuer: {cert.get('issuer')}")
+                    logger.info(f"Verified RDS proxy cert for {host}")
         except Exception as e:
-            logger.exception(f"❌ Failed to verify SSL certificate for {host}:{port}")
+            logger.exception(f"Failed to verify SSL certificate for {host}:{port}")
             raise
 
     def _build_db_config(self) -> tuple[URL, str, int]:
@@ -91,11 +91,7 @@ class HotelManagementDBClient:
         for attempt in range(1, 4):
             try:
                 url, host, port = self._build_db_config()
-                logger.info(f"🔄 Attempting DB connection to {host}:{port} (attempt {attempt})")
-                logger.info(f"DB URL {url}")
-
-                # 🔐 Validate cert chain before connecting
-                # self._verify_proxy_certificate(host, port)
+                logger.info(f"Attempting DB connection to {host}:{port})")
 
                 connect_args = {
                     "sslmode": "require",
@@ -109,14 +105,14 @@ class HotelManagementDBClient:
                 self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
 
                 with self._engine.connect() as _:
-                    logger.info("✅ DB connection established.")
+                    logger.info("DB connection established.")
                 return
 
             except Exception as e:
-                logger.exception(f"❌ DB connection failed on attempt {attempt}")
+                logger.exception(f"DB connection failed")
                 time.sleep(2)
 
-        raise RuntimeError("❌ All attempts to connect to the DB failed.")
+        raise RuntimeError("All attempts to connect to the DB failed.")
 
     def get_session(self) -> Session:
         self._init_engine()

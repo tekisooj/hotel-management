@@ -4,7 +4,6 @@ import pytest
 import anyio
 from fastapi.testclient import TestClient
 
-# your BFF app (bffs/guest_bff/app/main.py) should expose `app`
 from bffs.guest_bff.app.main import app  # type: ignore
 
 

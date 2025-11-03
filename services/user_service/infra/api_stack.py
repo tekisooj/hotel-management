@@ -60,17 +60,14 @@ class UserServiceStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, env_name: str, pr_number: str | None = None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
 
-        # 🔹 Load existing VPC
         vpc = Vpc.from_lookup(self, "HotelManagementVpc", vpc_id="vpc-0b28dea117c8220de")
 
-        # 🔹 Add interface endpoints
         vpc.add_interface_endpoint(f"SecretsManagerEndpoint-{env_name}", service=InterfaceVpcEndpointAwsService.SECRETS_MANAGER)
         vpc.add_interface_endpoint(f"CloudWatchLogsEndpoint-{env_name}", service=InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS)
         vpc.add_interface_endpoint(f"StsEndpoint-{env_name}", service=InterfaceVpcEndpointService(name="com.amazonaws.us-east-1.sts", port=443))
 
         db_sg = SecurityGroup.from_security_group_id(self, "HotelManagementDbSG", security_group_id="sg-030e54916d52c0bd0")
 
-        # 🔹 Lambda IAM Role
         lambda_role = Role(
             self, f"UserServiceLambdaRole-{env_name}",
             assumed_by=ServicePrincipal("lambda.amazonaws.com"),
@@ -82,7 +79,6 @@ class UserServiceStack(Stack):
             ]
         )
 
-        # 🔑 Secrets and Environment
         db_name = f"hotel-management-database-{env_name}"
         db_secret = Secret.from_secret_name_v2(self, "DbSecret", secret_name=db_name)
 
@@ -125,10 +121,9 @@ class UserServiceStack(Stack):
             },
             vpc=vpc,
             vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS),
-            security_groups=[db_sg],  # ✅ Force-use correct SG
+            security_groups=[db_sg],
         )
 
-        # 🌐 API Gateway
         api = RestApi(
             self, f"UserServiceApi-{env_name}",
             rest_api_name=f"user-service-api-{env_name}",

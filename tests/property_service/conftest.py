@@ -4,8 +4,6 @@ import pytest
 from fastapi.testclient import TestClient
 from moto import mock_aws
 
-# Adjust import below to your actual app entrypoint
-# e.g., services/property_service/app/main.py exposes FastAPI app as `app`
 from services.property_service.app.main import app  # type: ignore
 
 
@@ -13,7 +11,6 @@ from services.property_service.app.main import app  # type: ignore
 def property_env(aws_resources, monkeypatch):
     dynamodb, s3 = aws_resources
 
-    # match your CDK stack names
     PROPERTY_TABLE = "property_table_test"
     ROOM_TABLE = "room_table_test"
     BUCKET = "property-assets-test"

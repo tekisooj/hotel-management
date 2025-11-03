@@ -56,7 +56,7 @@ class S3AssetStorage:
         key = self.generate_key(prefix, extension)
         try:
             payload = self.create_presigned_post(key, content_type)
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:
             logger.error("Failed to generate pre-signed POST for key %s", key, exc_info=exc)
             raise
         payload["key"] = key
@@ -69,6 +69,6 @@ class S3AssetStorage:
                 Params={"Bucket": self.bucket_name, "Key": key},
                 ExpiresIn=self.presign_ttl_seconds,
             )
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:
             logger.error("Failed to generate pre-signed GET for key %s", key, exc_info=exc)
             raise

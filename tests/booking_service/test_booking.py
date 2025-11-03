@@ -25,7 +25,6 @@ def test_create_and_cancel_booking(booking_client):
 
 
 def test_availability_batch(booking_client):
-    # with no bookings, everything is available
     body = {
         "room_uuids": [str(uuid.uuid4()), str(uuid.uuid4())],
         "check_in": "2025-10-01T00:00:00",
