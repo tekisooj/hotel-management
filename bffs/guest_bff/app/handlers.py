@@ -60,7 +60,6 @@ class JWTVerifier:
             alg = unverified.get("alg")
             key = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
             if not key:
-                # try refresh once for rotation
                 self._jwks = None
                 jwks = await self._load_jwks()
                 key = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
@@ -188,7 +187,6 @@ def _get_paypal_settings(request: Request) -> tuple[str, str, str]:
 
 async def _paypal_access_token(request: Request) -> tuple[str, str]:
     client_id, secret, base_url = _get_paypal_settings(request)
-    logger.info(f"PAYPAL SETTINGS {client_id} {secret} {base_url}")
     async with AsyncClient(timeout=PAYPAL_HTTP_TIMEOUT) as client:
         try:
             resp = await client.post(
@@ -196,7 +194,6 @@ async def _paypal_access_token(request: Request) -> tuple[str, str]:
                 data={"grant_type": "client_credentials"},
                 auth=(client_id, secret),
             )
-            logger.info(f"PAYPAL oauth response {resp.status_code}")
             resp.raise_for_status()
         except HTTPError as exc:
             raise HTTPException(status_code=502, detail=f"PayPal auth failed: {exc}") from exc
@@ -375,6 +372,14 @@ async def add_review(
         pass
     return review_uuid
 
+def _paypal_headers(token: str) -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Prefer": "return=representation",
+        "PayPal-Request-Id": str(uuid4()),
+    }
 
 
 async def create_payment_order(
@@ -390,7 +395,6 @@ async def create_payment_order(
         headers=headers or None,
     )
 
-    logger.info(f"Room response status code {room_response.status_code}")
 
     if room_response.status_code != 200:
         raise HTTPException(status_code=room_response.status_code, detail=room_response.text)
@@ -402,12 +406,10 @@ async def create_payment_order(
         payload.check_out,
     )
     
-    logger.info(f"{total} {nightly} {nights} {currency}")
 
     token, base_url = await _paypal_access_token(request)
-    logger.info(f"Token {token} bas_url {base_url}")
     order_body = {
-        "intent": "CAPTURE",
+        "intent": "capture",
         "purchase_units": [
             {
                 "reference_id": str(payload.room_uuid),
@@ -430,9 +432,8 @@ async def create_payment_order(
             response = await client.post(
                 f"{base_url}/v2/checkout/orders",
                 json=order_body,
-                headers={"Authorization": f"Bearer {token}"},
+                headers=_paypal_headers(token),
             )
-            logger.info(f"RESPONSE {response.status_code}")
             response.raise_for_status()
         except HTTPError as exc:
             raise HTTPException(status_code=502, detail=f"Failed to create PayPal order: {exc}") from exc
@@ -483,7 +484,7 @@ async def capture_payment_order(
         try:
             response = await client.post(
                 f"{base_url}/v2/checkout/orders/{payload.order_id}/capture",
-                headers={"Authorization": f"Bearer {token}"},
+                headers=_paypal_headers(token),
             )
             response.raise_for_status()
         except HTTPError as exc:
@@ -559,16 +560,13 @@ async def add_booking(
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     body = resp.json()
     booking_uuid = UUID(body if isinstance(body, str) else body.get("uuid"))
-    # Emit BookingConfirmed event for notifications, enriched with guest/host/property
     try:
-        # guest email
         guest_email = None
         me = await user_service_client.get("me", headers=headers or None, timeout=10.0)
         if me.status_code == 200:
             me_body = me.json() or {}
             guest_email = me_body.get("email")
 
-        # property name and host email via room -> property -> host user
         property_name = None
         host_email = None
         room_uuid = booking.get("room_uuid") if isinstance(booking, dict) else None

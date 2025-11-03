@@ -53,7 +53,6 @@ class JWTVerifier:
             alg = unverified.get("alg")
             key = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
             if not key:
-                # try refresh once for rotation
                 self._jwks = None
                 jwks = await self._load_jwks()
                 key = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
@@ -97,7 +96,6 @@ def get_user_service_client(request: Request) -> AsyncClient:
     return request.app.state.user_service_client
 
 def get_place_index(request: Request) -> str | None:
-    # Prefer value set on app state; fall back to env var
     place_index = getattr(request.app.state, "place_index", None)
     return place_index or os.environ.get("PLACE_INDEX_NAME")
 

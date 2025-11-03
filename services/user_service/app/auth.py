@@ -7,25 +7,20 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 
 class CognitoAuthMiddleware(BaseHTTPMiddleware):
-    """Middleware for validating AWS Cognito JWT tokens."""
 
     def __init__(self, app):
         super().__init__(app)
 
-        # --- Environment ---
         self.region = os.getenv("COGNITO_REGION")
         self.audience = os.getenv("AUDIENCE")
         self.secret_name = os.getenv("JWKS_SECRET_NAME")
 
         if not self.region or not self.secret_name or not self.audience:
-            raise Exception("❌ Missing env vars: COGNITO_REGION, JWKS_SECRET_NAME, AUDIENCE")
+            raise Exception("Missing env vars: COGNITO_REGION, JWKS_SECRET_NAME, AUDIENCE")
 
-        # --- Load JWKS ---
         self.jwks = self._load_jwks_from_secrets_manager()
-        print(f"✅ JWKS loaded successfully ({len(self.jwks)} keys): {[k['kid'] for k in self.jwks]}")
 
     def _load_jwks_from_secrets_manager(self):
-        """Retrieve JWKS secret from AWS Secrets Manager."""
         sm = boto3.client("secretsmanager", region_name=self.region)
         secret = sm.get_secret_value(SecretId=self.secret_name)
 
@@ -40,7 +35,6 @@ class CognitoAuthMiddleware(BaseHTTPMiddleware):
         return data["keys"]
 
     async def dispatch(self, request: Request, call_next):
-        """Validate Cognito JWT from Authorization header."""
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
@@ -62,7 +56,7 @@ class CognitoAuthMiddleware(BaseHTTPMiddleware):
                 audience=self.audience,
                 options={
                     "verify_exp": True,
-                    "verify_at_hash": False  # ✅ Disable at_hash validation for ID tokens
+                    "verify_at_hash": False
                 }
             )
 

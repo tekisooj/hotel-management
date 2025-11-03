@@ -9,21 +9,21 @@ class Money(BaseModel):
 
 
 class CreatePaymentOrderRequest(BaseModel):
-    room_uuid: UUID = Field(alias="room_uuid")
-    check_in: date
-    check_out: date
-    guests: conint(gt=0) = 1
+    room_uuid: UUID = Field(description="Room uuid")
+    check_in: date = Field(description="Check in date")
+    check_out: date = Field(description="Check out date")
+    guests: int = Field(description="Number of guests", gt=1)
 
     class Config:
         populate_by_name = True
 
 
 class CreatePaymentOrderResponse(BaseModel):
-    order_id: str = Field(alias="order_id")
-    amount: Money
-    nights: int
-    nightly_rate: str
-    room_name: str
+    order_id: str = Field(description="Order id")
+    amount: Money = Field(description="Price")
+    nights: int = Field(description="Number of nights")
+    nightly_rate: str = Field(description="Price for one night")
+    room_name: str = Field(description="Room name")
     paypal_client_id: str | None = None
 
     class Config:
@@ -31,18 +31,18 @@ class CreatePaymentOrderResponse(BaseModel):
 
 
 class CapturePaymentRequest(BaseModel):
-    order_id: str = Field(alias="order_id")
-    room_uuid: UUID = Field(alias="room_uuid")
-    check_in: date
-    check_out: date
-    guests: conint(gt=0) = 1
+    order_id: str = Field(description="Order id")
+    room_uuid: UUID = Field(description="Room uuid")
+    check_in: date = Field(description="Check in date")
+    check_out: date = Field(description="Check out date")
+    guests: int = Field(description="Number of guests", gt=1)
 
     class Config:
         populate_by_name = True
 
 
 class CapturePaymentResponse(BaseModel):
-    booking_uuid: UUID
-    payment_status: str
-    amount: Money
+    booking_uuid: UUID = Field(description="Booking uuid")
+    payment_status: str = Field(description="Payment status")
+    amount: Money = Field(description="Price")
 

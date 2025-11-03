@@ -2,28 +2,56 @@ import os
 from aws_cdk import (
     Stack,
     Duration,
-    RemovalPolicy
+    RemovalPolicy,
 )
 from aws_cdk.aws_lambda import Function, Runtime, Code
 from aws_cdk.aws_apigateway import LambdaRestApi, EndpointType, Cors, LambdaIntegration
 from aws_cdk.aws_events import EventBus
 from aws_cdk.aws_iam import Role, ServicePrincipal, ManagedPolicy, PolicyStatement
+from aws_cdk.aws_ec2 import (
+    Vpc,
+    SubnetType,
+    SubnetConfiguration,
+    SecurityGroup,
+    SubnetSelection,
+)
 from constructs import Construct
+
 
 class GuestBffStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, env_name: str, pr_number: str | None = None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
         self.env_name = env_name
+        suffix = f"-{pr_number}" if pr_number else ""
 
         self.lambda_role = Role(
-            self, f"GuestBffLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            assumed_by=ServicePrincipal("lambda.amazonaws.com"), # type: ignore
+            self,
+            f"GuestBffLambdaRole-{env_name}{suffix}",
+            assumed_by=ServicePrincipal("lambda.amazonaws.com"),  # type: ignore
             managed_policies=[
                 ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
-            ]
+                ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaVPCAccessExecutionRole"),
+            ],
         )
 
-          
+        vpc = Vpc(
+            self,
+            f"GuestBffVpc-{env_name}{suffix}",
+            max_azs=2,
+            nat_gateways=1,
+            subnet_configuration=[
+                SubnetConfiguration(name="public", subnet_type=SubnetType.PUBLIC),
+                SubnetConfiguration(name="private-egress", subnet_type=SubnetType.PRIVATE_WITH_EGRESS),
+            ],
+        )
+
+        lambda_sg = SecurityGroup(
+            self,
+            f"GuestBffLambdaSg-{env_name}{suffix}",
+            vpc=vpc,
+            allow_all_outbound=True,
+        )
+
         if self.env_name == "prod":
             self.user_pool_id = "us-east-1_Wtvh2rdSQ"
             self.audience = "7226gqpnghn0q22ec2ill399lv"
@@ -44,11 +72,12 @@ class GuestBffStack(Stack):
         }
 
         self.lambda_function = Function(
-            self, f"GuestBffFunction-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            self,
+            f"GuestBffFunction-{env_name}{suffix}",
             runtime=Runtime.PYTHON_3_11,
             handler="main.handler",
             code=Code.from_asset("bffs/guest_bff/app"),
-            role=self.lambda_role, # type: ignore
+            role=self.lambda_role,  # type: ignore
             timeout=Duration.seconds(30),
             memory_size=512,
             environment={
@@ -58,14 +87,18 @@ class GuestBffStack(Stack):
                 "JWKS_URL": self.jwks_url,
                 "PLACE_INDEX_NAME": "HotelManagementPlaceIndex",
                 **paypal_env,
-            }
+            },
+            vpc=vpc,
+            vpc_subnets=SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS),
+            security_groups=[lambda_sg],
         )
 
         self.gateway = LambdaRestApi(
-            self, f"GuestBffApi-{env_name}{f'-{pr_number}' if pr_number else ''}",
-            handler=self.lambda_function, # type: ignore
+            self,
+            f"GuestBffApi-{env_name}{suffix}",
+            handler=self.lambda_function,  # type: ignore
             proxy=True,
-            rest_api_name=f"guest-bff-api-{env_name}{f'-{pr_number}' if pr_number else ''}",
+            rest_api_name=f"guest-bff-api-{env_name}{suffix}",
             description="Public API Gateway exposing Guest BFF Lambda",
             endpoint_types=[EndpointType.REGIONAL],
             default_cors_preflight_options={
@@ -82,10 +115,12 @@ class GuestBffStack(Stack):
         event_bus = EventBus.from_event_bus_name(self, "SharedEventBus", "hotel-event-bus")
         event_bus.grant_put_events_to(self.lambda_function)  # type: ignore
 
-        self.lambda_function.add_to_role_policy(PolicyStatement(
-            actions=["geo:SearchPlaceIndexForText"],
-            resources=["*"]
-        ))
+        self.lambda_function.add_to_role_policy(
+            PolicyStatement(
+                actions=["geo:SearchPlaceIndexForText"],
+                resources=["*"],
+            )
+        )
 
         integration = LambdaIntegration(self.lambda_function)
 
@@ -99,11 +134,15 @@ class GuestBffStack(Stack):
         reviews = self.gateway.root.add_resource("reviews")
         reviews_property = reviews.add_resource("{property_uuid}")
         reviews_property.add_method("GET", integration)
-        # NOTE: API Gateway cannot have two sibling variable resources.
-        # The '/reviews/{user_uuid}' route will still work via 'proxy=True'.
 
         booking = self.gateway.root.add_resource("booking")
         booking.add_method("POST", integration)
+
+        payment = booking.add_resource("payment")
+        payment_order = payment.add_resource("order")
+        payment_order.add_method("POST", integration)
+        payment_capture = payment.add_resource("capture")
+        payment_capture.add_method("POST", integration)
 
         my = self.gateway.root.add_resource("my")
         my_bookings = my.add_resource("bookings")
@@ -114,6 +153,14 @@ class GuestBffStack(Stack):
 
         rooms = self.gateway.root.add_resource("rooms")
         rooms.add_method("GET", integration)
+
+        room = self.gateway.root.add_resource("room")
+        room_id = room.add_resource("{room_uuid}")
+        room_id.add_method("GET", integration)
+
+        property_res = self.gateway.root.add_resource("property")
+        property_id = property_res.add_resource("{property_uuid}")
+        property_id.add_method("GET", integration)
 
         me = self.gateway.root.add_resource("me")
         me.add_method("GET", integration)
