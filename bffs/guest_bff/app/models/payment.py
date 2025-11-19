@@ -12,7 +12,7 @@ class CreatePaymentOrderRequest(BaseModel):
     room_uuid: UUID = Field(description="Room uuid")
     check_in: date = Field(description="Check in date")
     check_out: date = Field(description="Check out date")
-    guests: int = Field(description="Number of guests", gt=1)
+    guests: int = Field(description="Number of guests", ge=1)
 
     class Config:
         populate_by_name = True
@@ -35,7 +35,7 @@ class CapturePaymentRequest(BaseModel):
     room_uuid: UUID = Field(description="Room uuid")
     check_in: date = Field(description="Check in date")
     check_out: date = Field(description="Check out date")
-    guests: int = Field(description="Number of guests", gt=1)
+    guests: int = Field(description="Number of guests", ge=1)
 
     class Config:
         populate_by_name = True
