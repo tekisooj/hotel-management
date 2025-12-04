@@ -249,7 +249,9 @@ async def fetch_property(
     property_uuid: UUID,
     request: Request,
     check_in_date: date | None = None,
+    check_out_date: date | None = None,
     property_service_client: AsyncClient = Depends(get_property_service_client),
+    booking_service_client: AsyncClient = Depends(get_booking_service_client),
 ) -> PropertyDetail:
     headers = _forward_auth_headers(request)
     resp = await property_service_client.get(
@@ -270,6 +272,33 @@ async def fetch_property(
     rooms_payload = rooms_resp.json() if rooms_resp.status_code == 200 else []
 
     normalized_check_in = _normalize_date(check_in_date)
+    normalized_check_out = _normalize_date(check_out_date)
+
+    if rooms_payload and normalized_check_in and normalized_check_out:
+        room_ids = [str(room.get("uuid") or room.get("id")) for room in rooms_payload if room.get("uuid") or room.get("id")]
+        if room_ids:
+            payload = {
+                "room_uuids": room_ids,
+                "check_in": normalized_check_in.isoformat(),
+                "check_out": normalized_check_out.isoformat(),
+            }
+            availability_response = await booking_service_client.post(
+                "availability/batch",
+                json=payload,
+                timeout=10.0,
+                headers=headers or None,
+            )
+            if availability_response.status_code == 200:
+                availability_map = availability_response.json() or {}
+                rooms_payload = [
+                    room for room in rooms_payload
+                    if str(room.get("uuid") or room.get("id")) in availability_map
+                    and (
+                        availability_map.get(str(room.get("uuid") or room.get("id"))) is True
+                        or str(availability_map.get(str(room.get("uuid") or room.get("id")))).lower() == "true"
+                    )
+                ]
+
     if normalized_check_in:
         adjusted_rooms: list[dict[str, Any]] = []
         for room_data in rooms_payload:
