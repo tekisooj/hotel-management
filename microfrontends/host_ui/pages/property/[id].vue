@@ -1,269 +1,275 @@
 <template>
-  <div class="host-property" v-if="!loadError && property">
-    <header class="host-property__header">
-      <div>
-        <p class="host-property__eyebrow">Property overview</p>
-        <h1 class="host-property__title">{{ property.name }}</h1>
-        <p class="host-property__location">{{ locationLabel }}</p>
-      </div>
-      <div class="host-property__summary" v-if="averageRating !== null">
-        <span class="host-property__score">{{ averageRating.toFixed(1) }}</span>
-        <span class="host-property__score-label">Guest score</span>
-      </div>
-      <div class="host-property__actions">
-        <button
-          v-if="!isEditingProperty"
-          class="host-btn host-btn--ghost"
-          type="button"
-          @click="beginEditProperty"
-        >
-          Edit property
-        </button>
-        <button
-          v-if="isEditingProperty"
-          class="host-btn host-btn--ghost"
-          type="button"
-          @click="cancelEditProperty"
-        >
-          Cancel
-        </button>
-        <button
-          v-if="isEditingProperty"
-          class="host-btn host-btn--primary"
-          type="button"
-          :disabled="savingProperty || propertyUploadCount > 0"
-          @click="submitEditProperty"
-        >
-          Save changes
-        </button>
-        <button
-          class="host-btn host-btn--danger"
-          type="button"
-          @click="confirmPropertyRemoval"
-        >
-          Delete property
-        </button>
-      </div>
-    </header>
-
-    <section v-if="propertyEditError" class="host-property__message host-property__message--error">
-      {{ propertyEditError }}
-    </section>
-    <p v-if="propertyUploadCount > 0" class="host-property__note">Uploading property images...</p>
-
-    <section v-if="isEditingProperty" class="host-property__card host-property__edit-card">
-      <div class="host-form-grid">
-        <div class="host-form-field">
-          <label class="host-label">Name</label>
-          <input v-model="editPropertyForm.name" type="text" placeholder="Property name" />
+  <div class="host-page host-page--property">
+    <section v-if="!loadError && property" class="host-section host-property">
+      <header class="host-hero host-property__header">
+        <div>
+          <p class="host-property__eyebrow">Property overview</p>
+          <h1 class="host-property__title">{{ property.name }}</h1>
+          <p class="host-property__location">{{ locationLabel }}</p>
         </div>
-        <div class="host-form-field">
-          <label class="host-label">Description</label>
-          <input v-model="editPropertyForm.description" type="text" placeholder="Short description" />
+        <div class="host-property__summary" v-if="averageRating !== null">
+          <span class="host-property__score">{{ averageRating.toFixed(1) }}</span>
+          <span class="host-property__score-label">Guest score</span>
         </div>
-        <div class="host-form-field">
-          <label class="host-label">Stars</label>
-          <input v-model="editPropertyForm.stars" type="number" min="0" max="5" step="0.5" />
+        <div class="host-property__actions">
+          <button
+            v-if="!isEditingProperty"
+            class="host-btn host-btn--ghost"
+            type="button"
+            @click="beginEditProperty"
+          >
+            Edit property
+          </button>
+          <button
+            v-if="isEditingProperty"
+            class="host-btn host-btn--ghost"
+            type="button"
+            @click="cancelEditProperty"
+          >
+            Cancel
+          </button>
+          <button
+            v-if="isEditingProperty"
+            class="host-btn host-btn--primary"
+            type="button"
+            :disabled="savingProperty || propertyUploadCount > 0"
+            @click="submitEditProperty"
+          >
+            Save changes
+          </button>
+          <button
+            class="host-btn host-btn--danger"
+            type="button"
+            @click="confirmPropertyRemoval"
+          >
+            Delete property
+          </button>
         </div>
-        <div class="host-form-field">
-          <label class="host-label">Country</label>
-          <input v-model="editPropertyForm.country" type="text" placeholder="Country" />
-        </div>
-        <div class="host-form-field">
-          <label class="host-label">State</label>
-          <input v-model="editPropertyForm.state" type="text" placeholder="State" />
-        </div>
-        <div class="host-form-field">
-          <label class="host-label">City</label>
-          <input v-model="editPropertyForm.city" type="text" placeholder="City" />
-        </div>
-        <div class="host-form-field">
-          <label class="host-label">County</label>
-          <input v-model="editPropertyForm.county" type="text" placeholder="County" />
-        </div>
-        <div class="host-form-field host-form-field--full">
-          <label class="host-label">Address</label>
-          <input v-model="editPropertyForm.address" type="text" placeholder="Street and number" />
-        </div>
-        <div class="host-form-field">
-          <label class="host-label">Latitude</label>
-          <input v-model="editPropertyForm.latitude" type="number" step="0.000001" />
-        </div>
-        <div class="host-form-field">
-          <label class="host-label">Longitude</label>
-          <input v-model="editPropertyForm.longitude" type="number" step="0.000001" />
-        </div>
-        <div class="host-form-field host-form-field--full">
-          <label class="host-label">Search &amp; replace location</label>
-          <LocationSearch @selected="applyLocation" />
-          <p class="host-form-note">Selecting a new place will update location related fields above.</p>
-        </div>
-        <div class="host-form-field host-form-field--full">
-          <label class="host-label">Property images</label>
-          <input type="file" multiple accept="image/*" @change="handlePropertyImageUpload" />
-          <ul v-if="editPropertyForm.images.length" class="host-uploader-list">
-            <li v-for="(image, index) in editPropertyForm.images" :key="image.key || index" class="host-uploader-item">
-              <span class="text-truncate">{{ image.key }}</span>
-              <button type="button" class="host-link host-link--danger" @click="removePropertyImage(index)">Remove</button>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <section class="host-property__details">
-      <div class="host-property__gallery" v-if="images.length">
-        <img
-          v-for="(image, index) in images"
-          :key="image.key || index"
-          :src="image.url"
-          :alt="`${property.name} image ${index + 1}`"
-        />
-      </div>
-      <div class="host-property__gallery host-property__gallery--empty" v-else>
-        <span>{{ initials }}</span>
-      </div>
-
-      <article class="host-property__card">
-        <h2>Property overview</h2>
-        <p v-if="property.description">{{ property.description }}</p>
-        <p v-else>This property does not have a description yet.</p>
-
-        <ul class="host-property__facts">
-          <li>
-            <strong>Rooms:</strong>
-            <span>{{ roomCount }}</span>
-          </li>
-          <li v-if="property.stars">
-            <strong>Rating:</strong>
-            <span>{{ Number(property.stars).toFixed(1) }} stars</span>
-          </li>
-          <li v-if="averageRating !== null">
-            <strong>Guest reviews:</strong>
-            <span>{{ averageRating.toFixed(1) }} average score</span>
-          </li>
-          <li v-if="property.phone">
-            <strong>Phone:</strong>
-            <span>{{ property.phone }}</span>
-          </li>
-          <li v-if="property.email">
-            <strong>Email:</strong>
-            <span>{{ property.email }}</span>
-          </li>
-        </ul>
-      </article>
-    </section>
-
-    <section class="host-property__rooms">
-      <header>
-        <h2>Rooms</h2>
-        <p v-if="!rooms.length">No rooms created for this property yet.</p>
       </header>
 
-      <section v-if="roomEditError" class="host-property__message host-property__message--error">
-        {{ roomEditError }}
+      <section v-if="propertyEditError" class="host-property__message host-property__message--error">
+        {{ propertyEditError }}
       </section>
-      <p v-if="roomUploadCount > 0" class="host-property__note">Uploading room images...</p>
+      <p v-if="propertyUploadCount > 0" class="host-property__note">Uploading property images...</p>
 
-      <ul v-if="rooms.length" class="host-property__room-list">
-        <li v-for="room in rooms" :key="room.uuid || room.name">
-          <h3>{{ room.name }}</h3>
-          <p class="host-property__room-meta">
-            {{ room.capacity }} guests  ${{ Number(room.price_per_night ?? room.pricePerNight ?? 0).toFixed(2) }} per night
-          </p>
-          <p v-if="room.description">{{ room.description }}</p>
-          <div class="host-room-images" v-if="roomGalleryImages(room).length">
-            <template v-for="(image, idx) in roomGalleryImages(room)" :key="image.key || idx">
-              <img
-                :src="image.url"
-                :alt="`${room.name} image ${idx + 1}`"
-              />
-            </template>
+      <section v-if="isEditingProperty" class="host-card host-card--form host-property__edit-card">
+        <div class="host-form-grid">
+          <div class="host-form-field">
+            <label class="host-label">Name</label>
+            <input v-model="editPropertyForm.name" type="text" placeholder="Property name" />
           </div>
-          <div class="host-room-actions">
-            <button type="button" class="host-link" @click="startRoomEdit(room)">Edit room</button>
-            <button type="button" class="host-link host-link--danger" @click="removeRoom(room)">Delete room</button>
+          <div class="host-form-field">
+            <label class="host-label">Description</label>
+            <input v-model="editPropertyForm.description" type="text" placeholder="Short description" />
           </div>
+          <div class="host-form-field">
+            <label class="host-label">Stars</label>
+            <input v-model="editPropertyForm.stars" type="number" min="0" max="5" step="0.5" />
+          </div>
+          <div class="host-form-field">
+            <label class="host-label">Country</label>
+            <input v-model="editPropertyForm.country" type="text" placeholder="Country" />
+          </div>
+          <div class="host-form-field">
+            <label class="host-label">State</label>
+            <input v-model="editPropertyForm.state" type="text" placeholder="State" />
+          </div>
+          <div class="host-form-field">
+            <label class="host-label">City</label>
+            <input v-model="editPropertyForm.city" type="text" placeholder="City" />
+          </div>
+          <div class="host-form-field">
+            <label class="host-label">County</label>
+            <input v-model="editPropertyForm.county" type="text" placeholder="County" />
+          </div>
+          <div class="host-form-field host-form-field--full">
+            <label class="host-label">Address</label>
+            <input v-model="editPropertyForm.address" type="text" placeholder="Street and number" />
+          </div>
+          <div class="host-form-field">
+            <label class="host-label">Latitude</label>
+            <input v-model="editPropertyForm.latitude" type="number" step="0.000001" />
+          </div>
+          <div class="host-form-field">
+            <label class="host-label">Longitude</label>
+            <input v-model="editPropertyForm.longitude" type="number" step="0.000001" />
+          </div>
+          <div class="host-form-field host-form-field--full">
+            <label class="host-label">Search &amp; replace location</label>
+            <LocationSearch @selected="applyLocation" />
+            <p class="host-form-note">Selecting a new place will update location related fields above.</p>
+          </div>
+          <div class="host-form-field host-form-field--full">
+            <label class="host-label">Property images</label>
+            <input type="file" multiple accept="image/*" @change="handlePropertyImageUpload" />
+            <ul v-if="editPropertyForm.images.length" class="host-uploader-list">
+              <li v-for="(image, index) in editPropertyForm.images" :key="image.key || index" class="host-uploader-item">
+                <span class="text-truncate">{{ image.key }}</span>
+                <button type="button" class="host-link host-link--danger" @click="removePropertyImage(index)">Remove</button>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
 
-          <div v-if="editingRoomId === (room.uuid || room.name)" class="host-room-edit host-form-grid">
-            <div class="host-form-field">
-              <label class="host-label">Name</label>
-              <input v-model="editRoomForm.name" type="text" placeholder="Room name" />
+      <section class="host-property__details host-card">
+        <div class="host-property__gallery" v-if="images.length">
+          <img
+            v-for="(image, index) in images"
+            :key="image.key || index"
+            :src="image.url"
+            :alt="`${property.name} image ${index + 1}`"
+          />
+        </div>
+        <div class="host-property__gallery host-property__gallery--empty" v-else>
+          <span>{{ initials }}</span>
+        </div>
+
+        <article class="host-property__card">
+          <h2>Property overview</h2>
+          <p v-if="property.description">{{ property.description }}</p>
+          <p v-else>This property does not have a description yet.</p>
+
+          <ul class="host-property__facts">
+            <li>
+              <strong>Rooms:</strong>
+              <span>{{ roomCount }}</span>
+            </li>
+            <li v-if="property.stars">
+              <strong>Rating:</strong>
+              <span>{{ Number(property.stars).toFixed(1) }} stars</span>
+            </li>
+            <li v-if="averageRating !== null">
+              <strong>Guest reviews:</strong>
+              <span>{{ averageRating.toFixed(1) }} average score</span>
+            </li>
+            <li v-if="property.phone">
+              <strong>Phone:</strong>
+              <span>{{ property.phone }}</span>
+            </li>
+            <li v-if="property.email">
+              <strong>Email:</strong>
+              <span>{{ property.email }}</span>
+            </li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="host-card host-property__rooms">
+        <header>
+          <h2>Rooms</h2>
+          <p v-if="!rooms.length">No rooms created for this property yet.</p>
+        </header>
+
+        <section v-if="roomEditError" class="host-property__message host-property__message--error">
+          {{ roomEditError }}
+        </section>
+        <p v-if="roomUploadCount > 0" class="host-property__note">Uploading room images...</p>
+
+        <ul v-if="rooms.length" class="host-property__room-list">
+          <li v-for="room in rooms" :key="room.uuid || room.name" class="host-room-card">
+            <div class="host-room-card__header">
+              <div>
+                <h3>{{ room.name }}</h3>
+                <p class="host-property__room-meta">
+                  {{ room.capacity }} guests • ${{ Number(room.price_per_night ?? room.pricePerNight ?? 0).toFixed(2) }} per night
+                </p>
+              </div>
+              <div class="host-room-actions">
+                <button type="button" class="host-link" @click="startRoomEdit(room)">Edit room</button>
+                <button type="button" class="host-link host-link--danger" @click="removeRoom(room)">Delete room</button>
+              </div>
             </div>
-            <div class="host-form-field">
-              <label class="host-label">Description</label>
-              <input v-model="editRoomForm.description" type="text" placeholder="Short description" />
+            <p v-if="room.description" class="host-room-card__description">{{ room.description }}</p>
+            <div class="host-room-images" v-if="roomGalleryImages(room).length">
+              <template v-for="(image, idx) in roomGalleryImages(room)" :key="image.key || idx">
+                <img
+                  :src="image.url"
+                  :alt="`${room.name} image ${idx + 1}`"
+                />
+              </template>
             </div>
-            <div class="host-form-field">
-              <label class="host-label">Capacity</label>
-              <input v-model="editRoomForm.capacity" type="number" min="1" />
-            </div>
-            <div class="host-form-field">
-              <label class="host-label">Room type</label>
-              <select v-model="editRoomForm.roomType">
-                <option disabled value="">Select type</option>
-                <option v-for="type in roomTypes" :key="type" :value="type">
-                  {{ type.charAt(0).toUpperCase() + type.slice(1) }}
-                </option>
-              </select>
-            </div>
-            <div class="host-form-field">
-              <label class="host-label">Price / night</label>
-              <input v-model="editRoomForm.pricePerNight" type="number" min="0" step="0.01" />
-            </div>
-            <div class="host-form-field">
-              <label class="host-label">Min price</label>
-              <input v-model="editRoomForm.minPricePerNight" type="number" min="0" step="0.01" />
-            </div>
-            <div class="host-form-field">
-              <label class="host-label">Max price</label>
-              <input v-model="editRoomForm.maxPricePerNight" type="number" min="0" step="0.01" />
-            </div>
-            <div class="host-form-field host-form-field--full">
-              <label class="host-label">Amenities (comma separated)</label>
-              <input v-model="editRoomForm.amenitiesInput" type="text" placeholder="Wi-Fi, Parking" />
-            </div>
-            <div class="host-form-field host-form-field--full">
-              <label class="host-label">Room images</label>
-              <input type="file" multiple accept="image/*" @change="handleRoomImageUpload" />
-              <ul v-if="editRoomForm.images.length" class="host-uploader-list">
-                <li
-                  v-for="(image, idx) in editRoomForm.images"
-                  :key="image.key || idx"
-                  class="host-uploader-item"
+
+            <div v-if="editingRoomId === (room.uuid || room.name)" class="host-room-edit host-form-grid">
+              <div class="host-form-field">
+                <label class="host-label">Name</label>
+                <input v-model="editRoomForm.name" type="text" placeholder="Room name" />
+              </div>
+              <div class="host-form-field">
+                <label class="host-label">Description</label>
+                <input v-model="editRoomForm.description" type="text" placeholder="Short description" />
+              </div>
+              <div class="host-form-field">
+                <label class="host-label">Capacity</label>
+                <input v-model="editRoomForm.capacity" type="number" min="1" />
+              </div>
+              <div class="host-form-field">
+                <label class="host-label">Room type</label>
+                <select v-model="editRoomForm.roomType">
+                  <option disabled value="">Select type</option>
+                  <option v-for="type in roomTypes" :key="type" :value="type">
+                    {{ type.charAt(0).toUpperCase() + type.slice(1) }}
+                  </option>
+                </select>
+              </div>
+              <div class="host-form-field">
+                <label class="host-label">Price / night</label>
+                <input v-model="editRoomForm.pricePerNight" type="number" min="0" step="0.01" />
+              </div>
+              <div class="host-form-field">
+                <label class="host-label">Min price</label>
+                <input v-model="editRoomForm.minPricePerNight" type="number" min="0" step="0.01" />
+              </div>
+              <div class="host-form-field">
+                <label class="host-label">Max price</label>
+                <input v-model="editRoomForm.maxPricePerNight" type="number" min="0" step="0.01" />
+              </div>
+              <div class="host-form-field host-form-field--full">
+                <label class="host-label">Amenities (comma separated)</label>
+                <input v-model="editRoomForm.amenitiesInput" type="text" placeholder="Wi-Fi, Parking" />
+              </div>
+              <div class="host-form-field host-form-field--full">
+                <label class="host-label">Room images</label>
+                <input type="file" multiple accept="image/*" @change="handleRoomImageUpload" />
+                <ul v-if="editRoomForm.images.length" class="host-uploader-list">
+                  <li
+                    v-for="(image, idx) in editRoomForm.images"
+                    :key="image.key || idx"
+                    class="host-uploader-item"
+                  >
+                    <span class="text-truncate">{{ image.key }}</span>
+                    <button type="button" class="host-link host-link--danger" @click="removeRoomImage(idx)">Remove</button>
+                  </li>
+                </ul>
+              </div>
+              <div class="host-room-edit__actions host-form-field host-form-field--full">
+                <button
+                  type="button"
+                  class="host-btn host-btn--primary"
+                  :disabled="roomUploadCount > 0"
+                  @click="submitRoomEdit"
                 >
-                  <span class="text-truncate">{{ image.key }}</span>
-                  <button type="button" class="host-link host-link--danger" @click="removeRoomImage(idx)">Remove</button>
-                </li>
-              </ul>
+                  Save room
+                </button>
+                <button type="button" class="host-btn host-btn--ghost" @click="cancelRoomEdit">Cancel</button>
+              </div>
             </div>
-            <div class="host-room-edit__actions host-form-field host-form-field--full">
-              <button
-                type="button"
-                class="host-btn host-btn--primary"
-                :disabled="roomUploadCount > 0"
-                @click="submitRoomEdit"
-              >
-                Save room
-              </button>
-              <button type="button" class="host-btn host-btn--ghost" @click="cancelRoomEdit">Cancel</button>
-            </div>
-          </div>
-        </li>
-      </ul>
+          </li>
+        </ul>
+      </section>
+
+      <section v-if="showDeletePrompt" class="host-property__message host-property__message--warning">
+        <p>Deleting this property will remove all associated rooms. This action cannot be undone.</p>
+        <div class="host-property__message-actions">
+          <button class="host-btn host-btn--danger" type="button" @click="deletePropertyAndRedirect">Confirm delete</button>
+          <button class="host-btn host-btn--ghost" type="button" @click="showDeletePrompt = false">Cancel</button>
+        </div>
+      </section>
     </section>
 
-    <section v-if="showDeletePrompt" class="host-property__message host-property__message--warning">
-      <p>Deleting this property will remove all associated rooms. This action cannot be undone.</p>
-      <div class="host-property__message-actions">
-        <button class="host-btn host-btn--danger" type="button" @click="deletePropertyAndRedirect">Confirm delete</button>
-        <button class="host-btn host-btn--ghost" type="button" @click="showDeletePrompt = false">Cancel</button>
-      </div>
-    </section>
+    <p v-else-if="loadError" class="host-property__empty">{{ loadError }}</p>
+    <p v-else class="host-property__empty">Loading property details...</p>
   </div>
-
-  <p v-else-if="loadError" class="host-property__empty">{{ loadError }}</p>
-  <p v-else class="host-property__empty">Loading property details...</p>
 </template>
 
 <script setup lang="ts">
@@ -687,6 +693,58 @@ watch(
 </script>
 
 <style scoped>
+.host-page--property {
+  gap: 32px;
+}
+
+.host-property {
+  gap: 20px;
+}
+
+.host-property__header {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.host-property__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.82rem;
+  color: var(--host-muted);
+  margin: 0 0 6px;
+}
+
+.host-property__title {
+  margin: 0 0 6px;
+  font-size: 2.4rem;
+}
+
+.host-property__location {
+  margin: 0;
+  color: var(--host-soft-muted);
+}
+
+.host-property__summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(247, 197, 120, 0.2);
+  border-radius: 18px;
+  padding: 10px 14px;
+  color: #7f4b10;
+  min-width: 90px;
+}
+
+.host-property__score {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.host-property__score-label {
+  font-size: 0.85rem;
+}
+
 .host-property__actions {
   display: flex;
   flex-wrap: wrap;
@@ -707,6 +765,7 @@ watch(
   border-radius: 16px;
   font-size: 0.96rem;
   line-height: 1.4;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .host-property__message--error {
@@ -726,15 +785,111 @@ watch(
   margin-top: 12px;
 }
 
-.host-property__edit-card {
-  margin-bottom: 32px;
+.host-property__details {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 22px;
+}
+
+.host-property__card {
+  background: var(--host-card-bg-alt);
+  border-radius: var(--host-radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--host-border);
+}
+
+.host-property__card h2 {
+  margin: 0;
+}
+
+.host-property__facts {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.host-property__facts li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--host-muted);
+}
+
+.host-property__gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.host-property__gallery img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: var(--host-radius-md);
+  box-shadow: var(--host-shadow-soft);
+}
+
+.host-property__gallery--empty {
+  background: var(--host-card-bg-alt);
+  border-radius: var(--host-radius-md);
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--host-muted);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.host-property__rooms {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.host-property__room-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.host-room-card {
+  background: var(--host-card-bg-alt);
+  border-radius: var(--host-radius-md);
+  padding: 18px 18px 14px;
+  border: 1px solid var(--host-border);
+  box-shadow: var(--host-shadow-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.host-room-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.host-room-card__description {
+  margin: 0;
+  color: var(--host-soft-muted);
 }
 
 .host-room-images {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin: 18px 0;
+  margin: 6px 0 4px;
 }
 
 .host-room-images img {
@@ -747,13 +902,13 @@ watch(
 
 .host-room-actions {
   display: flex;
-  gap: 16px;
-  margin-top: 12px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .host-room-edit {
-  margin-top: 18px;
-  padding: 20px;
+  margin-top: 10px;
+  padding: 18px;
   border-radius: 18px;
   border: 1px dashed rgba(210, 160, 110, 0.6);
   background: rgba(255, 248, 236, 0.6);
@@ -765,9 +920,27 @@ watch(
   align-items: center;
 }
 
+.host-property__room-meta {
+  margin: 4px 0 0;
+  color: var(--host-muted);
+  font-size: 0.95rem;
+}
+
 .host-form-note {
   font-size: 0.85rem;
   color: #8a7358;
+}
+
+.host-property__empty {
+  text-align: center;
+  color: var(--host-muted);
+  padding: 48px 0;
+}
+
+@media (max-width: 1024px) {
+  .host-property__details {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
