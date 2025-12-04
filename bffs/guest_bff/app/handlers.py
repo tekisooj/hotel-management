@@ -829,7 +829,11 @@ async def get_filtered_rooms(
                     raise HTTPException(status_code=availability_response.status_code, detail=availability_response.text)
                 availability_map = availability_response.json() or {}
                 for room in rooms_to_check:
-                    if availability_map.get(str(room.uuid)):
+                    raw_availability = availability_map.get(str(room.uuid))
+                    available = (
+                        True if raw_availability is True else str(raw_availability).lower() == "true"
+                    )
+                    if available:
                         property_detail.rooms.append(room)  # type: ignore[attr-defined]
             else:
                 property_detail.rooms = rooms_to_check  # type: ignore[attr-defined]

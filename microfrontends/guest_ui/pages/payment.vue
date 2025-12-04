@@ -373,6 +373,10 @@ async function renderPayPalButtons(forceReload = false) {
           orderAmount.value = result.amount
           paymentSuccess.value = true
           orderId.value = null
+          // redirect after showing success briefly
+          setTimeout(() => {
+            router.push('/')
+          }, 1200)
         } catch (err: any) {
           paymentError.value = parseError(err, 'Something went wrong while processing the payment.')
         }
