@@ -114,6 +114,20 @@ type CapturePaymentResponse = {
   amount: PaymentAmount
 }
 
+function normalizeBooking(raw: any): Booking {
+  return {
+    uuid: raw.uuid || raw.id,
+    userUuid: raw.user_uuid || raw.userUuid,
+    roomUuid: raw.room_uuid || raw.roomUuid,
+    checkIn: raw.check_in ? new Date(raw.check_in) : raw.checkIn ? new Date(raw.checkIn) : undefined as any,
+    checkOut: raw.check_out ? new Date(raw.check_out) : raw.checkOut ? new Date(raw.checkOut) : undefined as any,
+    totalPrice: Number(raw.total_price ?? raw.totalPrice ?? 0),
+    status: raw.status,
+    createdAt: raw.created_at ? new Date(raw.created_at) : raw.createdAt ? new Date(raw.createdAt) : undefined as any,
+    updatedAt: raw.updated_at ? new Date(raw.updated_at) : raw.updatedAt ? new Date(raw.updatedAt) : undefined as any,
+  }
+}
+
 export function useGuestBff() {
   const config = useRuntimeConfig()
   const baseURL = (config.public.apiBase || '').replace(/\/$/, '')
@@ -182,9 +196,11 @@ export function useGuestBff() {
   }
 
   async function getMyBookings() {
-    return await $fetch(`${baseURL}/my/bookings`, {
+    const res = await $fetch<any[]>(`${baseURL}/my/bookings`, {
       headers: authHeaders(),
     })
+    if (!Array.isArray(res)) return []
+    return res.map(normalizeBooking)
   }
 
   async function cancelMyBooking(bookingUuid: string): Promise<string> {
