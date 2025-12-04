@@ -206,10 +206,12 @@ function goToNextMonth() {
 function buildCalendarBookings(bookings: AvailabilityBooking[]): CalendarBooking[] {
   return bookings.map((booking) => ({
     uuid: booking.uuid,
-    start: booking.check_in,
-    end: booking.check_out,
+    checkIn: new Date(booking.check_in),
+    checkOut: new Date(booking.check_out),
     label: buildGuestLabel(booking),
     status: booking.status,
+    guestName: booking.guest_name,
+    guestEmail: booking.guest_email,
   }))
 }
 
