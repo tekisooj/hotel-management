@@ -12,6 +12,7 @@ from models.booking import Booking, BookingStatus
 from models.user import UserResponse, UserUpdate
 from models.property import Availability, Property, PropertyDetail, Room
 from models.asset import AssetUploadRequest, AssetUploadResponse
+from datetime import timedelta
 import os
 import boto3
 
@@ -95,6 +96,9 @@ def get_property_service_client(request: Request) -> AsyncClient:
 def get_user_service_client(request: Request) -> AsyncClient:
     return request.app.state.user_service_client
 
+def get_event_bus(request: Request):
+    return getattr(request.app.state, "event_bus", None)
+
 def get_place_index(request: Request) -> str | None:
     place_index = getattr(request.app.state, "place_index", None)
     return place_index or os.environ.get("PLACE_INDEX_NAME")
@@ -113,6 +117,40 @@ def _forward_auth_headers(request: Request) -> dict[str, str]:
                 headers["X-User-Id"] = xuid
     return headers
 
+async def _get_user_info(user_service_client: AsyncClient, user_uuid: UUID, headers: dict[str, str]) -> dict[str, Any] | None:
+    try:
+        resp = await user_service_client.get(
+            f"user/{str(user_uuid)}",
+            headers=headers or None,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception:
+        return None
+    return None
+
+async def _fetch_future_bookings(
+    booking_service_client: AsyncClient,
+    room_uuid: UUID,
+    headers: dict[str, str],
+    window_days: int = 365,
+) -> list[Booking]:
+    start = datetime.utcnow()
+    end = start + timedelta(days=window_days)
+    resp = await booking_service_client.get(
+        "bookings",
+        params={
+            "room_uuid": str(room_uuid),
+            "check_in": start.isoformat() + "Z",
+            "check_out": end.isoformat() + "Z",
+        },
+        headers=headers or None,
+        timeout=15.0,
+    )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    payload = resp.json() or []
+    return [Booking(**item) for item in payload]
 
 def _extract_image_key(image: Any) -> str | None:
     if isinstance(image, dict):
@@ -388,30 +426,162 @@ async def create_asset_upload_url(
 async def delete_room(
     room_uuid: UUID,
     request: Request,
-    property_service_client: AsyncClient = Depends(get_property_service_client)
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+    booking_service_client: AsyncClient = Depends(get_booking_service_client),
+    user_service_client: AsyncClient = Depends(get_user_service_client),
+    current_user_uuid: UUID = Depends(get_current_user_uuid),
+    event_bus = Depends(get_event_bus),
 ) -> UUID:
     headers = _forward_auth_headers(request)
+
+    room_resp = await property_service_client.get(
+        f"room/{str(room_uuid)}",
+        headers=headers or None,
+    )
+    if room_resp.status_code != 200:
+        raise HTTPException(status_code=room_resp.status_code, detail=room_resp.text)
+    room_payload = room_resp.json()
+    room_obj = Room(**room_payload)
+
+    prop_obj: Property | None = None
+    if room_obj.property_uuid:
+        prop_resp = await property_service_client.get(
+            f"property/{str(room_obj.property_uuid)}",
+            headers=headers or None,
+        )
+        if prop_resp.status_code == 200:
+            prop_obj = Property(**(prop_resp.json() or {}))
+            if prop_obj.user_uuid != current_user_uuid:
+                raise HTTPException(status_code=403, detail="Forbidden")
+        else:
+            raise HTTPException(status_code=prop_resp.status_code, detail=prop_resp.text)
+
+    host_info = None
+    if prop_obj:
+        host_info = await _get_user_info(user_service_client, prop_obj.user_uuid, headers)
+
+    future_bookings: list[Booking] = []
+    try:
+        future_bookings = await _fetch_future_bookings(booking_service_client, room_uuid, headers)
+    except Exception:
+        future_bookings = []
+
     response = await property_service_client.delete(
         f"room/{str(room_uuid)}",
         headers=headers or None,
     )
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    if future_bookings and event_bus and hasattr(event_bus, "put_event"):
+        for booking in future_bookings:
+            guest_info = await _get_user_info(user_service_client, booking.user_uuid, headers) or {}
+            detail = {
+                "detail_type": "PropertyUnavailable",
+                "guest_email": guest_info.get("email"),
+                "guest_phone": guest_info.get("phone_number") or guest_info.get("phone"),
+                "guest_name": guest_info.get("name"),
+                "guest_last_name": guest_info.get("last_name"),
+                "property_uuid": str(prop_obj.uuid) if prop_obj else None,
+                "property_name": prop_obj.name if prop_obj else None,
+                "room_uuid": str(room_uuid),
+                "room_name": room_obj.name if hasattr(room_obj, "name") else None,
+                "check_in": booking.check_in.isoformat(),
+                "check_out": booking.check_out.isoformat(),
+                "host_name": " ".join(
+                    part for part in [(host_info or {}).get("name"), (host_info or {}).get("last_name")] if part
+                ),
+                "host_email": (host_info or {}).get("email"),
+                "host_phone": (host_info or {}).get("phone_number") or (host_info or {}).get("phone"),
+            }
+            try:
+                event_bus.put_event(
+                    detail_type="PropertyUnavailable",
+                    source="property-service",
+                    detail=detail,
+                )
+            except Exception:
+                continue
+
     return room_uuid
 
 
 async def delete_property(
     property_uuid: UUID,
     request: Request,
-    property_service_client: AsyncClient = Depends(get_property_service_client)
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+    booking_service_client: AsyncClient = Depends(get_booking_service_client),
+    user_service_client: AsyncClient = Depends(get_user_service_client),
+    current_user_uuid: UUID = Depends(get_current_user_uuid),
+    event_bus = Depends(get_event_bus),
 ) -> UUID:
     headers = _forward_auth_headers(request)
+
+    prop_resp = await property_service_client.get(
+        f"property/{str(property_uuid)}",
+        headers=headers or None,
+    )
+    if prop_resp.status_code != 200:
+        raise HTTPException(status_code=prop_resp.status_code, detail=prop_resp.text)
+    prop_payload = prop_resp.json()
+    prop_obj = Property(**prop_payload)
+    if prop_obj.user_uuid != current_user_uuid:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    host_info = await _get_user_info(user_service_client, prop_obj.user_uuid, headers)
+
+    rooms_resp = await property_service_client.get(
+        f"rooms/{str(property_uuid)}",
+        headers=headers or None,
+    )
+    rooms_payload = rooms_resp.json() if rooms_resp.status_code == 200 else []
+    rooms = [Room(**room) for room in rooms_payload]
+
+    future_bookings: list[tuple[Room, Booking]] = []
+    for room in rooms:
+        try:
+            for booking in await _fetch_future_bookings(booking_service_client, room.uuid, headers):
+                future_bookings.append((room, booking))
+        except Exception:
+            continue
+
     response = await property_service_client.delete(
         f"property/{str(property_uuid)}",
         headers=headers or None,
     )
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    if future_bookings and event_bus and hasattr(event_bus, "put_event"):
+        for room, booking in future_bookings:
+            guest_info = await _get_user_info(user_service_client, booking.user_uuid, headers) or {}
+            detail = {
+                "detail_type": "PropertyUnavailable",
+                "guest_email": guest_info.get("email"),
+                "guest_phone": guest_info.get("phone_number") or guest_info.get("phone"),
+                "guest_name": guest_info.get("name"),
+                "guest_last_name": guest_info.get("last_name"),
+                "property_uuid": str(property_uuid),
+                "property_name": prop_obj.name,
+                "room_uuid": str(room.uuid) if room.uuid else None,
+                "room_name": room.name,
+                "check_in": booking.check_in.isoformat(),
+                "check_out": booking.check_out.isoformat(),
+                "host_name": " ".join(
+                    part for part in [(host_info or {}).get("name"), (host_info or {}).get("last_name")] if part
+                ),
+                "host_email": (host_info or {}).get("email"),
+                "host_phone": (host_info or {}).get("phone_number") or (host_info or {}).get("phone"),
+            }
+            try:
+                event_bus.put_event(
+                    detail_type="PropertyUnavailable",
+                    source="property-service",
+                    detail=detail,
+                )
+            except Exception:
+                continue
+
     return property_uuid
 
 
@@ -431,6 +601,100 @@ async def change_booking_status(
         raise HTTPException(status_code=response.status_code, detail=response.text)
     response = response.json()
     return Booking(**response)
+
+async def cancel_booking(
+    booking_uuid: UUID,
+    request: Request,
+    current_user_uuid: UUID = Depends(get_current_user_uuid),
+    booking_service_client: AsyncClient = Depends(get_booking_service_client),
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+    user_service_client: AsyncClient = Depends(get_user_service_client),
+    event_bus = Depends(get_event_bus),
+) -> Booking:
+    headers = _forward_auth_headers(request)
+
+    booking_resp = await booking_service_client.get(
+        f"booking/{str(booking_uuid)}",
+        headers=headers or None,
+    )
+    if booking_resp.status_code != 200:
+        raise HTTPException(status_code=booking_resp.status_code, detail=booking_resp.text)
+    booking_payload = booking_resp.json()
+    booking_obj = Booking(**booking_payload)
+
+    property_name = None
+
+    room_resp = await property_service_client.get(
+        f"room/{str(booking_obj.room_uuid)}",
+        headers=headers or None,
+    )
+    if room_resp.status_code != 200:
+        raise HTTPException(status_code=room_resp.status_code, detail=room_resp.text)
+    room_payload = room_resp.json()
+    room_obj = Room(**room_payload)
+    if room_obj.property_uuid:
+        prop_resp = await property_service_client.get(
+            f"property/{str(room_obj.property_uuid)}",
+            headers=headers or None,
+        )
+        if prop_resp.status_code == 200:
+            prop_payload = prop_resp.json()
+            prop_obj = Property(**prop_payload)
+            property_name = prop_obj.name
+            if prop_obj.user_uuid != current_user_uuid:
+                raise HTTPException(status_code=403, detail="Forbidden")
+        else:
+            raise HTTPException(status_code=prop_resp.status_code, detail=prop_resp.text)
+
+    cancel_resp = await booking_service_client.patch(
+        f"booking/{str(booking_uuid)}/cancel",
+        json={"user_uuid": str(current_user_uuid)},
+        headers=headers or None,
+    )
+    if cancel_resp.status_code != 200:
+        raise HTTPException(status_code=cancel_resp.status_code, detail=cancel_resp.text)
+    cancel_payload = cancel_resp.json()
+    cancelled_booking = Booking(**cancel_payload)
+
+    guest_email = None
+    guest_phone = None
+    guest_first = None
+    guest_last = None
+    try:
+        user_resp = await user_service_client.get(
+            f"user/{str(booking_obj.user_uuid)}",
+            headers=headers or None,
+        )
+        if user_resp.status_code == 200:
+            user_payload = user_resp.json()
+            guest_email = user_payload.get("email")
+            guest_phone = user_payload.get("phone_number") or user_payload.get("phone")
+            guest_first = user_payload.get("name")
+            guest_last = user_payload.get("last_name")
+    except Exception:
+        pass
+
+    if event_bus and hasattr(event_bus, "put_event"):
+        try:
+            event_bus.put_event(
+                detail_type="BookingCancelled",
+                source="booking-service",
+                detail={
+                    "booking_uuid": str(booking_uuid),
+                    "guest_email": guest_email,
+                    "guest_phone": guest_phone,
+                    "guest_name": guest_first,
+                    "guest_last_name": guest_last,
+                    "property_uuid": str(room_obj.property_uuid) if room_obj.property_uuid else None,
+                    "room_uuid": str(booking_obj.room_uuid),
+                    "property_name": property_name,
+                    "check_in": booking_obj.check_in.isoformat(),
+                },
+            )
+        except Exception:
+            pass
+
+    return cancelled_booking
 
 async def get_bookings(
     property_uuid: UUID,
@@ -518,11 +782,17 @@ async def get_bookings(
             user_info = user_details.get(str(booking.user_uuid))
             if not user_info:
                 continue
-            full_name = " ".join(
-                part.strip()
-                for part in [user_info.get("name", ""), user_info.get("last_name", "")]
-                if part and part.strip()
-            )
+            first = (user_info.get("name") or "").strip()
+            last = (user_info.get("last_name") or "").strip()
+            email = user_info.get("email")
+            phone = user_info.get("phone_number") or user_info.get("phone") or None
+            full_name = " ".join(part for part in [first, last] if part)
+            booking.guest_name = first or (full_name if full_name else None)
+            booking.guest_last_name = last or None
+            booking.guest_email = email
+            booking.guest_phone = phone
+            if not booking.guest_name and email:
+                booking.guest_name = email.split("@")[0]
     return availabilities
 
 

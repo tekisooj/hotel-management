@@ -9,6 +9,7 @@ from config import AppMetadata, host_bff_prod_configuration, host_bff_int_config
 from handlers import JWTVerifier
 from httpx import AsyncClient
 import time
+from event_bus import EventBusClient
 
 
 logger = logging.getLogger()
@@ -37,6 +38,8 @@ def create_app() -> FastAPI:
     app.state.review_service_client = AsyncClient(base_url=app_config.review_service_url)
     app.state.jwt_verifier = JWTVerifier(jwks_url=app_config.jwks_url, audience=app_config.audience, env=app_metadata.host_bff_env)
     app.state.place_index = app_config.place_index
+    if app_config.event_bus_name:
+        app.state.event_bus = EventBusClient(app_config.event_bus_name)
 
 
     app.add_middleware(

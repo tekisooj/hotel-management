@@ -6,6 +6,9 @@
         <div class="search_intro">
           <p class="search_text">Plan your next stay</p>
           <h1 class="search_title">Find your perfect hotel</h1>
+          <div class="search_actions">
+            <button class="search_cta" type="button" @click="goToBookings">My bookings</button>
+          </div>
         </div>
         <div class="search_card">
           <h3 class="search_card-title">Search</h3>
@@ -55,12 +58,14 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useGuestBff } from '@/api/guestBff'
 import HotelList from '@/components/HotelList.vue'
 import { useSearchStore } from '@/stores/search'
 
 const { searchRooms } = useGuestBff()
 const store = useSearchStore()
+const router = useRouter()
 const country = ref('')
 const city = ref('')
 const state = ref('')
@@ -89,6 +94,9 @@ const handleLocation = (location: any) => {
   longitude.value = typeof location.longitude === 'number' ? location.longitude : null
 };
 
+function goToBookings() {
+  router.push('/bookings')
+}
 
 async function submit() {
   if (!canSearch.value) return
@@ -205,6 +213,12 @@ async function submit() {
   font-weight: 700;
   line-height: 1.1;
   text-transform: uppercase;
+}
+
+.search_actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
 }
 
 .search_copy {

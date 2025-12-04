@@ -26,6 +26,7 @@ interface HostBff {
   deleteProperty(propertyUuid: string): Promise<any>
   getBookings(propertyUuid: string, checkInDate: Date, checkOutDate: Date): Promise<RoomAvailability[]>
   changeBookingStatus(bookingUuid: string, status: BookingStatus): Promise<any>
+  cancelBooking(bookingUuid: string): Promise<any>
   getPropertyReviews(propertyUuid: string): Promise<any>
   createAssetUploadUrl(prefix: string, contentType: string, extension?: string): Promise<AssetUploadResponse>
 }
@@ -66,7 +67,9 @@ function mapAvailability(raw: any): RoomAvailability {
           created_at: booking.created_at,
           updated_at: booking.updated_at,
           guest_name: booking.guest_name,
+          guest_last_name: booking.guest_last_name,
           guest_email: booking.guest_email,
+          guest_phone: booking.guest_phone,
         }))
       : [],
   }
@@ -126,6 +129,7 @@ export default (axios: NuxtAxiosInstance): HostBff => ({
   },
   changeBookingStatus: async (bookingUuid: string, status: BookingStatus) =>
     axios.$patch(`booking/${bookingUuid}`, { booking_status: status }),
+  cancelBooking: async (bookingUuid: string) => axios.$delete(`booking/${bookingUuid}`),
   getPropertyReviews: async (propertyUuid: string) => axios.$get(`reviews/${propertyUuid}`),
   createAssetUploadUrl: async (prefix: string, contentType: string, extension?: string) => {
     const res = await axios.$post('assets/upload-url', { prefix, content_type: contentType, extension })
@@ -284,6 +288,13 @@ export function useHostBff() {
     })
   }
 
+  async function cancelBooking(booking_uuid: string): Promise<Booking> {
+    return await $fetch<Booking>(`${baseURL}/booking/${booking_uuid}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+  }
+
   async function getPropertyReviews(property_uuid: string): Promise<Review[]> {
     return await $fetch<Review[]>(`${baseURL}/reviews/${property_uuid}`, {
       headers: authHeaders(),
@@ -321,6 +332,7 @@ export function useHostBff() {
     deleteProperty,
     getBookings,
     changeBookingStatus,
+    cancelBooking,
     getPropertyReviews,
     createAssetUploadUrl,
     searchPlaces,
