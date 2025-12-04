@@ -78,6 +78,8 @@ const property = ref<PropertyDetail | null>(null)
 const reviews = ref<any[]>([])
 
 const propertyUuid = computed(() => String(route.params.propertyUuid || ''))
+const queryCheckIn = computed(() => (route.query.checkIn as string) || (route.query.check_in as string) || '')
+const queryCheckOut = computed(() => (route.query.checkOut as string) || (route.query.check_out as string) || '')
 
 const averageRating = computed(() => {
   if (!property.value) return null
@@ -100,8 +102,8 @@ const propertyAddress = computed(() => {
 })
 
 const roomSearchParams = computed(() => ({
-  checkIn: store.lastSearch?.checkIn,
-  checkOut: store.lastSearch?.checkOut,
+  checkIn: queryCheckIn.value || store.lastSearch?.checkIn,
+  checkOut: queryCheckOut.value || store.lastSearch?.checkOut,
   guests: store.lastSearch?.capacity,
 }))
 
@@ -121,8 +123,8 @@ async function loadProperty() {
       property.value = fromStore
     }
     const fetched = await getProperty(uuid, {
-      checkInDate: store.lastSearch?.checkIn,
-      checkOutDate: store.lastSearch?.checkOut,
+      checkInDate: queryCheckIn.value || store.lastSearch?.checkIn,
+      checkOutDate: queryCheckOut.value || store.lastSearch?.checkOut,
     })
     if (fetched) {
       store.setProperty(fetched)
