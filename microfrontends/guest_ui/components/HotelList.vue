@@ -24,14 +24,21 @@
 import { useRouter } from 'vue-router'
 import HotelElement from '@/components/HotelElement.vue'
 import type { PropertyDetail } from 'types/PropertyDetail'
+import { useSearchStore } from '@/stores/search'
 
 defineProps<{ hotels: PropertyDetail[] }>()
 const router = useRouter()
+const store = useSearchStore()
 
 function openDetails(hotel: PropertyDetail) {
   const uuid = hotel.uuid || (hotel as any).uuid
   if (!uuid) return
-  router.push({ path: `/property/${uuid}` })
+  const qs: Record<string, string> = {}
+  const last = store.lastSearch
+  if (last?.checkIn) qs.checkIn = last.checkIn
+  if (last?.checkOut) qs.checkOut = last.checkOut
+  if (last?.capacity) qs.guests = String(last.capacity)
+  router.push({ path: `/property/${uuid}`, query: qs })
 }
 </script>
 
