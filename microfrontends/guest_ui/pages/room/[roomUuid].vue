@@ -218,10 +218,12 @@ async function load() {
       const storedProperty = store.getProperty(propUuid)
       let resolvedProperty: PropertyDetail | null = storedProperty || null
       try {
-        const data = await getProperty(
-          propUuid,
-          normalizedCheckIn ? { checkInDate: normalizedCheckIn } : undefined,
-        )
+      const data = await getProperty(
+        propUuid,
+        normalizedCheckIn || checkOut.value
+          ? { checkInDate: normalizedCheckIn || undefined, checkOutDate: checkOut.value || undefined }
+          : undefined,
+      )
         if (data) {
           resolvedProperty = data as PropertyDetail
         }

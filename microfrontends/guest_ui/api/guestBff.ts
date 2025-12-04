@@ -7,6 +7,7 @@ import type { Review } from 'types/Review'
 
 type RoomPricingOptions = {
   checkInDate?: string | null
+  checkOutDate?: string | null
 }
 
 interface GuestBff {
@@ -43,7 +44,13 @@ export default (axios: NuxtAxiosInstance): GuestBff => ({
     }),
   getProperty: async (propertyUuid: string, options?: RoomPricingOptions) =>
     axios.$get(`property/${propertyUuid}`, {
-      params: options?.checkInDate ? { check_in_date: options.checkInDate } : undefined,
+      params:
+        options?.checkInDate || options?.checkOutDate
+          ? {
+              ...(options?.checkInDate ? { check_in_date: options.checkInDate } : {}),
+              ...(options?.checkOutDate ? { check_out_date: options.checkOutDate } : {}),
+            }
+          : undefined,
     }),
   createPaymentOrder: async (payload: PaymentOrderRequest) => axios.$post('booking/payment/order', payload),
   capturePayment: async (payload: CapturePaymentRequest) => axios.$post('booking/payment/capture', payload),

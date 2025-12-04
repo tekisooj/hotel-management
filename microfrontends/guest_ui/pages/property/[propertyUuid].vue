@@ -120,7 +120,10 @@ async function loadProperty() {
     if (fromStore) {
       property.value = fromStore
     }
-    const fetched = await getProperty(uuid)
+    const fetched = await getProperty(uuid, {
+      checkInDate: store.lastSearch?.checkIn,
+      checkOutDate: store.lastSearch?.checkOut,
+    })
     if (fetched) {
       store.setProperty(fetched)
       property.value = store.getProperty(uuid) || fetched

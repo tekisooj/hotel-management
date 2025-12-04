@@ -185,7 +185,7 @@ async function hydrateRoom() {
   if (propertyUuid) {
     let existing = store.getProperty(propertyUuid)
     try {
-      const fetched = await getProperty(propertyUuid, { checkInDate: checkIn.value })
+    const fetched = await getProperty(propertyUuid, { checkInDate: checkIn.value, checkOutDate: checkOut.value })
       if (fetched) {
         store.setProperty(fetched)
         existing = store.getProperty(propertyUuid) || fetched
