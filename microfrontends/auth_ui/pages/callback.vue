@@ -52,6 +52,10 @@ onMounted(async () => {
       catch { return {} }
     })() as { app?: string; redirect?: string }
 
+    // Fall back to query params if state is missing (some providers drop state)
+    const routeApp = typeof route.query.app === "string" ? route.query.app : undefined
+    const routeRedirect = typeof route.query.redirect === "string" ? route.query.redirect : undefined
+
     const idToken = signinResponse.id_token
     const refreshToken = signinResponse.refresh_token || undefined
     const authHeaders = { Authorization: `Bearer ${idToken}` }
@@ -62,7 +66,7 @@ onMounted(async () => {
       return typeof value === "string" ? value : ""
     }
 
-    const selectedApp = state.app === "host" ? "host" : "guest"
+    const selectedApp = state.app === "host" || routeApp === "host" ? "host" : "guest"
     const desiredUserType = selectedApp === "host" ? "STAFF" : "GUEST"
 
     const emailClaim = getClaim("email")
@@ -111,7 +115,7 @@ onMounted(async () => {
 
     const targetApp = selectedApp === "host" || me.user_type === "STAFF" ? "host" : "guest"
     const targetBase = targetApp === "host" ? config.public.hostUiUrl : config.public.guestUiUrl
-    const redirectUrl = buildTargetUrl(targetBase, idToken, refreshToken, state.redirect)
+    const redirectUrl = buildTargetUrl(targetBase, idToken, refreshToken, state.redirect || routeRedirect)
     window.location.href = redirectUrl
   } catch (error: any) {
     await userManager.clearStaleState().catch(() => undefined)
