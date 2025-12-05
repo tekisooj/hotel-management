@@ -55,6 +55,7 @@ onMounted(async () => {
     // Fall back to query params if state is missing (some providers drop state)
     const routeApp = typeof route.query.app === "string" ? route.query.app : undefined
     const routeRedirect = typeof route.query.redirect === "string" ? route.query.redirect : undefined
+    const storedApp = typeof window !== "undefined" ? window.localStorage.getItem("last_selected_app") || undefined : undefined
 
     const idToken = signinResponse.id_token
     const refreshToken = signinResponse.refresh_token || undefined
@@ -66,7 +67,7 @@ onMounted(async () => {
       return typeof value === "string" ? value : ""
     }
 
-    const selectedApp = state.app === "host" || routeApp === "host" ? "host" : "guest"
+    const selectedApp = (state.app || routeApp || storedApp) === "host" ? "host" : "guest"
     const desiredUserType = selectedApp === "host" ? "STAFF" : "GUEST"
 
     const emailClaim = getClaim("email")
