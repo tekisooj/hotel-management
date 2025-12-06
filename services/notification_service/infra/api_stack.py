@@ -44,7 +44,9 @@ class NotificationServiceStack(Stack):
             event_pattern=EventPattern(
                 source=["booking-service"],
                 detail_type=["BookingConfirmed"]
-            ))
+            ),
+            event_bus=self.event_bus,
+        )
         
         self.booking_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
 
@@ -52,7 +54,9 @@ class NotificationServiceStack(Stack):
             event_pattern=EventPattern(
                 source=["booking-service"],
                 detail_type=["BookingCancelled"]
-            ))
+            ),
+            event_bus=self.event_bus,
+        )
 
         self.booking_cancelled_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
 
@@ -60,7 +64,9 @@ class NotificationServiceStack(Stack):
             event_pattern=EventPattern(
                 source=["review-service"],
                 detail_type=["ReviewCreated"]
-            ))
+            ),
+            event_bus=self.event_bus,
+        )
 
         self.review_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
 
@@ -68,7 +74,9 @@ class NotificationServiceStack(Stack):
             event_pattern=EventPattern(
                 source=["property-service"],
                 detail_type=["PropertyUnavailable"]
-            ))
+            ),
+            event_bus=self.event_bus,
+        )
 
         self.property_unavailable_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
         

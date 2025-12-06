@@ -375,7 +375,7 @@ async function renderPayPalButtons(forceReload = false) {
           orderId.value = null
           // redirect after showing success briefly
           setTimeout(() => {
-            router.push('/')
+            router.push('/bookings')
           }, 1200)
         } catch (err: any) {
           paymentError.value = parseError(err, 'Something went wrong while processing the payment.')

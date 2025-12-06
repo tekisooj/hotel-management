@@ -250,6 +250,7 @@ async def fetch_property(
     request: Request,
     check_in_date: date | None = None,
     check_out_date: date | None = None,
+    capacity: int | None = None,
     property_service_client: AsyncClient = Depends(get_property_service_client),
     booking_service_client: AsyncClient = Depends(get_booking_service_client),
 ) -> PropertyDetail:
@@ -263,9 +264,13 @@ async def fetch_property(
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     data = resp.json() or {}
 
+    room_params: dict[str, str | int] = {"property_uuid": str(property_uuid)}
+    if capacity is not None and capacity > 0:
+        room_params["capacity"] = capacity
+
     rooms_resp = await property_service_client.get(
         "rooms",
-        params={"property_uuid": str(property_uuid)},
+        params=room_params,
         timeout=10.0,
         headers=headers or None,
     )
@@ -273,6 +278,19 @@ async def fetch_property(
 
     normalized_check_in = _normalize_date(check_in_date)
     normalized_check_out = _normalize_date(check_out_date)
+
+    if capacity is not None and capacity > 0 and rooms_payload:
+        filtered_rooms: list[dict] = []
+        for room in rooms_payload:
+            raw_capacity = _extract_room_value(room, "capacity")
+            try:
+                numeric_capacity = int(raw_capacity)
+            except (TypeError, ValueError):
+                filtered_rooms.append(room)
+                continue
+            if numeric_capacity >= capacity:
+                filtered_rooms.append(room)
+        rooms_payload = filtered_rooms
 
     if rooms_payload and normalized_check_in and normalized_check_out:
         room_ids = [str(room.get("uuid") or room.get("id")) for room in rooms_payload if room.get("uuid") or room.get("id")]

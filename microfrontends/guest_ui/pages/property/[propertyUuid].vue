@@ -39,9 +39,9 @@
       <section class="property-rooms">
         <div class="property-rooms-header">
           <h2>Available rooms</h2>
-          <p v-if="!hasRooms" class="text-muted">There are no rooms available for the selected dates.</p>
+          <p v-if="!hasRooms" class="text-muted">No rooms match your current search.</p>
         </div>
-        <Rooms v-if="hasRooms" :rooms="property.rooms || []" :search-params="roomSearchParams" />
+        <Rooms v-if="hasRooms" :rooms="filteredRooms" :search-params="roomSearchParams" />
       </section>
 
       <section v-if="reviews.length" class="property-reviews">
@@ -80,6 +80,11 @@ const reviews = ref<any[]>([])
 const propertyUuid = computed(() => String(route.params.propertyUuid || ''))
 const queryCheckIn = computed(() => (route.query.checkIn as string) || (route.query.check_in as string) || '')
 const queryCheckOut = computed(() => (route.query.checkOut as string) || (route.query.check_out as string) || '')
+const queryGuests = computed(() => {
+  const raw = (route.query.guests as string) || (route.query.capacity as string) || ''
+  const numeric = Number(raw)
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null
+})
 
 const averageRating = computed(() => {
   if (!property.value) return null
@@ -104,10 +109,22 @@ const propertyAddress = computed(() => {
 const roomSearchParams = computed(() => ({
   checkIn: queryCheckIn.value || store.lastSearch?.checkIn,
   checkOut: queryCheckOut.value || store.lastSearch?.checkOut,
-  guests: store.lastSearch?.capacity,
+  guests: queryGuests.value ?? store.lastSearch?.capacity,
 }))
 
-const hasRooms = computed(() => (property.value?.rooms?.length || 0) > 0)
+const filteredRooms = computed(() => {
+  const rooms = property.value?.rooms || []
+  const guests = roomSearchParams.value.guests
+  if (guests && guests > 0) {
+    return rooms.filter((room) => {
+      const capacity = Number((room as any).capacity)
+      return Number.isFinite(capacity) ? capacity >= guests : true
+    })
+  }
+  return rooms
+})
+
+const hasRooms = computed(() => filteredRooms.value.length > 0)
 
 async function loadProperty() {
   const uuid = propertyUuid.value
@@ -117,15 +134,17 @@ async function loadProperty() {
   }
   loading.value = true
   let fetchError: any = null
-  try {
-    const fromStore = store.getProperty(uuid)
-    if (fromStore) {
-      property.value = fromStore
-    }
-    const fetched = await getProperty(uuid, {
-      checkInDate: queryCheckIn.value || store.lastSearch?.checkIn,
-      checkOutDate: queryCheckOut.value || store.lastSearch?.checkOut,
-    })
+    try {
+      const fromStore = store.getProperty(uuid)
+      if (fromStore) {
+        property.value = fromStore
+      }
+      const searchParams = roomSearchParams.value
+      const fetched = await getProperty(uuid, {
+        checkInDate: searchParams.checkIn,
+        checkOutDate: searchParams.checkOut,
+        capacity: searchParams.guests ?? undefined,
+      })
     if (fetched) {
       store.setProperty(fetched)
       property.value = store.getProperty(uuid) || fetched
