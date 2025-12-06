@@ -1,5 +1,5 @@
 from aws_cdk import Duration, RemovalPolicy, Stack
-from aws_cdk.aws_apigateway import EndpointType, LambdaIntegration, RestApi
+from aws_cdk.aws_apigateway import Cors, CorsOptions, EndpointType, LambdaIntegration, RestApi
 from aws_cdk.aws_dynamodb import Attribute, AttributeType, BillingMode, Table, TableEncryption
 from aws_cdk.aws_iam import ManagedPolicy, Role, ServicePrincipal
 from aws_cdk.aws_lambda import Code, Function, Runtime
@@ -90,6 +90,8 @@ class PropertyServiceStack(Stack):
                 "PROPERTY_TABLE_NAME": property_table.table_name,
                 "ROOM_TABLE_NAME": room_table.table_name,
                 "ASSET_BUCKET_NAME": assets_bucket.bucket_name,
+                # Used by FastAPI CORS middleware to allow browser clients.
+                "CORS_ALLOWED_ORIGINS": "https://dz5wjcpk0b8gl.cloudfront.net",
             },
         )
 
@@ -103,6 +105,11 @@ class PropertyServiceStack(Stack):
             rest_api_name=f"property-service-api-{env_name}{suffix}",
             description="API Gateway exposing property service Lambda",
             endpoint_types=[EndpointType.REGIONAL],
+            default_cors_preflight_options=CorsOptions(
+                allow_origins=["https://dz5wjcpk0b8gl.cloudfront.net"],
+                allow_methods=Cors.ALL_METHODS,
+                allow_headers=["*"],
+            ),
         )
         integration = LambdaIntegration(lambda_function, proxy=True)
 

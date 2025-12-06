@@ -1,7 +1,7 @@
 import logging
-import os
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
 from config import (
@@ -32,6 +32,16 @@ def create_app() -> FastAPI:
         title=app_metadata.app_title,
         description=app_metadata.app_description,
     )
+
+    allowed_origins = ["https://dz5wjcpk0b8gl.cloudfront.net"]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     app.state.app_metadata = app_metadata
     app.state.property_table_client = PropertyTableClient(
         app_config.property_table_name,

@@ -52,7 +52,15 @@ onMounted(async () => {
       catch { return {} }
     })() as { app?: string; redirect?: string }
 
+    // Fall back to query params if state is missing (some providers drop state)
+    const routeApp = typeof route.query.app === "string" ? route.query.app : undefined
+    const routeRedirect = typeof route.query.redirect === "string" ? route.query.redirect : undefined
+    const storedApp = typeof window !== "undefined" ? window.localStorage.getItem("last_selected_app") || undefined : undefined
+
     const idToken = signinResponse.id_token
+    if (!idToken) {
+      throw new Error("Missing id token from signin response")
+    }
     const refreshToken = signinResponse.refresh_token || undefined
     const authHeaders = { Authorization: `Bearer ${idToken}` }
 
@@ -62,7 +70,7 @@ onMounted(async () => {
       return typeof value === "string" ? value : ""
     }
 
-    const selectedApp = state.app === "host" ? "host" : "guest"
+    const selectedApp = (state.app || routeApp || storedApp) === "host" ? "host" : "guest"
     const desiredUserType = selectedApp === "host" ? "STAFF" : "GUEST"
 
     const emailClaim = getClaim("email")
@@ -72,46 +80,51 @@ onMounted(async () => {
     const resolvedName = baseName || "New"
     const resolvedLastName = familyName || resolvedName
 
-    const postPayload = {
-      name: resolvedName,
-      last_name: resolvedLastName,
-      email: emailClaim,
-      user_type: desiredUserType,
-    }
+    const extractStatus = (err: any) =>
+      Number(
+        err?.status ??
+        err?.response?.status ??
+        err?.data?.status ??
+        err?.cause?.status ??
+        0,
+      )
 
     let me: User | undefined
     try {
       me = await $fetch<User>(`${config.public.userApiBase}/me`, {
-        method: "POST",
-        body: postPayload,
-        headers: authHeaders,
+        headers: authHeaders, // ensure Authorization is always sent
       })
-    } catch (postError: any) {
-      const status = Number(
-        postError?.status ??
-        postError?.response?.status ??
-        postError?.data?.status ??
-        postError?.cause?.status ??
-        0,
-      )
+    } catch (getError: any) {
+      const status = extractStatus(getError)
+      if (status === 404) {
+        // User not yet registered in our DB — send to signup with context
+        const params = new URLSearchParams()
+        if (selectedApp) params.set("app", selectedApp)
+        if (state.redirect || routeRedirect) params.set("redirect", state.redirect || routeRedirect || "")
+        if (emailClaim) params.set("email", emailClaim)
+        if (desiredUserType) params.set("user_type", desiredUserType)
 
-      const allowedStatuses = new Set([400, 401, 403, 404, 405, 409, 422])
-      if (!status || !allowedStatuses.has(status)) {
-        throw postError
+        const signupUrl = `${window.location.origin}/signup${params.toString() ? `?${params.toString()}` : ""}`
+        window.location.href = signupUrl
+        return
       }
-    }
 
-    if (!me) {
-      me = await $fetch<User>(`${config.public.userApiBase}/me`, {
-        headers: authHeaders,
-      })
+      if (status === 401 || status === 403) {
+        await restartLogin()
+        return
+      }
+
+      const allowedStatuses = new Set([400, 401, 403, 405, 409, 422])
+      if (!status || !allowedStatuses.has(status)) {
+        throw getError
+      }
     }
 
     store.setUser(me, idToken)
 
     const targetApp = selectedApp === "host" || me.user_type === "STAFF" ? "host" : "guest"
     const targetBase = targetApp === "host" ? config.public.hostUiUrl : config.public.guestUiUrl
-    const redirectUrl = buildTargetUrl(targetBase, idToken, refreshToken, state.redirect)
+    const redirectUrl = buildTargetUrl(targetBase, idToken, refreshToken, state.redirect || routeRedirect)
     window.location.href = redirectUrl
   } catch (error: any) {
     await userManager.clearStaleState().catch(() => undefined)

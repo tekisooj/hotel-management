@@ -34,11 +34,11 @@
         <div class="host-bookings-toolbar">
           <div class="host-month-nav">
             <button class="host-btn host-btn--ghost" type="button" @click="goToPreviousMonth" :disabled="loadingBookings">
-              ‹
+              &lt;
             </button>
             <span class="host-month-label">{{ monthRangeLabel }}</span>
             <button class="host-btn host-btn--ghost" type="button" @click="goToNextMonth" :disabled="loadingBookings">
-              ›
+              &gt;
             </button>
           </div>
           <div class="host-legend">
@@ -85,6 +85,36 @@
                 />
               </div>
             </div>
+            <div v-if="availability.bookings?.length" class="host-booking-contacts">
+              <p class="host-booking-contacts__title">Guest details</p>
+              <ul class="host-booking-contacts__list">
+                <li
+                  v-for="booking in availability.bookings"
+                  :key="booking.uuid"
+                  class="host-booking-contacts__item"
+                >
+                  <div class="host-booking-contacts__name">
+                    <strong>{{ guestFullName(booking) }}</strong>
+                    <span class="host-booking-contacts__dates">
+                      {{ new Date(booking.check_in).toLocaleDateString() }}
+                      - {{ new Date(booking.check_out).toLocaleDateString() }}
+                    </span>
+                  </div>
+                  <div class="host-booking-contacts__contact">
+                    <span v-if="booking.guest_email">Email: {{ booking.guest_email }}</span>
+                    <span v-if="booking.guest_phone">Phone: {{ booking.guest_phone }}</span>
+                    <button
+                      class="host-btn host-btn--ghost"
+                      type="button"
+                      :disabled="cancelling[booking.uuid]"
+                      @click="onCancel(booking.uuid)"
+                    >
+                      {{ cancelling[booking.uuid] ? 'Cancelling…' : 'Cancel booking' }}
+                    </button>
+                  </div>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -99,7 +129,7 @@ import { useHostBff } from '@/api/hostBff'
 import type { PropertyDetail } from '@/types/PropertyDetail'
 import type { RoomAvailability, CalendarBooking, AvailabilityBooking } from '@/types/Availability'
 
-const { getProperties, getBookings } = useHostBff()
+const { getProperties, getBookings, cancelBooking } = useHostBff()
 
 const properties = ref<PropertyDetail[]>([])
 const propertiesLoading = ref(true)
@@ -108,6 +138,7 @@ const selectedPropertyUuid = ref<string>('')
 const roomAvailabilities = ref<RoomAvailability[]>([])
 const loadingBookings = ref(false)
 const bookingsError = ref<string | null>(null)
+const cancelling = ref<Record<string, boolean>>({})
 
 const currentMonth = ref(startOfMonth(new Date()))
 
@@ -211,7 +242,9 @@ function buildCalendarBookings(bookings: AvailabilityBooking[]): CalendarBooking
     label: buildGuestLabel(booking),
     status: booking.status,
     guestName: booking.guest_name,
+    guestLastName: booking.guest_last_name,
     guestEmail: booking.guest_email,
+    guestPhone: booking.guest_phone,
   }))
 }
 
@@ -223,15 +256,26 @@ function formatMonth(month: { month: number; year: number }) {
 }
 
 function buildGuestLabel(booking: AvailabilityBooking): string {
-  const fullName = (booking.guest_name || '').trim()
+  const first = (booking.guest_name || '').trim()
+  const last = (booking.guest_last_name || '').trim()
+  const fullName = [first, last].filter(Boolean).join(' ').trim()
   if (fullName) {
-    return fullName.split(/\\s+/)[0]
+    return fullName.split(/\s+/)[0]
   }
   const email = (booking.guest_email || '').trim()
   if (email) {
     return email.split('@')[0]
   }
   return formatBookingLabel(booking.status)
+}
+
+function guestFullName(booking: AvailabilityBooking): string {
+  const first = (booking.guest_name || '').trim()
+  const last = (booking.guest_last_name || '').trim()
+  const full = [first, last].filter(Boolean).join(' ').trim()
+  if (full) return full
+  if (booking.guest_email) return booking.guest_email
+  return 'Guest'
 }
 
 function formatBookingLabel(status: string) {
@@ -247,6 +291,22 @@ function formatBookingLabel(status: string) {
   }
 }
 
+async function onCancel(bookingUuid: string) {
+  if (cancelling.value[bookingUuid]) return
+  cancelling.value = { ...cancelling.value, [bookingUuid]: true }
+  try {
+    await cancelBooking(bookingUuid)
+    roomAvailabilities.value = roomAvailabilities.value.map((availability) => ({
+      ...availability,
+      bookings: (availability.bookings || []).filter((b) => b.uuid !== bookingUuid),
+    }))
+  } catch {
+    bookingsError.value = 'Unable to cancel this booking right now.'
+  } finally {
+    cancelling.value = { ...cancelling.value, [bookingUuid]: false }
+  }
+}
+
 function startOfMonth(date: Date) {
   const copy = new Date(date)
   copy.setDate(1)
@@ -255,4 +315,69 @@ function startOfMonth(date: Date) {
 }
 </script>
 
+<style scoped>
+.host-booking-contacts {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  background: #faf7f2;
+}
 
+.host-booking-contacts__title {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: #2f261a;
+}
+
+.host-booking-contacts__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.host-booking-contacts__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.host-booking-contacts__name {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.host-booking-contacts__dates {
+  font-size: 0.9rem;
+  color: #6a5b45;
+}
+
+.host-booking-contacts__contact {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  color: #3a3124;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 640px) {
+  .host-booking-contacts__item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .host-booking-contacts__contact {
+    align-items: flex-start;
+  }
+}
+</style>

@@ -9,7 +9,9 @@ export interface AvailabilityBooking {
   created_at: string
   updated_at: string
   guest_name?: string
+  guest_last_name?: string
   guest_email?: string
+  guest_phone?: string
 }
 
 export interface AvailabilityRoom {
@@ -40,5 +42,7 @@ export interface CalendarBooking {
   label: string
   status: string
   guestName?: string
+  guestLastName?: string
   guestEmail?: string
+  guestPhone?: string
 }
