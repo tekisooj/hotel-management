@@ -36,7 +36,7 @@ export default (axios: NuxtAxiosInstance): GuestBff => ({
   getUserReviews: async (userUuid: string) => axios.$get(`reviews/${userUuid}`),
   addBooking: async (booking: Booking) => axios.$post('booking', booking),
   getUserBookings: async () => axios.$get('my/bookings'),
-  cancelUserBooking: async (bookingUuid: string) => axios.$delete(`my/booking/${bookingUuid}/cancel`),
+  cancelUserBooking: async (bookingUuid: string) => axios.$delete(`my/booking/${bookingUuid}`),
   getFilteredRooms: async (params: Record<string, unknown>) => axios.$get('rooms', { params }),
   getRoom: async (roomUuid: string, options?: RoomPricingOptions) =>
     axios.$get(`room/${roomUuid}`, {

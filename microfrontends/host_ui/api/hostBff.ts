@@ -289,8 +289,8 @@ export function useHostBff() {
   }
 
   async function cancelBooking(booking_uuid: string): Promise<Booking> {
-    return await $fetch<Booking>(`${baseURL}/booking/${booking_uuid}/cancel`, {
-      method: 'PATCH',
+    return await $fetch<Booking>(`${baseURL}/booking/${booking_uuid}`, {
+      method: 'DELETE',
       headers: authHeaders(),
     })
   }
