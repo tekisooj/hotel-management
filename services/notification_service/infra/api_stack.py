@@ -48,6 +48,14 @@ class NotificationServiceStack(Stack):
         
         self.booking_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
 
+        self.booking_cancelled_rule = Rule(self, "BookingCancelledEventRule",
+            event_pattern=EventPattern(
+                source=["booking-service"],
+                detail_type=["BookingCancelled"]
+            ))
+
+        self.booking_cancelled_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
+
         self.review_rule = Rule(self, "ReviewCreatedEventRule",
             event_pattern=EventPattern(
                 source=["review-service"],
@@ -55,4 +63,12 @@ class NotificationServiceStack(Stack):
             ))
 
         self.review_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
+
+        self.property_unavailable_rule = Rule(self, "PropertyUnavailableEventRule",
+            event_pattern=EventPattern(
+                source=["property-service"],
+                detail_type=["PropertyUnavailable"]
+            ))
+
+        self.property_unavailable_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
         

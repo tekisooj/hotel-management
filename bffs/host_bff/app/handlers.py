@@ -444,6 +444,7 @@ async def delete_room(
     room_obj = Room(**room_payload)
 
     prop_obj: Property | None = None
+    host_info: dict[str, Any] | None = None
     if room_obj.property_uuid:
         prop_resp = await property_service_client.get(
             f"property/{str(room_obj.property_uuid)}",
@@ -453,12 +454,9 @@ async def delete_room(
             prop_obj = Property(**(prop_resp.json() or {}))
             if prop_obj.user_uuid != current_user_uuid:
                 raise HTTPException(status_code=403, detail="Forbidden")
+            host_info = await _get_user_info(user_service_client, prop_obj.user_uuid, headers)
         else:
             raise HTTPException(status_code=prop_resp.status_code, detail=prop_resp.text)
-
-    host_info = None
-    if prop_obj:
-        host_info = await _get_user_info(user_service_client, prop_obj.user_uuid, headers)
 
     future_bookings: list[Booking] = []
     try:
@@ -660,6 +658,9 @@ async def cancel_booking(
     guest_phone = None
     guest_first = None
     guest_last = None
+    host_email = (host_info or {}).get("email")
+    host_first = (host_info or {}).get("name")
+    host_last = (host_info or {}).get("last_name")
     try:
         user_resp = await user_service_client.get(
             f"user/{str(booking_obj.user_uuid)}",
@@ -676,6 +677,7 @@ async def cancel_booking(
 
     if event_bus and hasattr(event_bus, "put_event"):
         try:
+            cancelled_by = "HOST" if prop_obj and prop_obj.user_uuid == current_user_uuid else "GUEST"
             event_bus.put_event(
                 detail_type="BookingCancelled",
                 source="booking-service",
@@ -685,10 +687,14 @@ async def cancel_booking(
                     "guest_phone": guest_phone,
                     "guest_name": guest_first,
                     "guest_last_name": guest_last,
+                    "host_email": host_email,
+                    "host_name": host_first,
+                    "host_last_name": host_last,
                     "property_uuid": str(room_obj.property_uuid) if room_obj.property_uuid else None,
                     "room_uuid": str(booking_obj.room_uuid),
                     "property_name": property_name,
                     "check_in": booking_obj.check_in.isoformat(),
+                    "cancelled_by": cancelled_by,
                 },
             )
         except Exception:

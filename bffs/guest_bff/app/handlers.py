@@ -670,8 +670,22 @@ async def cancel_user_booking(
     request: Request,
     current_user_uuid: UUID = Depends(get_current_user_uuid),
     booking_service_client: AsyncClient = Depends(get_booking_service_client),
+    property_service_client: AsyncClient = Depends(get_property_service_client),
+    user_service_client: AsyncClient = Depends(get_user_service_client),
+    event_bus = Depends(get_event_bus),
 ) -> UUID:
     headers = _forward_auth_headers(request)
+
+    # Fetch booking details to enrich the cancellation event
+    booking_resp = await booking_service_client.get(
+        f"booking/{str(booking_uuid)}",
+        headers=headers or None,
+        timeout=10.0,
+    )
+    if booking_resp.status_code != 200:
+        raise HTTPException(status_code=booking_resp.status_code, detail=booking_resp.text)
+    booking_payload = booking_resp.json() or {}
+
     resp = await booking_service_client.patch(
         f"booking/{str(booking_uuid)}/cancel",
         json={"user_uuid": str(current_user_uuid)},
@@ -681,6 +695,58 @@ async def cancel_user_booking(
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     body = resp.json()
+
+    # Notify the host of guest-initiated cancellation
+    try:
+        room_uuid = booking_payload.get("room_uuid")
+        room_resp = await property_service_client.get(
+            f"room/{str(room_uuid)}",
+            headers=headers or None,
+            timeout=10.0,
+        ) if room_uuid else None
+        room_payload = room_resp.json() if room_resp and room_resp.status_code == 200 else {}
+        prop_uuid = room_payload.get("property_uuid")
+        prop_resp = await property_service_client.get(
+            f"property/{str(prop_uuid)}",
+            headers=headers or None,
+            timeout=10.0,
+        ) if prop_uuid else None
+        prop_payload = prop_resp.json() if prop_resp and prop_resp.status_code == 200 else {}
+        host_uuid = prop_payload.get("user_uuid")
+
+        guest_email = None
+        me = await user_service_client.get("me", headers=headers or None, timeout=10.0)
+        if me.status_code == 200:
+            guest_email = (me.json() or {}).get("email")
+
+        host_email = None
+        if host_uuid:
+            host_resp = await user_service_client.get(
+                f"user/{str(host_uuid)}",
+                headers=headers or None,
+                timeout=10.0,
+            )
+            if host_resp.status_code == 200:
+                host_email = (host_resp.json() or {}).get("email")
+
+        if event_bus and hasattr(event_bus, "put_event"):
+            event_bus.put_event(
+                detail_type="BookingCancelled",
+                source="booking-service",
+                detail={
+                    "booking_uuid": str(booking_uuid),
+                    "guest_email": guest_email,
+                    "host_email": host_email,
+                    "property_uuid": str(prop_uuid) if prop_uuid else None,
+                    "property_name": prop_payload.get("name"),
+                    "room_uuid": str(room_uuid) if room_uuid else None,
+                    "check_in": booking_payload.get("check_in"),
+                    "cancelled_by": "GUEST",
+                },
+            )
+    except Exception:
+        pass
+
     return UUID(body if isinstance(body, str) else body.get("uuid"))
 
 

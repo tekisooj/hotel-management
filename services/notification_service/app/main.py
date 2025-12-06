@@ -52,24 +52,39 @@ def handler(event, context) -> None:
 
     elif detail_type == "BookingCancelled":
         guest_email = detail.get("guest_email")
+        host_email = detail.get("host_email")
         property_name = detail.get("property_name")
         check_in = detail.get("check_in")
+        cancelled_by = (detail.get("cancelled_by") or "").upper()
 
-        if guest_email:
-            subject = "Your booking has been cancelled"
-            message_parts = ["We wanted to let you know your booking was cancelled."]
-            if property_name:
-                message_parts.append(f"Property: {property_name}.")
-            if check_in:
-                message_parts.append(f"Original check-in date: {check_in}.")
-            message = " ".join(message_parts)
-            try:
-                notification_client.send_email(guest_email, subject, message)
-                logger.info(f"Booking cancellation email sent to {guest_email}")
-            except Exception as e:
-                logger.error(f"Failed to send cancellation email to {guest_email}: {e}")
+        subject = "Booking cancelled"
+        message_parts = ["A booking was cancelled."]
+        if property_name:
+            message_parts.append(f"Property: {property_name}.")
+        if check_in:
+            message_parts.append(f"Original check-in date: {check_in}.")
+        message = " ".join(message_parts)
+
+        targets = []
+        if cancelled_by == "HOST":
+            if guest_email:
+                targets.append(guest_email)
+        elif cancelled_by == "GUEST":
+            if host_email:
+                targets.append(host_email)
         else:
-            logger.warning(f"Missing guest email for cancellation event: {detail}")
+            if guest_email:
+                targets.append(guest_email)
+
+        if not targets:
+            logger.warning(f"Missing email target(s) for cancellation event: {detail}")
+        else:
+            for email in targets:
+                try:
+                    notification_client.send_email(email, subject, message)
+                    logger.info(f"Booking cancellation email sent to {email}")
+                except Exception as e:
+                    logger.error(f"Failed to send cancellation email to {email}: {e}")
 
     elif detail_type == "PropertyUnavailable":
         guest_email = detail.get("guest_email")
