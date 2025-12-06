@@ -1,5 +1,4 @@
 import logging
-import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,13 +33,14 @@ def create_app() -> FastAPI:
         description=app_metadata.app_description,
     )
 
-    # Prefer explicit CORS_ALLOWED_ORIGINS set by the stack; fall back to AUTH_UI_URL or "*"
-    allowed_origins = os.environ.get("AUTH_UI_URL")
-    if allowed_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=allowed_origins,
-        )
+    allowed_origins = ["https://dz5wjcpk0b8gl.cloudfront.net"]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     app.state.app_metadata = app_metadata
     app.state.property_table_client = PropertyTableClient(
