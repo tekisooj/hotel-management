@@ -51,9 +51,9 @@ async def upsert_logged_in_user(
 
     existing_user = hotel_management_db_client.get_user(user_uuid)
     if existing_user:
-        resolved_user_type = payload.user_type
-        if existing_user.user_type == UserType.STAFF and payload.user_type == UserType.GUEST:
-            # Avoid downgrading staff accounts when the auth callback defaults to GUEST
+        # Preserve existing staff role even if the callback payload says GUEST (default)
+        resolved_user_type = payload.user_type or existing_user.user_type
+        if existing_user.user_type == UserType.STAFF and resolved_user_type != UserType.STAFF:
             resolved_user_type = existing_user.user_type
         update_payload = UserUpdate(
             name=payload.name,

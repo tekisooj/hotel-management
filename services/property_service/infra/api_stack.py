@@ -1,5 +1,6 @@
+import os
 from aws_cdk import Duration, RemovalPolicy, Stack
-from aws_cdk.aws_apigateway import EndpointType, LambdaIntegration, RestApi
+from aws_cdk.aws_apigateway import Cors, CorsOptions, EndpointType, LambdaIntegration, RestApi
 from aws_cdk.aws_dynamodb import Attribute, AttributeType, BillingMode, Table, TableEncryption
 from aws_cdk.aws_iam import ManagedPolicy, Role, ServicePrincipal
 from aws_cdk.aws_lambda import Code, Function, Runtime
@@ -97,12 +98,18 @@ class PropertyServiceStack(Stack):
         room_table.grant_read_write_data(lambda_function)
         assets_bucket.grant_read_write(lambda_function)
 
+        cors_allowed_origins = os.environ.get("AUTH_UI_URL", "")
         api = RestApi(
             self,
             f"PropertyServiceApi-{env_name}{suffix}",
             rest_api_name=f"property-service-api-{env_name}{suffix}",
             description="API Gateway exposing property service Lambda",
             endpoint_types=[EndpointType.REGIONAL],
+            default_cors_preflight_options=CorsOptions(
+                allow_origins=[cors_allowed_origins],
+                allow_methods=Cors.ALL_METHODS,
+                allow_headers=["*"],
+            ),
         )
         integration = LambdaIntegration(lambda_function, proxy=True)
 
