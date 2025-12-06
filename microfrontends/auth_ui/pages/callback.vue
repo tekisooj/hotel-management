@@ -77,39 +77,39 @@ onMounted(async () => {
     const resolvedName = baseName || "New"
     const resolvedLastName = familyName || resolvedName
 
-    const postPayload = {
-      name: resolvedName,
-      last_name: resolvedLastName,
-      email: emailClaim,
-      user_type: desiredUserType,
-    }
+    const extractStatus = (err: any) =>
+      Number(
+        err?.status ??
+        err?.response?.status ??
+        err?.data?.status ??
+        err?.cause?.status ??
+        0,
+      )
 
     let me: User | undefined
     try {
       me = await $fetch<User>(`${config.public.userApiBase}/me`, {
-        method: "POST",
-        body: postPayload,
         headers: authHeaders,
       })
-    } catch (postError: any) {
-      const status = Number(
-        postError?.status ??
-        postError?.response?.status ??
-        postError?.data?.status ??
-        postError?.cause?.status ??
-        0,
-      )
+    } catch (getError: any) {
+      const status = extractStatus(getError)
+      if (status === 404) {
+        // User not yet registered in our DB — send to signup with context
+        const params = new URLSearchParams()
+        if (selectedApp) params.set("app", selectedApp)
+        if (state.redirect || routeRedirect) params.set("redirect", state.redirect || routeRedirect || "")
+        if (emailClaim) params.set("email", emailClaim)
+        if (desiredUserType) params.set("user_type", desiredUserType)
 
-      const allowedStatuses = new Set([400, 401, 403, 404, 405, 409, 422])
-      if (!status || !allowedStatuses.has(status)) {
-        throw postError
+        const signupUrl = `${window.location.origin}/signup${params.toString() ? `?${params.toString()}` : ""}`
+        window.location.href = signupUrl
+        return
       }
-    }
 
-    if (!me) {
-      me = await $fetch<User>(`${config.public.userApiBase}/me`, {
-        headers: authHeaders,
-      })
+      const allowedStatuses = new Set([400, 401, 403, 405, 409, 422])
+      if (!status || !allowedStatuses.has(status)) {
+        throw getError
+      }
     }
 
     store.setUser(me, idToken)
