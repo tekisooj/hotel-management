@@ -58,6 +58,9 @@ onMounted(async () => {
     const storedApp = typeof window !== "undefined" ? window.localStorage.getItem("last_selected_app") || undefined : undefined
 
     const idToken = signinResponse.id_token
+    if (!idToken) {
+      throw new Error("Missing id token from signin response")
+    }
     const refreshToken = signinResponse.refresh_token || undefined
     const authHeaders = { Authorization: `Bearer ${idToken}` }
 
@@ -89,7 +92,7 @@ onMounted(async () => {
     let me: User | undefined
     try {
       me = await $fetch<User>(`${config.public.userApiBase}/me`, {
-        headers: authHeaders,
+        headers: authHeaders, // ensure Authorization is always sent
       })
     } catch (getError: any) {
       const status = extractStatus(getError)
@@ -103,6 +106,11 @@ onMounted(async () => {
 
         const signupUrl = `${window.location.origin}/signup${params.toString() ? `?${params.toString()}` : ""}`
         window.location.href = signupUrl
+        return
+      }
+
+      if (status === 401 || status === 403) {
+        await restartLogin()
         return
       }
 
