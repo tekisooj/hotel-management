@@ -41,6 +41,7 @@ export default defineNuxtConfig({
       devUserId: process.env.DEV_USER_ID || '',
       authUiUrl: process.env.AUTH_UI_URL || '',
       hostUiUrl: process.env.HOST_UI_URL || '',
+      guestUiUrl: process.env.GUEST_UI_URL || '',
     },
   },
 })

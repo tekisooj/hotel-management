@@ -6,6 +6,7 @@ from schemas import (
     UserCreate,
     UserResponse,
     UserUpdate,
+    UserType,
 )
 from db_client import HotelManagementDBClient
 from cognito_client import CognitoClient
@@ -50,11 +51,15 @@ async def upsert_logged_in_user(
 
     existing_user = hotel_management_db_client.get_user(user_uuid)
     if existing_user:
+        # Preserve existing staff role even if the callback payload says GUEST (default)
+        resolved_user_type = payload.user_type or existing_user.user_type
+        if existing_user.user_type == UserType.STAFF and resolved_user_type != UserType.STAFF:
+            resolved_user_type = existing_user.user_type
         update_payload = UserUpdate(
             name=payload.name,
             last_name=payload.last_name,
             email=payload.email,
-            user_type=payload.user_type,
+            user_type=resolved_user_type,
         )
         updated_user = hotel_management_db_client.update_user(user_uuid, update_payload)
         return updated_user or existing_user

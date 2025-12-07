@@ -39,6 +39,10 @@ async function login() {
     app: selectedApp.value,
     redirect: redirectTarget.value,
   }
+  if (process.client) {
+    // Remember the selected app in case OIDC state is dropped by the provider
+    window.localStorage.setItem("last_selected_app", selectedApp.value)
+  }
   await signInRedirect({ state: JSON.stringify(state) })
 }
 </script>

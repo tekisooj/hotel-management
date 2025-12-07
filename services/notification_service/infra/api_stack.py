@@ -16,9 +16,11 @@ class NotificationServiceStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
         self.env_name = env_name
 
-        self.event_bus = EventBus.from_event_bus_name(
-            self, "SharedEventBus",
-            "hotel-event-bus"
+        bus_name_suffix = f"-{pr_number}" if pr_number else ""
+        self.event_bus = EventBus(
+            self,
+            "SharedEventBus",
+            event_bus_name=f"hotel-event-bus-{env_name}{bus_name_suffix}",
         )
 
         self.lambda_function = Function(
@@ -44,15 +46,39 @@ class NotificationServiceStack(Stack):
             event_pattern=EventPattern(
                 source=["booking-service"],
                 detail_type=["BookingConfirmed"]
-            ))
+            ),
+            event_bus=self.event_bus,
+        )
         
         self.booking_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
+
+        self.booking_cancelled_rule = Rule(self, "BookingCancelledEventRule",
+            event_pattern=EventPattern(
+                source=["booking-service"],
+                detail_type=["BookingCancelled"]
+            ),
+            event_bus=self.event_bus,
+        )
+
+        self.booking_cancelled_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
 
         self.review_rule = Rule(self, "ReviewCreatedEventRule",
             event_pattern=EventPattern(
                 source=["review-service"],
                 detail_type=["ReviewCreated"]
-            ))
+            ),
+            event_bus=self.event_bus,
+        )
 
         self.review_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
+
+        self.property_unavailable_rule = Rule(self, "PropertyUnavailableEventRule",
+            event_pattern=EventPattern(
+                source=["property-service"],
+                detail_type=["PropertyUnavailable"]
+            ),
+            event_bus=self.event_bus,
+        )
+
+        self.property_unavailable_rule.add_target(LambdaFunction(self.lambda_function, retry_attempts=3, dead_letter_queue=self.dead_letter_queue)) # type: ignore
         

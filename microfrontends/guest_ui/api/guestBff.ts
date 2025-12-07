@@ -8,6 +8,7 @@ import type { Review } from 'types/Review'
 type RoomPricingOptions = {
   checkInDate?: string | null
   checkOutDate?: string | null
+  capacity?: number | null
 }
 
 interface GuestBff {
@@ -42,16 +43,21 @@ export default (axios: NuxtAxiosInstance): GuestBff => ({
     axios.$get(`room/${roomUuid}`, {
       params: options?.checkInDate ? { check_in_date: options.checkInDate } : undefined,
     }),
-  getProperty: async (propertyUuid: string, options?: RoomPricingOptions) =>
-    axios.$get(`property/${propertyUuid}`, {
-      params:
-        options?.checkInDate || options?.checkOutDate
-          ? {
-              ...(options?.checkInDate ? { check_in_date: options.checkInDate } : {}),
-              ...(options?.checkOutDate ? { check_out_date: options.checkOutDate } : {}),
-            }
-          : undefined,
-    }),
+  getProperty: async (propertyUuid: string, options?: RoomPricingOptions) => {
+    const params: Record<string, string | number> = {}
+    if (options?.checkInDate) {
+      params.check_in_date = options.checkInDate
+    }
+    if (options?.checkOutDate) {
+      params.check_out_date = options.checkOutDate
+    }
+    if (options?.capacity && options.capacity > 0) {
+      params.capacity = options.capacity
+    }
+    return axios.$get(`property/${propertyUuid}`, {
+      params: Object.keys(params).length ? params : undefined,
+    })
+  },
   createPaymentOrder: async (payload: PaymentOrderRequest) => axios.$post('booking/payment/order', payload),
   capturePayment: async (payload: CapturePaymentRequest) => axios.$post('booking/payment/capture', payload),
 })
@@ -244,12 +250,23 @@ export function useGuestBff() {
   }
 
   async function getProperty(propertyUuid: string, options: RoomPricingOptions = {}) {
-    const requestOptions: { headers: Record<string, string>; params?: Record<string, string> } = {
+    const requestOptions: { headers: Record<string, string>; params?: Record<string, string | number> } = {
       headers: authHeaders(),
     }
+    const params: Record<string, string | number> = {}
     const trimmedCheckIn = options.checkInDate?.trim()
+    const trimmedCheckOut = options.checkOutDate?.trim()
     if (trimmedCheckIn) {
-      requestOptions.params = { check_in_date: trimmedCheckIn }
+      params.check_in_date = trimmedCheckIn
+    }
+    if (trimmedCheckOut) {
+      params.check_out_date = trimmedCheckOut
+    }
+    if (options.capacity && options.capacity > 0) {
+      params.capacity = options.capacity
+    }
+    if (Object.keys(params).length) {
+      requestOptions.params = params
     }
     return await $fetch(`${baseURL}/property/${propertyUuid}`, requestOptions)
   }

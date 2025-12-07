@@ -8,6 +8,7 @@ from handlers import (
     add_room,
     update_room,
     change_booking_status,
+    cancel_booking,
     create_asset_upload_url,
     delete_property,
     delete_room,
@@ -114,6 +115,14 @@ router.add_api_route(
     response_model=Booking,
     endpoint=change_booking_status,
     description="Change booking status",
+)
+
+router.add_api_route(
+    path="/booking/{booking_uuid}",
+    methods=["DELETE"],
+    response_model=Booking,
+    endpoint=cancel_booking,
+    description="Cancel booking",
 )
 
 router.add_api_route(
