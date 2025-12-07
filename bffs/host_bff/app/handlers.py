@@ -150,7 +150,9 @@ async def _fetch_future_bookings(
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     payload = resp.json() or []
-    return [Booking(**item) for item in payload]
+    bookings = [Booking(**item) for item in payload]
+    # Ignore cancelled bookings when determining future reservations
+    return [booking for booking in bookings if booking.status != BookingStatus.CANCELLED]
 
 def _extract_image_key(image: Any) -> str | None:
     if isinstance(image, dict):
@@ -757,8 +759,10 @@ async def get_bookings(
         availability = Availability(**room.model_dump())
         availability.property = property_obj
         room_bookings = [Booking(**booking) for booking in bookings_payload]
-        availability.bookings = room_bookings
-        for booking in room_bookings:
+        # Drop cancelled bookings so they do not reappear in the host view
+        active_bookings = [booking for booking in room_bookings if booking.status != BookingStatus.CANCELLED]
+        availability.bookings = active_bookings
+        for booking in active_bookings:
             unique_user_ids.add(str(booking.user_uuid))
         return availability
 
