@@ -621,6 +621,7 @@ async def cancel_booking(
     booking_obj = Booking(**booking_payload)
 
     property_name = None
+    host_info: dict[str, Any] | None = None
 
     room_resp = await property_service_client.get(
         f"room/{str(booking_obj.room_uuid)}",
@@ -639,6 +640,7 @@ async def cancel_booking(
             prop_payload = prop_resp.json()
             prop_obj = Property(**prop_payload)
             property_name = prop_obj.name
+            host_info = await _get_user_info(user_service_client, prop_obj.user_uuid, headers)
             if prop_obj.user_uuid != current_user_uuid:
                 raise HTTPException(status_code=403, detail="Forbidden")
         else:
