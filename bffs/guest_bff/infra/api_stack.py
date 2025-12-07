@@ -23,6 +23,7 @@ class GuestBffStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
         self.env_name = env_name
         suffix = f"-{pr_number}" if pr_number else ""
+        self.bus_name = f"hotel-event-bus-{env_name}{suffix}"
 
         self.lambda_role = Role(
             self,
@@ -82,7 +83,7 @@ class GuestBffStack(Stack):
             memory_size=512,
             environment={
                 "GUEST_BFF_ENV": self.env_name,
-                "EVENT_BUS_NAME": "hotel-event-bus",
+                "EVENT_BUS_NAME": self.bus_name,
                 "AUDIENCE": self.audience,
                 "JWKS_URL": self.jwks_url,
                 "PLACE_INDEX_NAME": "HotelManagementPlaceIndex",
@@ -112,7 +113,7 @@ class GuestBffStack(Stack):
             },
         )
 
-        event_bus = EventBus.from_event_bus_name(self, "SharedEventBus", "hotel-event-bus")
+        event_bus = EventBus.from_event_bus_name(self, "SharedEventBus", self.bus_name)
         event_bus.grant_put_events_to(self.lambda_function)  # type: ignore
 
         self.lambda_function.add_to_role_policy(

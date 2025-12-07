@@ -13,6 +13,8 @@ class HostBffStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, env_name: str, pr_number: str | None = None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
         self.env_name = env_name
+        suffix = f"-{pr_number}" if pr_number else ""
+        self.bus_name = f"hotel-event-bus-{env_name}{suffix}"
 
         self.lambda_role = Role(
             self, f"HostBffLambdaRole-{env_name}{f'-{pr_number}' if pr_number else ''}",
@@ -45,6 +47,7 @@ class HostBffStack(Stack):
                 "AUDIENCE": self.audience,
                 "JWKS_URL": self.jwks_url,
                 "PLACE_INDEX_NAME": "HotelManagementPlaceIndex",
+                "EVENT_BUS_NAME": self.bus_name,
             }
         )
 
@@ -106,6 +109,9 @@ class HostBffStack(Stack):
         me = self.gateway.root.add_resource("me")
         me.add_method("GET", integration)
         me.add_method("PATCH", integration)
+
+        event_bus = EventBus.from_event_bus_name(self, "SharedEventBus", self.bus_name)
+        event_bus.grant_put_events_to(self.lambda_function)  # type: ignore
         
         self.lambda_function.add_to_role_policy(PolicyStatement(
             actions=["geo:SearchPlaceIndexForText"],

@@ -16,12 +16,11 @@ class NotificationServiceStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
         self.env_name = env_name
 
-        # Create (or own) the shared event bus if it does not already exist.
-        # Using a stable name lets other stacks publish to the same bus.
+        bus_name_suffix = f"-{pr_number}" if pr_number else ""
         self.event_bus = EventBus(
             self,
             "SharedEventBus",
-            event_bus_name="hotel-event-bus",
+            event_bus_name=f"hotel-event-bus-{env_name}{bus_name_suffix}",
         )
 
         self.lambda_function = Function(
